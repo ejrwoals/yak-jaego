@@ -1,0 +1,10 @@
+/data
+/trash
+*.html
+*.csv
+.DS_Store
+
+# Claude Code files
+CLAUDE.md
+.claude/
+.anthropic/
