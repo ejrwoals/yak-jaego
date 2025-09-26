@@ -3,6 +3,7 @@
 *.html
 *.csv
 .DS_Store
+__pycache__/
 
 # Claude Code files
 CLAUDE.md

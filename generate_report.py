@@ -469,13 +469,32 @@ def analyze_runway(df):
         pass
     return None, None
 
-# 메인 실행 코드
-if __name__ == "__main__":
+def create_and_save_report(df, m, open_browser=True):
+    """보고서를 생성하고 파일로 저장하는 함수"""
+    # HTML 보고서 생성
+    html_content = generate_html_report(df, m)
+
+    # 파일로 저장
+    output_path = f'inventory_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+    print(f"\n✅ 보고서가 생성되었습니다: {output_path}")
+
+    # 브라우저에서 자동으로 열기
+    if open_browser:
+        import webbrowser
+        webbrowser.open(f'file://{os.path.abspath(output_path)}')
+
+    return output_path
+
+def main():
+    """메인 함수 - 직접 실행시에만 동작"""
     # CSV 파일 읽기
     csv_path = 'processed_inventory.csv'
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
-        
+
         # 사용자에게 데이터 기간 물어보기
         while True:
             try:
@@ -484,20 +503,13 @@ if __name__ == "__main__":
                     break
             except ValueError:
                 print("올바른 숫자를 입력해주세요.")
-        
-        # HTML 보고서 생성
-        html_content = generate_html_report(df, m)
-        
-        # 파일로 저장
-        output_path = f'inventory_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        print(f"\n✅ 보고서가 생성되었습니다: {output_path}")
-        
-        # 브라우저에서 자동으로 열기
-        import webbrowser
-        webbrowser.open(f'file://{os.path.abspath(output_path)}')
+
+        # 보고서 생성 및 저장
+        create_and_save_report(df, m)
+
     else:
         print(f"❌ {csv_path} 파일을 찾을 수 없습니다.")
         print("먼저 read_excel.py를 실행하여 CSV 파일을 생성해주세요.")
+
+if __name__ == "__main__":
+    main()
