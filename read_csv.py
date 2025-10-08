@@ -1,6 +1,8 @@
 import pandas as pd
 import os
 import sys
+import re
+from datetime import datetime
 
 def select_file_from_directory(directory='data'):
     """디렉토리에서 파일을 선택하는 함수"""
@@ -81,6 +83,197 @@ def read_csv_file(file_path):
             return read_csv_file(new_file)
 
     raise Exception("CSV 파일을 읽을 수 없습니다")
+
+def extract_month_from_file(filename):
+    """파일명에서 날짜 정보 추출 (예: 2025-01.csv, 202501.csv, 2025_01.csv 등)"""
+    patterns = [
+        r'(\d{4})[-_]?(\d{2})',  # 2025-01, 202501, 2025_01
+        r'(\d{4})년\s*(\d{1,2})월',  # 2025년 1월
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, filename)
+        if match:
+            year, month = match.groups()
+            return f"{year}-{month.zfill(2)}"
+
+    return None
+
+def load_multiple_csv_files(directory='data'):
+    """여러 CSV 파일을 읽어 월별 데이터로 구성"""
+    if not os.path.exists(directory):
+        print(f"'{directory}' 디렉토리가 존재하지 않습니다.")
+        return None
+
+    files = sorted([f for f in os.listdir(directory) if f.endswith('.csv')])
+
+    if not files:
+        print(f"'{directory}' 디렉토리에 CSV 파일이 없습니다.")
+        return None
+
+    print(f"\n'{directory}' 디렉토리에서 {len(files)}개의 CSV 파일을 발견했습니다.")
+
+    monthly_data = {}
+
+    for file in files:
+        month = extract_month_from_file(file)
+        if month:
+            file_path = os.path.join(directory, file)
+            print(f"읽는 중: {file} → {month}")
+
+            # CSV 파일 읽기 (여러 인코딩 시도)
+            df = None
+            for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                try:
+                    df = pd.read_csv(file_path, encoding=encoding)
+                    break
+                except:
+                    continue
+
+            if df is not None:
+                monthly_data[month] = df
+                print(f"  ✅ 성공: {len(df)}개 행")
+            else:
+                print(f"  ⚠️ 실패: {file}")
+        else:
+            print(f"⚠️ 날짜 정보를 추출할 수 없습니다: {file}")
+
+    if not monthly_data:
+        print("읽을 수 있는 월별 데이터가 없습니다.")
+        return None
+
+    print(f"\n총 {len(monthly_data)}개월의 데이터를 로드했습니다.")
+    return monthly_data
+
+def merge_by_drug_code(monthly_data):
+    """약품코드 기준으로 월별 데이터 통합"""
+    if not monthly_data:
+        return None
+
+    print("\n약품코드 기준으로 데이터 통합 중...")
+
+    # 모든 약품코드 수집
+    all_drug_codes = set()
+    for month, df in monthly_data.items():
+        if '약품코드' in df.columns:
+            # 약품코드를 string으로 변환 (float 형태의 .0 제거)
+            df['약품코드'] = df['약품코드'].astype(str).str.strip()
+            # .0으로 끝나는 경우 제거 (예: "673400030.0" → "673400030")
+            df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
+            all_drug_codes.update(df['약품코드'].unique())
+
+    print(f"총 {len(all_drug_codes)}개의 약품 발견")
+
+    # 월 리스트 (시간순 정렬)
+    months = sorted(monthly_data.keys())
+
+    # 결과 데이터프레임 구축
+    result_rows = []
+
+    for drug_code in all_drug_codes:
+        row_data = {
+            '약품코드': drug_code,
+            '약품명': None,
+            '제약회사': None,
+            '최종_재고수량': 0
+        }
+
+        monthly_quantities = []
+
+        for month in months:
+            df = monthly_data[month]
+            if '약품코드' not in df.columns:
+                continue
+
+            # 해당 약품코드 찾기 (float 형태의 .0 제거)
+            df['약품코드'] = df['약품코드'].astype(str).str.strip()
+            df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
+            drug_row = df[df['약품코드'] == drug_code]
+
+            if not drug_row.empty:
+                drug_row = drug_row.iloc[0]
+
+                # 기본 정보 업데이트 (처음 발견시)
+                if row_data['약품명'] is None:
+                    row_data['약품명'] = drug_row.get('약품명', '')
+                    row_data['제약회사'] = drug_row.get('제약회사', '')
+
+                # 조제수량 추출
+                if '조제수량' in drug_row:
+                    qty = str(drug_row['조제수량']).replace(',', '').replace('-', '0')
+                    qty = pd.to_numeric(qty, errors='coerce')
+                    if pd.notna(qty):
+                        monthly_quantities.append(qty)
+                        row_data[f'{month}_조제수량'] = qty
+                    else:
+                        row_data[f'{month}_조제수량'] = 0
+                        monthly_quantities.append(0)
+                else:
+                    row_data[f'{month}_조제수량'] = 0
+                    monthly_quantities.append(0)
+
+                # 마지막 월의 재고수량 저장
+                if month == months[-1] and '재고수량' in drug_row:
+                    stock = str(drug_row['재고수량']).replace(',', '').replace('-', '0')
+                    stock = pd.to_numeric(stock, errors='coerce')
+                    row_data['최종_재고수량'] = stock if pd.notna(stock) else 0
+            else:
+                row_data[f'{month}_조제수량'] = 0
+                monthly_quantities.append(0)
+
+        # 시계열 데이터 저장 (리스트 형태)
+        row_data['월별_조제수량_리스트'] = monthly_quantities
+
+        result_rows.append(row_data)
+
+    result_df = pd.DataFrame(result_rows)
+    print(f"통합 완료: {len(result_df)}개 약품")
+
+    return result_df, months
+
+def calculate_statistics(df, months):
+    """통계 계산: 월평균, 3개월 이동평균, 런웨이"""
+    print("\n통계 계산 중...")
+
+    # 월평균 조제수량
+    df['월평균_조제수량'] = df['월별_조제수량_리스트'].apply(
+        lambda x: sum(x) / len(x) if len(x) > 0 else 0
+    )
+
+    # 3개월 이동평균 계산
+    def calculate_ma3(quantities):
+        if len(quantities) < 3:
+            return [None] * len(quantities)
+
+        ma3 = []
+        for i in range(len(quantities)):
+            if i < 2:
+                ma3.append(None)
+            else:
+                ma3.append(sum(quantities[i-2:i+1]) / 3)
+
+        return ma3
+
+    df['3개월_이동평균_리스트'] = df['월별_조제수량_리스트'].apply(calculate_ma3)
+
+    # 런웨이 계산
+    def calculate_runway(row):
+        if row['월평균_조제수량'] == 0:
+            return '재고만 있음'
+
+        runway_months = row['최종_재고수량'] / row['월평균_조제수량']
+
+        if runway_months >= 1:
+            return f"{runway_months:.2f}개월"
+        else:
+            runway_days = runway_months * 30.417
+            return f"{runway_days:.2f}일"
+
+    df['런웨이'] = df.apply(calculate_runway, axis=1)
+
+    print("통계 계산 완료")
+
+    return df
 
 def process_inventory_data(df_all, m):
     """재고 데이터를 처리하고 분석하는 함수"""
