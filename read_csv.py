@@ -195,8 +195,14 @@ def merge_by_drug_code(monthly_data):
 
                 # 기본 정보 업데이트 (처음 발견시)
                 if row_data['약품명'] is None:
-                    row_data['약품명'] = drug_row.get('약품명', '')
-                    row_data['제약회사'] = drug_row.get('제약회사', '')
+                    # 약품코드가 'nan'인 경우 = 전체 합계 행
+                    if drug_code == 'nan':
+                        row_data['약품명'] = '전체 합계'
+                        row_data['제약회사'] = '-'
+                        row_data['약품코드'] = 'TOTAL'
+                    else:
+                        row_data['약품명'] = drug_row.get('약품명', '')
+                        row_data['제약회사'] = drug_row.get('제약회사', '')
 
                 # 조제수량 추출
                 if '조제수량' in drug_row:

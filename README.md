@@ -29,8 +29,8 @@
 
 1. **저장소 클론**
    ```bash
-   git clone https://github.com/yourusername/jaego.git
-   cd jaego
+   git clone https://github.com/ejrwoals/yak-jaego.git
+   cd yak-jaego
    ```
 
 2. **가상환경 설정 (권장)**
@@ -120,7 +120,7 @@ python generate_report.py
 ## 📁 프로젝트 구조
 
 ```
-jaego/
+yak-jaego/
 ├── data/                          # 입력 CSV 데이터 폴더
 │   ├── 2023-09.csv                # 2023년 9월 데이터
 │   ├── 2023-10.csv                # 2023년 10월 데이터

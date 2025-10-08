@@ -328,8 +328,11 @@ def generate_html_report(df, months):
                     <tbody>
     """
 
+    # 월평균 조제수량 기준 내림차순 정렬
+    df_sorted = df.sort_values('월평균_조제수량', ascending=False).reset_index(drop=True)
+
     # 데이터 행 추가 + 경량 스파크라인 생성
-    for idx, row in df.iterrows():
+    for idx, row in df_sorted.iterrows():
         runway_class = get_runway_class(row['런웨이'])
 
         # 경량 SVG 스파크라인 생성
@@ -412,7 +415,13 @@ def generate_html_report(df, months):
                 const chartData = JSON.parse(row.getAttribute('data-chart-data'));
 
                 // Plotly 차트 생성
-                const ma3Clean = chartData.ma3.map(v => v !== null ? v : 0);
+                // null은 그대로 유지 (처음 2개월은 표시 안 함)
+                const ma3Clean = chartData.ma3;
+
+                // 최대값 찾기
+                const maxValue = Math.max(...chartData.timeseries);
+                const maxIndex = chartData.timeseries.indexOf(maxValue);
+                const maxMonth = chartData.months[maxIndex];
 
                 const traces = [
                     {
@@ -420,7 +429,7 @@ def generate_html_report(df, months):
                         y: chartData.timeseries,
                         mode: 'lines+markers',
                         name: '실제 조제수량',
-                        line: {color: 'black', width: 2},
+                        line: {color: 'black', width: 2, dash: 'dot'},
                         marker: {size: 8, color: 'black'}
                     },
                     {
@@ -458,19 +467,38 @@ def generate_html_report(df, months):
                         y0: chartData.avg,
                         y1: chartData.avg,
                         line: {
-                            color: 'gray',
+                            color: 'green',
                             width: 2,
                             dash: 'dash'
                         }
                     }],
-                    annotations: [{
-                        x: chartData.months[chartData.months.length - 1],
-                        y: chartData.avg,
-                        text: '평균: ' + chartData.avg.toFixed(1),
-                        showarrow: false,
-                        xanchor: 'left',
-                        xshift: 10
-                    }]
+                    annotations: [
+                        {
+                            x: chartData.months[chartData.months.length - 1],
+                            y: chartData.avg,
+                            text: '평균: ' + chartData.avg.toFixed(1),
+                            showarrow: false,
+                            xanchor: 'left',
+                            xshift: 10
+                        },
+                        {
+                            x: maxMonth,
+                            y: maxValue,
+                            text: '최대: ' + maxValue.toFixed(0),
+                            showarrow: true,
+                            arrowhead: 2,
+                            arrowsize: 1,
+                            arrowwidth: 2,
+                            arrowcolor: 'red',
+                            ax: 0,
+                            ay: -40,
+                            bgcolor: 'rgba(255, 255, 255, 0.9)',
+                            bordercolor: 'red',
+                            borderwidth: 2,
+                            borderpad: 4,
+                            font: {color: 'red', size: 12, weight: 'bold'}
+                        }
+                    ]
                 };
 
                 Plotly.newPlot(chartContainer, traces, layout, {displayModeBar: true});
