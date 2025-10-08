@@ -17,12 +17,13 @@ import sys
 # 로컬 모듈 import
 from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
 from generate_report import create_and_save_report
+from drug_order_calculator import run as run_order_calculator
 
 
-def main():
-    """메인 워크플로우 함수"""
+def run_timeseries_analysis():
+    """시계열 분석 워크플로우"""
     print("=" * 60)
-    print("📊 Jaego - 약국 재고 관리 및 분석 시스템 (시계열 분석)")
+    print("📊 약국 재고 관리 및 분석 시스템 (시계열 분석)")
     print("=" * 60)
     print()
 
@@ -85,6 +86,68 @@ def main():
         print("2. data/ 폴더에 파일이 있는지 확인")
         print("3. 필요한 Python 패키지가 설치되어 있는지 확인")
         sys.exit(1)
+
+
+def run_order_calculation():
+    """주문 수량 산출 워크플로우"""
+    print("=" * 60)
+    print("📦 약 주문 수량 산출 시스템")
+    print("=" * 60)
+    print()
+
+    try:
+        run_order_calculator()
+    except KeyboardInterrupt:
+        print("\n\n⚠️ 사용자에 의해 프로그램이 중단되었습니다.")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n❌ 오류가 발생했습니다: {e}")
+        sys.exit(1)
+
+
+def show_menu():
+    """워크플로우 선택 메뉴 출력"""
+    print("\n" + "=" * 60)
+    print("🏥 Jaego - 약국 재고 관리 시스템")
+    print("=" * 60)
+    print("\n사용 가능한 워크플로우:")
+    print("  1. 약국 재고 관리 및 분석 시스템 (시계열 분석)")
+    print("  2. 약 주문 수량 산출 시스템")
+    print("  0. 종료")
+    print("\n" + "=" * 60)
+
+
+def get_user_choice():
+    """사용자 선택 입력 받기"""
+    while True:
+        try:
+            choice = input("\n실행할 워크플로우 번호를 입력하세요: ").strip()
+            if choice in ['0', '1', '2']:
+                return choice
+            else:
+                print("❌ 잘못된 입력입니다. 0, 1, 2 중 하나를 입력해주세요.")
+        except EOFError:
+            print("\n\n⚠️ 입력이 중단되었습니다.")
+            sys.exit(0)
+
+
+def main():
+    """메인 함수 - 워크플로우 선택 및 실행"""
+    try:
+        show_menu()
+        choice = get_user_choice()
+
+        if choice == '0':
+            print("\n👋 프로그램을 종료합니다.")
+            sys.exit(0)
+        elif choice == '1':
+            run_timeseries_analysis()
+        elif choice == '2':
+            run_order_calculation()
+
+    except KeyboardInterrupt:
+        print("\n\n⚠️ 사용자에 의해 프로그램이 중단되었습니다.")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

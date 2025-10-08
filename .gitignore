@@ -1,5 +1,7 @@
 /data
 /trash
+/order_calc_reports
+
 *.html
 *.csv
 .DS_Store
