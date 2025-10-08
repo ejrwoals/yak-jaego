@@ -152,7 +152,7 @@ def merge_by_drug_code(monthly_data):
 
     print("\n약품코드 기준으로 데이터 통합 중...")
 
-    # 모든 약품코드 수집
+    # 모든 약품코드 수집 (NaN 제외)
     all_drug_codes = set()
     for month, df in monthly_data.items():
         if '약품코드' in df.columns:
@@ -160,7 +160,9 @@ def merge_by_drug_code(monthly_data):
             df['약품코드'] = df['약품코드'].astype(str).str.strip()
             # .0으로 끝나는 경우 제거 (예: "673400030.0" → "673400030")
             df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
-            all_drug_codes.update(df['약품코드'].unique())
+            # 'nan' 제외하고 수집
+            codes = df['약품코드'].unique()
+            all_drug_codes.update([code for code in codes if code != 'nan'])
 
     print(f"총 {len(all_drug_codes)}개의 약품 발견")
 
@@ -175,10 +177,13 @@ def merge_by_drug_code(monthly_data):
             '약품코드': drug_code,
             '약품명': None,
             '제약회사': None,
-            '최종_재고수량': 0
+            '최종_재고수량': None  # None으로 초기화 (아직 채택 안 됨)
         }
 
         monthly_quantities = []
+
+        # 최신순으로 순회하며 재고수량 찾기 위해 역순 리스트 생성
+        months_reversed = list(reversed(months))
 
         for month in months:
             df = monthly_data[month]
@@ -195,14 +200,8 @@ def merge_by_drug_code(monthly_data):
 
                 # 기본 정보 업데이트 (처음 발견시)
                 if row_data['약품명'] is None:
-                    # 약품코드가 'nan'인 경우 = 전체 합계 행
-                    if drug_code == 'nan':
-                        row_data['약품명'] = '전체 합계'
-                        row_data['제약회사'] = '-'
-                        row_data['약품코드'] = 'TOTAL'
-                    else:
-                        row_data['약품명'] = drug_row.get('약품명', '')
-                        row_data['제약회사'] = drug_row.get('제약회사', '')
+                    row_data['약품명'] = drug_row.get('약품명', '')
+                    row_data['제약회사'] = drug_row.get('제약회사', '')
 
                 # 조제수량 추출
                 if '조제수량' in drug_row:
@@ -218,14 +217,39 @@ def merge_by_drug_code(monthly_data):
                     row_data[f'{month}_조제수량'] = 0
                     monthly_quantities.append(0)
 
-                # 마지막 월의 재고수량 저장
-                if month == months[-1] and '재고수량' in drug_row:
+                # 재고수량 처리: 아직 채택되지 않았고, 현재 행에 유효한 재고가 있으면 채택
+                if row_data['최종_재고수량'] is None and '재고수량' in drug_row:
                     stock = str(drug_row['재고수량']).replace(',', '').replace('-', '0')
                     stock = pd.to_numeric(stock, errors='coerce')
-                    row_data['최종_재고수량'] = stock if pd.notna(stock) else 0
+                    # 유효한 재고 (not NaN and > 0)만 채택
+                    if pd.notna(stock) and stock > 0:
+                        row_data['최종_재고수량'] = stock
             else:
                 row_data[f'{month}_조제수량'] = 0
                 monthly_quantities.append(0)
+
+        # 최신순으로 재고수량 검색 (이미 채택 안 되었으면)
+        if row_data['최종_재고수량'] is None:
+            for month in months_reversed:
+                df = monthly_data[month]
+                if '약품코드' not in df.columns:
+                    continue
+
+                df['약품코드'] = df['약품코드'].astype(str).str.strip()
+                df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
+                drug_row = df[df['약품코드'] == drug_code]
+
+                if not drug_row.empty and '재고수량' in drug_row.columns:
+                    drug_row = drug_row.iloc[0]
+                    stock = str(drug_row['재고수량']).replace(',', '').replace('-', '0')
+                    stock = pd.to_numeric(stock, errors='coerce')
+                    if pd.notna(stock) and stock > 0:
+                        row_data['최종_재고수량'] = stock
+                        break  # 가장 최신의 유효한 재고를 찾았으므로 중단
+
+        # 여전히 None이면 0으로 설정
+        if row_data['최종_재고수량'] is None:
+            row_data['최종_재고수량'] = 0
 
         # 시계열 데이터 저장 (리스트 형태)
         row_data['월별_조제수량_리스트'] = monthly_quantities

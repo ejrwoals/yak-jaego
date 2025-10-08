@@ -158,16 +158,28 @@ def generate_html_report(df, months):
                 position: sticky;
                 top: 0;
             }}
+            th.runway-header {{
+                background: #5a6570;
+            }}
             td {{
                 padding: 10px 12px;
                 border-bottom: 1px solid #e2e8f0;
             }}
+            td.runway-cell {{
+                background: #f5f5f5;
+            }}
             tr:hover {{
-                background: #f7fafc;
+                background: rgba(247, 250, 252, 0.8);
+            }}
+            tr:hover td.runway-cell {{
+                background: rgba(245, 245, 245, 0.9);
             }}
             .warning {{
-                background: #fff5f5;
+                background: rgba(255, 245, 245, 0.7);
                 color: #c53030;
+            }}
+            .warning td.runway-cell {{
+                background: rgba(245, 245, 245, 0.9);
             }}
             .good {{
                 background: #f0fff4;
@@ -321,7 +333,9 @@ def generate_html_report(df, months):
                             <th>약품코드</th>
                             <th>재고수량</th>
                             <th>월평균 조제수량</th>
-                            <th>런웨이</th>
+                            <th class="runway-header">런웨이</th>
+                            <th>3개월 이동평균</th>
+                            <th class="runway-header">3-MA 런웨이</th>
                             <th>트렌드</th>
                         </tr>
                     </thead>
@@ -340,6 +354,23 @@ def generate_html_report(df, months):
         ma3 = row['3개월_이동평균_리스트']
         sparkline_html = create_sparkline_svg(timeseries, ma3)
 
+        # 3개월 이동평균 (최신값)
+        latest_ma3 = None
+        for val in reversed(ma3):
+            if val is not None:
+                latest_ma3 = val
+                break
+
+        # 3-MA 런웨이 계산
+        ma3_runway_display = "N/A"
+        if latest_ma3 and latest_ma3 > 0:
+            ma3_runway_months = row['최종_재고수량'] / latest_ma3
+            if ma3_runway_months >= 1:
+                ma3_runway_display = f"{ma3_runway_months:.2f}개월"
+            else:
+                ma3_runway_days = ma3_runway_months * 30.417
+                ma3_runway_display = f"{ma3_runway_days:.2f}일"
+
         # 차트 데이터를 JSON으로 변환 (모달에서 사용)
         chart_data_json = create_chart_data_json(
             months=months,
@@ -352,23 +383,76 @@ def generate_html_report(df, months):
 
         modal_id = f"modal_{idx}"
 
+        # 약품명 30자 제한
+        drug_name_display = row['약품명']
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사']
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
         html_content += f"""
                         <tr class="{runway_class} clickable-row" onclick="openModalWithChart('{modal_id}', {idx})" data-chart-data='{chart_data_json}'>
-                            <td>{row['약품명']}</td>
-                            <td>{row['제약회사']}</td>
+                            <td>{drug_name_display}</td>
+                            <td>{company_display}</td>
                             <td>{row['약품코드']}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
                             <td>{row['월평균_조제수량']:.2f}</td>
-                            <td>{row['런웨이']}</td>
+                            <td class="runway-cell">{row['런웨이']}</td>
+                            <td>{"N/A" if latest_ma3 is None else f"{latest_ma3:.2f}"}</td>
+                            <td class="runway-cell">{ma3_runway_display}</td>
                             <td>{sparkline_html}</td>
                         </tr>
         """
+
+        # 3개월 이동평균 (최신값)
+        ma3_list = row['3개월_이동평균_리스트']
+        latest_ma3 = None
+        for val in reversed(ma3_list):
+            if val is not None:
+                latest_ma3 = val
+                break
+
+        # 3-MA 런웨이 계산
+        ma3_runway = "N/A"
+        if latest_ma3 and latest_ma3 > 0:
+            ma3_runway_months = row['최종_재고수량'] / latest_ma3
+            if ma3_runway_months >= 1:
+                ma3_runway = f"{ma3_runway_months:.2f}개월"
+            else:
+                ma3_runway_days = ma3_runway_months * 30.417
+                ma3_runway = f"{ma3_runway_days:.2f}일"
 
         # 빈 모달 컨테이너 (차트는 클릭시 동적 생성)
         html_content += f"""
                         <div id="{modal_id}" class="modal">
                             <div class="modal-content">
                                 <span class="close-btn" onclick="closeModal('{modal_id}')">&times;</span>
+                                <h2 style="margin-bottom: 20px;">{row['약품명']} ({row['약품코드']})</h2>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px;">
+                                    <div style="background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); color: #2d3748; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;">재고수량</h4>
+                                        <div style="font-size: 1.8em; font-weight: bold;">{row['최종_재고수량']:,.0f}개</div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); color: #2d3748; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;">월평균 조제수량</h4>
+                                        <div style="font-size: 1.8em; font-weight: bold;">{row['월평균_조제수량']:.1f}개</div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.9;">런웨이</h4>
+                                        <div style="font-size: 1.8em; font-weight: bold;">{row['런웨이']}</div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); color: #2d3748; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;">3개월 이동평균</h4>
+                                        <div style="font-size: 1.8em; font-weight: bold;">{"N/A" if latest_ma3 is None else f"{latest_ma3:.1f}개"}</div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.9;">3-MA 런웨이</h4>
+                                        <div style="font-size: 1.8em; font-weight: bold;">{ma3_runway}</div>
+                                    </div>
+                                </div>
                                 <div id="chart-container-{idx}" style="width:100%;height:500px;"></div>
                             </div>
                         </div>
