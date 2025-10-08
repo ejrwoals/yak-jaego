@@ -522,8 +522,67 @@ def generate_html_report(df, months):
                         mode: 'lines',
                         name: '3개월 이동평균',
                         line: {color: 'orange', width: 3}
+                    },
+                    {
+                        x: [chartData.months[0]],
+                        y: [null],
+                        mode: 'markers',
+                        name: '겨울철 (10-2월)',
+                        marker: {size: 15, color: 'rgba(135, 206, 250, 0.5)', symbol: 'square'},
+                        showlegend: true
                     }
                 ];
+
+                // 겨울철 배경 영역 생성 (10, 11, 12, 1, 2월)
+                const winterShapes = [];
+
+                // 겨울철 월 확인 함수
+                function isWinterMonth(month) {
+                    const monthNum = parseInt(month.split('-')[1]);
+                    return monthNum === 10 || monthNum === 11 || monthNum === 12 || monthNum === 1 || monthNum === 2;
+                }
+
+                // 연속된 겨울철 구간 찾기
+                let winterStart = null;
+                for (let i = 0; i < chartData.months.length; i++) {
+                    const isWinter = isWinterMonth(chartData.months[i]);
+
+                    if (isWinter && winterStart === null) {
+                        // 겨울철 시작
+                        winterStart = i;
+                    } else if (!isWinter && winterStart !== null) {
+                        // 겨울철 끝
+                        winterShapes.push({
+                            type: 'rect',
+                            xref: 'x',
+                            yref: 'paper',
+                            x0: chartData.months[winterStart],
+                            x1: chartData.months[i - 1],
+                            y0: 0,
+                            y1: 1,
+                            fillcolor: 'rgba(135, 206, 250, 0.2)',
+                            line: {width: 0},
+                            layer: 'below'
+                        });
+                        winterStart = null;
+                    }
+                }
+
+                // 마지막이 겨울철인 경우
+                if (winterStart !== null) {
+                    winterShapes.push({
+                        type: 'rect',
+                        xref: 'x',
+                        yref: 'paper',
+                        x0: chartData.months[winterStart],
+                        x1: chartData.months[chartData.months.length - 1],
+                        y0: 0,
+                        y1: 1,
+                        fillcolor: 'rgba(135, 206, 250, 0.2)',
+                        line: {width: 0},
+                        layer: 'below'
+                    });
+                }
 
                 const layout = {
                     title: chartData.drug_name + ' (' + chartData.drug_code + ') 월별 조제수량 추이',
@@ -544,18 +603,21 @@ def generate_html_report(df, months):
                     plot_bgcolor: 'white',
                     paper_bgcolor: 'white',
                     font: {size: 12},
-                    shapes: [{
-                        type: 'line',
-                        x0: chartData.months[0],
-                        x1: chartData.months[chartData.months.length - 1],
-                        y0: chartData.avg,
-                        y1: chartData.avg,
-                        line: {
-                            color: 'green',
-                            width: 2,
-                            dash: 'dash'
+                    shapes: [
+                        ...winterShapes,
+                        {
+                            type: 'line',
+                            x0: chartData.months[0],
+                            x1: chartData.months[chartData.months.length - 1],
+                            y0: chartData.avg,
+                            y1: chartData.avg,
+                            line: {
+                                color: 'green',
+                                width: 2,
+                                dash: 'dash'
+                            }
                         }
-                    }],
+                    ],
                     annotations: [
                         {
                             x: chartData.months[chartData.months.length - 1],
