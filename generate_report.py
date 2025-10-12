@@ -253,6 +253,42 @@ def generate_html_report(df, months):
             .clickable-row:hover {{
                 background: #edf2f7 !important;
             }}
+            .toggle-header {{
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+                user-select: none;
+                background: rgba(255, 255, 255, 0.5);
+                border-radius: 10px;
+                transition: background 0.3s ease;
+            }}
+            .toggle-header:hover {{
+                background: rgba(230, 230, 250, 0.7);
+            }}
+            .toggle-icon {{
+                font-size: 1.8em;
+                font-weight: bold;
+                transition: transform 0.3s ease;
+                display: inline-block;
+                color: #667eea;
+                min-width: 30px;
+                text-align: center;
+            }}
+            .toggle-icon.collapsed {{
+                transform: rotate(-90deg);
+            }}
+            .toggle-content {{
+                max-height: 10000px;
+                overflow: hidden;
+                transition: max-height 0.3s ease, opacity 0.3s ease;
+                opacity: 1;
+            }}
+            .toggle-content.collapsed {{
+                max-height: 0;
+                opacity: 0;
+            }}
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
@@ -286,15 +322,20 @@ def generate_html_report(df, months):
     if runtime_analysis_low:
         html_content += f"""
             <div class="chart-container">
-                <h2>⚠️ 재고 부족 약품 (런웨이 3개월 이하)</h2>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <div>
-                        <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
-                        <span id="page-info-low" style="margin: 0 20px;"></span>
-                        <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
-                    </div>
+                <div class="toggle-header" onclick="toggleSection('low-runway-section')">
+                    <h2 style="margin: 0;">⚠️ 재고 부족 약품 (런웨이 3개월 이하)</h2>
+                    <span class="toggle-icon collapsed" id="toggle-icon-low-runway-section">▼</span>
                 </div>
-                <div id="runway-chart-low"></div>
+                <div id="low-runway-section" class="toggle-content collapsed">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
+                            <span id="page-info-low" style="margin: 0 20px;"></span>
+                            <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
+                        </div>
+                    </div>
+                    <div id="runway-chart-low"></div>
+                </div>
             </div>
             <script>
                 {runtime_analysis_low}
@@ -304,15 +345,20 @@ def generate_html_report(df, months):
     if runtime_analysis_high:
         html_content += f"""
             <div class="chart-container">
-                <h2>✅ 재고 충분 약품 (런웨이 3개월 초과)</h2>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <div>
-                        <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
-                        <span id="page-info-high" style="margin: 0 20px;"></span>
-                        <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
-                    </div>
+                <div class="toggle-header" onclick="toggleSection('high-runway-section')">
+                    <h2 style="margin: 0;">✅ 재고 충분 약품 (런웨이 3개월 초과)</h2>
+                    <span class="toggle-icon collapsed" id="toggle-icon-high-runway-section">▼</span>
                 </div>
-                <div id="runway-chart-high"></div>
+                <div id="high-runway-section" class="toggle-content collapsed">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
+                            <span id="page-info-high" style="margin: 0 20px;"></span>
+                            <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
+                        </div>
+                    </div>
+                    <div id="runway-chart-high"></div>
+                </div>
             </div>
             <script>
                 {runtime_analysis_high}
@@ -466,6 +512,15 @@ def generate_html_report(df, months):
         </div>
         
         <script>
+            // 토글 기능
+            function toggleSection(sectionId) {
+                const section = document.getElementById(sectionId);
+                const icon = document.getElementById('toggle-icon-' + sectionId);
+
+                section.classList.toggle('collapsed');
+                icon.classList.toggle('collapsed');
+            }
+
             // 검색 기능
             document.getElementById('searchInput').addEventListener('keyup', function() {
                 const searchValue = this.value.toLowerCase();
