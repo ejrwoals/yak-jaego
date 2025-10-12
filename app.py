@@ -28,6 +28,27 @@ def run_timeseries_analysis():
     print()
 
     try:
+        # Step 0: 보고서 유형 선택
+        print("📌 보고서 유형을 선택하세요:")
+        print("  1. 전문약 보고서 (조제수량 기준)")
+        print("  2. 일반약 보고서 (판매수량 기준)")
+        print()
+
+        while True:
+            choice = input("선택 (1 또는 2): ").strip()
+            if choice == '1':
+                mode = 'dispense'
+                mode_name = '전문약'
+                break
+            elif choice == '2':
+                mode = 'sale'
+                mode_name = '일반약'
+                break
+            else:
+                print("❌ 1 또는 2를 입력해주세요.")
+
+        print(f"\n✅ {mode_name} 보고서 모드로 진행합니다.\n")
+
         # Step 1: 월별 CSV 파일들 자동 로드
         print("🔍 Step 1: 월별 CSV 파일 자동 로드")
         print("-" * 30)
@@ -40,7 +61,7 @@ def run_timeseries_analysis():
         # Step 2: 약품코드 기준으로 데이터 통합
         print("\n🔗 Step 2: 약품코드 기준으로 데이터 통합")
         print("-" * 30)
-        df, months = merge_by_drug_code(monthly_data)
+        df, months = merge_by_drug_code(monthly_data, mode=mode)
 
         if df is None or df.empty:
             print("❌ 데이터 통합에 실패했습니다.")
@@ -54,7 +75,7 @@ def run_timeseries_analysis():
         # Step 4: CSV 저장 (자동으로 저장)
         print("\n💾 Step 4: 처리된 데이터 저장")
         print("-" * 30)
-        output_file = 'processed_inventory_timeseries.csv'
+        output_file = f'processed_inventory_{mode}.csv'
 
         # 리스트 컬럼을 문자열로 변환하여 저장
         df_to_save = df.copy()
@@ -66,7 +87,7 @@ def run_timeseries_analysis():
         # Step 5: HTML 보고서 생성
         print("\n📋 Step 5: HTML 보고서 생성")
         print("-" * 30)
-        report_path = create_and_save_report(df, months, open_browser=True)
+        report_path = create_and_save_report(df, months, mode=mode, open_browser=True)
 
         # 완료 메시지
         print("\n🎉 모든 작업이 완료되었습니다!")

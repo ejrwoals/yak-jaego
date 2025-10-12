@@ -145,12 +145,18 @@ def load_multiple_csv_files(directory='data'):
     print(f"\n총 {len(monthly_data)}개월의 데이터를 로드했습니다.")
     return monthly_data
 
-def merge_by_drug_code(monthly_data):
-    """약품코드 기준으로 월별 데이터 통합"""
+def merge_by_drug_code(monthly_data, mode='dispense'):
+    """약품코드 기준으로 월별 데이터 통합
+
+    Args:
+        monthly_data: 월별 데이터 딕셔너리
+        mode: 'dispense' (전문약, 조제수량만) 또는 'sale' (일반약, 판매수량만)
+    """
     if not monthly_data:
         return None
 
-    print("\n약품코드 기준으로 데이터 통합 중...")
+    mode_name = '조제수량 (전문약)' if mode == 'dispense' else '판매수량 (일반약)'
+    print(f"\n약품코드 기준으로 데이터 통합 중... (모드: {mode_name})")
 
     # 모든 약품코드 수집 (NaN 제외)
     all_drug_codes = set()
@@ -203,19 +209,26 @@ def merge_by_drug_code(monthly_data):
                     row_data['약품명'] = drug_row.get('약품명', '')
                     row_data['제약회사'] = drug_row.get('제약회사', '')
 
-                # 조제수량 추출
-                if '조제수량' in drug_row:
-                    qty = str(drug_row['조제수량']).replace(',', '').replace('-', '0')
-                    qty = pd.to_numeric(qty, errors='coerce')
-                    if pd.notna(qty):
-                        monthly_quantities.append(qty)
-                        row_data[f'{month}_조제수량'] = qty
-                    else:
-                        row_data[f'{month}_조제수량'] = 0
-                        monthly_quantities.append(0)
-                else:
-                    row_data[f'{month}_조제수량'] = 0
-                    monthly_quantities.append(0)
+                # mode에 따라 조제수량 또는 판매수량만 추출
+                qty = 0
+
+                if mode == 'dispense':
+                    # 전문약 모드: 조제수량만
+                    if '조제수량' in drug_row:
+                        dispense = str(drug_row['조제수량']).replace(',', '').replace('-', '0')
+                        qty = pd.to_numeric(dispense, errors='coerce')
+                        if pd.isna(qty):
+                            qty = 0
+                elif mode == 'sale':
+                    # 일반약 모드: 판매수량만
+                    if '판매수량' in drug_row:
+                        sale = str(drug_row['판매수량']).replace(',', '').replace('-', '0')
+                        qty = pd.to_numeric(sale, errors='coerce')
+                        if pd.isna(qty):
+                            qty = 0
+
+                monthly_quantities.append(qty)
+                row_data[f'{month}_조제수량'] = qty
 
                 # 재고수량 처리: 아직 채택되지 않았고, 현재 행에 유효한 재고가 있으면 채택
                 if row_data['최종_재고수량'] is None and '재고수량' in drug_row:
@@ -225,6 +238,7 @@ def merge_by_drug_code(monthly_data):
                     if pd.notna(stock) and stock > 0:
                         row_data['최종_재고수량'] = stock
             else:
+                # 해당 월에 데이터가 없는 경우
                 row_data[f'{month}_조제수량'] = 0
                 monthly_quantities.append(0)
 
@@ -257,7 +271,17 @@ def merge_by_drug_code(monthly_data):
         result_rows.append(row_data)
 
     result_df = pd.DataFrame(result_rows)
-    print(f"통합 완료: {len(result_df)}개 약품")
+    print(f"통합 완료: {len(result_df)}개 약품 (필터링 전)")
+
+    # 전체 기간 동안 소모량이 0인 약품 제외
+    before_count = len(result_df)
+    result_df = result_df[result_df['월별_조제수량_리스트'].apply(lambda x: sum(x) > 0)]
+    after_count = len(result_df)
+    filtered_count = before_count - after_count
+
+    mode_name = '조제수량' if mode == 'dispense' else '판매수량'
+    print(f"필터링 완료: 전체 기간 {mode_name}이 0인 {filtered_count}개 약품 제외")
+    print(f"최종 약품 수: {after_count}개")
 
     return result_df, months
 
@@ -305,8 +329,17 @@ def calculate_statistics(df, months):
 
     return df
 
-def process_inventory_data(df_all, m):
-    """재고 데이터를 처리하고 분석하는 함수"""
+def process_inventory_data(df_all, m, mode='dispense'):
+    """재고 데이터를 처리하고 분석하는 함수
+
+    Args:
+        df_all: 전체 데이터프레임
+        m: 개월 수
+        mode: 'dispense' (전문약, 조제수량만) 또는 'sale' (일반약, 판매수량만)
+    """
+
+    mode_name = '조제수량 (전문약)' if mode == 'dispense' else '판매수량 (일반약)'
+    print(f"재고 데이터 처리 중... (모드: {mode_name})")
 
     # 전체 컬럼 확인
     print("전체 컬럼 목록:")
@@ -314,7 +347,7 @@ def process_inventory_data(df_all, m):
     print("\n" + "="*50 + "\n")
 
     # 필요한 컬럼만 선택
-    required_columns = ['약품명', '제약회사', '약품코드', '재고수량', '조제수량']
+    required_columns = ['약품명', '제약회사', '약품코드', '재고수량', '조제수량', '판매수량']
 
     # 컬럼이 존재하는지 확인하고 선택
     available_columns = [col for col in required_columns if col in df_all.columns]
@@ -335,14 +368,21 @@ def process_inventory_data(df_all, m):
         print(f"\n선택된 컬럼: {available_columns}")
         print(f"데이터프레임 형태: {df.shape}")
 
-        # 월평균 조제수량 계산
-        if '조제수량' in df.columns:
-            # 조제수량을 숫자로 변환 (쉼표 제거 및 숫자 변환)
-            df['조제수량'] = df['조제수량'].astype(str).str.replace(',', '').replace('-', '0')
-            df['조제수량'] = pd.to_numeric(df['조제수량'], errors='coerce').fillna(0)
-
-            df['월평균_조제수량'] = df['조제수량'] / m
-            print(f"\n{m}개월 데이터를 기준으로 월평균 조제수량을 계산했습니다.")
+        # 월평균 소모량 계산 (mode에 따라 조제수량 또는 판매수량만)
+        if mode == 'dispense':
+            # 전문약 모드: 조제수량만
+            if '조제수량' in df.columns:
+                df['조제수량'] = df['조제수량'].astype(str).str.replace(',', '').replace('-', '0')
+                df['조제수량'] = pd.to_numeric(df['조제수량'], errors='coerce').fillna(0)
+                df['월평균_조제수량'] = df['조제수량'] / m
+                print(f"\n{m}개월 데이터를 기준으로 월평균 조제수량을 계산했습니다.")
+        elif mode == 'sale':
+            # 일반약 모드: 판매수량만
+            if '판매수량' in df.columns:
+                df['판매수량'] = df['판매수량'].astype(str).str.replace(',', '').replace('-', '0')
+                df['판매수량'] = pd.to_numeric(df['판매수량'], errors='coerce').fillna(0)
+                df['월평균_조제수량'] = df['판매수량'] / m
+                print(f"\n{m}개월 데이터를 기준으로 월평균 판매수량을 계산했습니다.")
 
             # 재고수량도 숫자로 변환
             if '재고수량' in df.columns:

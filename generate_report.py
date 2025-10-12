@@ -78,12 +78,20 @@ def create_chart_data_json(months, timeseries_data, ma3_data, avg, drug_name, dr
         'drug_code': str(drug_code)
     })
 
-def generate_html_report(df, months):
+def generate_html_report(df, months, mode='dispense'):
     """
     DataFrame을 HTML 보고서로 생성
     months: 월 리스트 (예: ['2025-01', '2025-02', ...])
+    mode: 'dispense' (전문약) 또는 'sale' (일반약)
     """
-    
+
+    # 모드에 따른 제목 설정
+    mode_titles = {
+        'dispense': '전문약 재고 관리 보고서',
+        'sale': '일반약 재고 관리 보고서'
+    }
+    report_title = mode_titles.get(mode, '약품 재고 관리 보고서')
+
     # HTML 템플릿 시작
     html_content = f"""
     <!DOCTYPE html>
@@ -91,7 +99,7 @@ def generate_html_report(df, months):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>재고 관리 보고서</title>
+        <title>{report_title}</title>
         <style>
             body {{
                 font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -294,7 +302,7 @@ def generate_html_report(df, months):
     </head>
     <body>
         <div class="container">
-            <h1>📊 약품 재고 관리 보고서</h1>
+            <h1>📊 {report_title}</h1>
             <div class="date">생성일: {datetime.now().strftime('%Y년 %m월 %d일 %H:%M')}</div>
             
             <div class="summary-grid">
@@ -940,19 +948,21 @@ def analyze_runway(df):
         pass
     return None, None
 
-def create_and_save_report(df, months, open_browser=True):
+def create_and_save_report(df, months, mode='dispense', open_browser=True):
     """보고서를 생성하고 파일로 저장하는 함수
 
     Args:
         df: DataFrame (시계열 데이터 포함)
         months: 월 리스트 또는 개월 수 (하위 호환성)
+        mode: 'dispense' (전문약) 또는 'sale' (일반약)
         open_browser: 브라우저에서 자동으로 열기 여부
     """
     # HTML 보고서 생성
-    html_content = generate_html_report(df, months)
+    html_content = generate_html_report(df, months, mode=mode)
 
-    # 파일로 저장
-    output_path = f'inventory_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
+    # 파일명에 모드 반영
+    mode_suffix = 'dispense' if mode == 'dispense' else 'sale'
+    output_path = f'inventory_report_{mode_suffix}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
 
