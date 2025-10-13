@@ -119,8 +119,8 @@ def merge_and_calculate(today_df, processed_df):
     result_df['런웨이'] = result_df['런웨이'].fillna(0)
     result_df['3-MA 런웨이'] = result_df['3-MA 런웨이'].fillna(0)
 
-    # 런웨이 기준 오름차순 정렬
-    result_df = result_df.sort_values('런웨이', ascending=True)
+    # 3-MA 런웨이 기준 오름차순 정렬
+    result_df = result_df.sort_values('3-MA 런웨이', ascending=True)
 
     print(f"✅ {len(result_df)}개 약품의 런웨이를 계산했습니다.")
 

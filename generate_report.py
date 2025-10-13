@@ -957,12 +957,18 @@ def create_and_save_report(df, months, mode='dispense', open_browser=True):
         mode: 'dispense' (전문약) 또는 'sale' (일반약)
         open_browser: 브라우저에서 자동으로 열기 여부
     """
+    # 출력 디렉토리 생성
+    output_dir = 'inventory_reports'
+    os.makedirs(output_dir, exist_ok=True)
+
     # HTML 보고서 생성
     html_content = generate_html_report(df, months, mode=mode)
 
     # 파일명에 모드 반영
     mode_suffix = 'dispense' if mode == 'dispense' else 'sale'
-    output_path = f'inventory_report_{mode_suffix}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
+    filename = f'inventory_report_{mode_suffix}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
+    output_path = os.path.join(output_dir, filename)
+
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
 
