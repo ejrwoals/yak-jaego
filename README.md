@@ -93,7 +93,7 @@
    - 루트 디렉토리에 `today.csv`로 저장
    - 필수 컬럼: `약품명`, `약품코드`, `제약회사`, `재고수량`
 
-2. **processed_inventory_timeseries.csv**:
+2. **processed_inventory.csv**:
    - 워크플로우 1을 먼저 실행하여 자동 생성
    - 과거 조제 패턴 데이터가 포함됨
 
@@ -140,14 +140,15 @@ python app.py
 - `inventory_report_dispense_YYYYMMDD_HHMMSS.html`: 전문약 시계열 분석 보고서
 - `inventory_report_sale_YYYYMMDD_HHMMSS.html`: 일반약 시계열 분석 보고서
 
-### 워크플로우 2: 주문 수량 산출 (NEW!)
+### 워크플로우 2: 주문 수량 산출
 
 **실행 전 요구사항:**
 - `today.csv`: 현재 재고 현황 파일
-- `processed_inventory_timeseries.csv`: 워크플로우 1을 먼저 실행하여 생성
+- `processed_inventory_dispense.csv`: 워크플로우 1을 먼저 실행하여 생성
+- `processed_inventory_sale.csv` : 워크플로우 1을 먼저 실행하여 생성
 
 **실행 과정:**
-1. 시계열 분석 데이터 로드 (`processed_inventory_timeseries.csv`)
+1. processed_inventory csv 파일 로드
 2. 오늘의 재고 데이터 로드 (`today.csv`)
 3. 데이터 병합 및 런웨이 계산
    - 월평균 조제수량 기반 런웨이
@@ -169,10 +170,10 @@ python app.py
 # 1. CSV 데이터 처리만
 python read_csv.py
 
-# 2. 시계열 보고서 생성만 (processed_inventory_timeseries.csv 필요)
+# 2. 시계열 보고서 생성만 (processed_inventory.csv 필요)
 python generate_report.py
 
-# 3. 주문 수량 산출만 (today.csv 및 processed_inventory_timeseries.csv 필요)
+# 3. 주문 수량 산출만 (today.csv 및 processed_inventory.csv 필요)
 python drug_order_calculator.py
 ```
 
@@ -247,7 +248,8 @@ yak-jaego/
 ├── drug_order_calculator.py       # 📦 주문 수량 산출 모듈 (NEW!)
 ├── requirements.txt               # Python 의존성 목록
 ├── today.csv                      # 현재 재고 현황 (워크플로우 2에 필요)
-├── processed_inventory_timeseries.csv  # 처리된 시계열 데이터 (생성됨)
+├── processed_inventory_dispense.csv  # 전문약 조제 데이터 (생성됨)
+├── processed_inventory_sale.csv   # 일반약 판매 데이터 (생성됨)
 ├── inventory_report_YYYYMMDD_HHMMSS.html  # 시계열 분석 보고서
 └── README.md                      # 프로젝트 문서
 ```
@@ -335,12 +337,12 @@ runway_months = 최종_재고수량 / 월평균_조제수량
 2. **런웨이 분석 차트**
    - 재고 부족 약품 (런웨이 3개월 이하) - 색상 그라디언트
 
-### drug_order_calculator.py - 주문 수량 산출 모듈 (NEW!)
+### drug_order_calculator.py - 주문 수량 산출 모듈
 
 #### 주요 기능:
 
 1. **데이터 로드 및 전처리**
-   - `processed_inventory_timeseries.csv`에서 과거 소비 패턴 로드
+   - `processed_inventory.csv`에서 과거 소모 패턴 로드
    - `today.csv`에서 현재 재고 현황 로드
    - numpy 타입 표기 파싱 (예: `np.int64(34)` → `34`)
    - 약품코드 기준으로 데이터 병합

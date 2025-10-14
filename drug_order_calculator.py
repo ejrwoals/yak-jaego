@@ -16,10 +16,19 @@ import webbrowser
 
 def check_required_files():
     """필수 파일 존재 여부 확인"""
-    if not os.path.exists('processed_inventory_timeseries.csv'):
-        print("❌ processed_inventory_timeseries.csv 파일이 존재하지 않습니다.")
+    # 전문약 또는 일반약 파일 중 하나라도 있는지 확인
+    has_dispense = os.path.exists('processed_inventory_dispense.csv')
+    has_sale = os.path.exists('processed_inventory_sale.csv')
+
+    if not has_dispense and not has_sale:
+        print("❌ processed_inventory_dispense.csv 또는 processed_inventory_sale.csv 파일이 존재하지 않습니다.")
         print("⚠️  먼저 워크플로우 1번 (시계열 분석)을 실행해주세요.")
         return False
+
+    if has_dispense:
+        print("✅ 전문약 데이터 파일 발견: processed_inventory_dispense.csv")
+    if has_sale:
+        print("✅ 일반약 데이터 파일 발견: processed_inventory_sale.csv")
 
     if not os.path.exists('today.csv'):
         print("❌ today.csv 파일이 존재하지 않습니다.")
@@ -29,17 +38,34 @@ def check_required_files():
 
 
 def load_processed_data():
-    """processed_inventory_timeseries.csv 로드"""
+    """전문약 및 일반약 데이터 로드 및 병합"""
     print("🔍 Step 1: 시계열 분석 데이터 로드")
     print("-" * 30)
 
-    df = pd.read_csv('processed_inventory_timeseries.csv', encoding='utf-8-sig')
+    dfs = []
+
+    # 전문약 데이터 로드
+    if os.path.exists('processed_inventory_dispense.csv'):
+        df_dispense = pd.read_csv('processed_inventory_dispense.csv', encoding='utf-8-sig')
+        df_dispense['약품유형'] = '전문약'
+        dfs.append(df_dispense)
+        print(f"  ✅ 전문약: {len(df_dispense)}개")
+
+    # 일반약 데이터 로드
+    if os.path.exists('processed_inventory_sale.csv'):
+        df_sale = pd.read_csv('processed_inventory_sale.csv', encoding='utf-8-sig')
+        df_sale['약품유형'] = '일반약'
+        dfs.append(df_sale)
+        print(f"  ✅ 일반약: {len(df_sale)}개")
+
+    # 두 데이터프레임 병합
+    df = pd.concat(dfs, ignore_index=True)
 
     # 필요한 컬럼만 선택
-    required_cols = ['약품코드', '약품명', '제약회사', '월별_조제수량_리스트', '3개월_이동평균_리스트']
+    required_cols = ['약품코드', '약품명', '제약회사', '월별_조제수량_리스트', '3개월_이동평균_리스트', '약품유형']
     df = df[required_cols].copy()
 
-    print(f"✅ {len(df)}개 약품의 시계열 데이터를 로드했습니다.")
+    print(f"✅ 총 {len(df)}개 약품의 시계열 데이터를 로드했습니다.")
     return df
 
 
@@ -100,12 +126,15 @@ def merge_and_calculate(today_df, processed_df):
     processed_df['월평균 조제수량'] = parse_list_column(processed_df['월별_조제수량_리스트'])
     processed_df['3개월 이동평균'] = parse_list_column(processed_df['3개월_이동평균_리스트'])
 
-    # 약품코드를 기준으로 병합
+    # 약품코드를 기준으로 병합 (약품유형 컬럼 포함)
     result_df = today_df.merge(
-        processed_df[['약품코드', '월평균 조제수량', '3개월 이동평균']],
+        processed_df[['약품코드', '월평균 조제수량', '3개월 이동평균', '약품유형']],
         on='약품코드',
         how='left'
     )
+
+    # 약품유형이 없는 경우 '미분류'로 표시
+    result_df['약품유형'] = result_df['약품유형'].fillna('미분류')
 
     # 런웨이 계산
     result_df['런웨이'] = result_df['현재 재고수량'] / result_df['월평균 조제수량']
@@ -141,6 +170,11 @@ def generate_html_report(df):
 
     # 런웨이 < 1인 약품 개수 확인
     urgent_count = len(df[(df['런웨이'] < 1) | (df['3-MA 런웨이'] < 1)])
+
+    # 약품 유형별 개수
+    dispense_count = len(df[df['약품유형'] == '전문약'])
+    sale_count = len(df[df['약품유형'] == '일반약'])
+    unclassified_count = len(df[df['약품유형'] == '미분류'])
 
     html = f"""
 <!DOCTYPE html>
@@ -215,6 +249,7 @@ def generate_html_report(df):
     <div class="summary">
         <h2>📊 요약</h2>
         <p>총 약품 수: <strong>{len(df)}개</strong></p>
+        <p>  - 전문약: <strong>{dispense_count}개</strong> / 일반약: <strong>{sale_count}개</strong>{f' / 미분류: {unclassified_count}개' if unclassified_count > 0 else ''}</p>
         <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{urgent_count}개</span></p>
     </div>
 
@@ -224,6 +259,7 @@ def generate_html_report(df):
                 <th>약품명</th>
                 <th>약품코드</th>
                 <th>제약회사</th>
+                <th>약품유형</th>
                 <th>현재 재고수량</th>
                 <th>월평균 조제수량</th>
                 <th>3개월 이동평균</th>
@@ -247,11 +283,16 @@ def generate_html_report(df):
         runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
         ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
 
+        # 약품유형에 따라 배지 스타일 적용
+        drug_type = row['약품유형']
+        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
+
         html += f"""
             <tr class="{row_class}">
                 <td>{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
                 <td>{row['제약회사']}</td>
+                <td><span style="background-color: {type_badge_color}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px;">{drug_type}</span></td>
                 <td>{row['현재 재고수량']:.0f}</td>
                 <td>{row['월평균 조제수량']:.1f}</td>
                 <td>{row['3개월 이동평균']:.1f}</td>
