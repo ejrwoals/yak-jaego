@@ -3,6 +3,8 @@ import os
 import sys
 import re
 from datetime import datetime
+import inventory_db
+from utils import normalize_drug_code
 
 def select_file_from_directory(directory='data'):
     """디렉토리에서 파일을 선택하는 함수"""
@@ -162,10 +164,8 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
     all_drug_codes = set()
     for month, df in monthly_data.items():
         if '약품코드' in df.columns:
-            # 약품코드를 string으로 변환 (float 형태의 .0 제거)
-            df['약품코드'] = df['약품코드'].astype(str).str.strip()
-            # .0으로 끝나는 경우 제거 (예: "673400030.0" → "673400030")
-            df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
+            # 약품코드 정규화 (utils.normalize_drug_code 사용)
+            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
             # 'nan' 제외하고 수집
             codes = df['약품코드'].unique()
             all_drug_codes.update([code for code in codes if code != 'nan'])
@@ -196,9 +196,8 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
             if '약품코드' not in df.columns:
                 continue
 
-            # 해당 약품코드 찾기 (float 형태의 .0 제거)
-            df['약품코드'] = df['약품코드'].astype(str).str.strip()
-            df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
+            # 해당 약품코드 찾기 (정규화)
+            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
             drug_row = df[df['약품코드'] == drug_code]
 
             if not drug_row.empty:
@@ -229,14 +228,6 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
 
                 monthly_quantities.append(qty)
                 row_data[f'{month}_조제수량'] = qty
-
-                # 재고수량 처리: 아직 채택되지 않았고, 현재 행에 유효한 재고가 있으면 채택
-                if row_data['최종_재고수량'] is None and '재고수량' in drug_row:
-                    stock = str(drug_row['재고수량']).replace(',', '').replace('-', '0')
-                    stock = pd.to_numeric(stock, errors='coerce')
-                    # 유효한 재고 (not NaN and > 0)만 채택
-                    if pd.notna(stock) and stock > 0:
-                        row_data['최종_재고수량'] = stock
             else:
                 # 해당 월에 데이터가 없는 경우
                 row_data[f'{month}_조제수량'] = 0
@@ -249,15 +240,16 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
                 if '약품코드' not in df.columns:
                     continue
 
-                df['약품코드'] = df['약품코드'].astype(str).str.strip()
-                df['약품코드'] = df['약품코드'].str.replace(r'\.0$', '', regex=True)
+                df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
                 drug_row = df[df['약품코드'] == drug_code]
 
                 if not drug_row.empty and '재고수량' in drug_row.columns:
                     drug_row = drug_row.iloc[0]
-                    stock = str(drug_row['재고수량']).replace(',', '').replace('-', '0')
+                    # 콤마만 제거 (음수 기호는 유지)
+                    stock = str(drug_row['재고수량']).replace(',', '')
                     stock = pd.to_numeric(stock, errors='coerce')
-                    if pd.notna(stock) and stock > 0:
+                    # 유효한 숫자면 채택 (음수 포함, NaN 제외)
+                    if pd.notna(stock):
                         row_data['최종_재고수량'] = stock
                         break  # 가장 최신의 유효한 재고를 찾았으므로 중단
 
@@ -384,9 +376,9 @@ def process_inventory_data(df_all, m, mode='dispense'):
                 df['월평균_조제수량'] = df['판매수량'] / m
                 print(f"\n{m}개월 데이터를 기준으로 월평균 판매수량을 계산했습니다.")
 
-            # 재고수량도 숫자로 변환
+            # 재고수량도 숫자로 변환 (음수 허용)
             if '재고수량' in df.columns:
-                df['재고수량'] = df['재고수량'].astype(str).str.replace(',', '').replace('-', '0')
+                df['재고수량'] = df['재고수량'].astype(str).str.replace(',', '')
                 df['재고수량'] = pd.to_numeric(df['재고수량'], errors='coerce').fillna(0)
 
                 # 런웨이 계산
@@ -417,45 +409,41 @@ def process_inventory_data(df_all, m, mode='dispense'):
         print(df_all.head())
         return None, None
 
-def main():
-    """메인 함수 - 직접 실행시에만 동작"""
-    try:
-        # Excel 파일 선택
-        file_path = select_file_from_directory()
+def init_recent_inventory_from_latest_month(result_df, drug_type='미분류'):
+    """
+    가장 최근 월의 재고수량으로 recent_inventory.sqlite3 초기화
 
-        # 파일이 선택되지 않았으면 종료
-        if not file_path:
-            sys.exit()
+    Args:
+        result_df: merge_by_drug_code에서 반환된 DataFrame (최종_재고수량 포함)
+        drug_type: 약품유형 ('전문약', '일반약', '미분류')
+    """
+    print(f"\n=== recent_inventory.sqlite3에 {drug_type} 데이터 추가 ===")
 
-        # 파일 읽기
-        df_all = read_csv_file(file_path)
+    # DB 초기화 (테이블이 없으면 생성)
+    inventory_db.init_db()
 
-        # 사용자에게 데이터 기간 물어보기
-        while True:
-            try:
-                m = int(input("\n총 몇개월 간의 데이터입니까? "))
-                if m > 0:
-                    break
-                else:
-                    print("양수를 입력해주세요.")
-            except ValueError:
-                print("올바른 숫자를 입력해주세요.")
+    # 필요한 데이터 추출
+    inventory_data = result_df[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
+    inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
+    inventory_data['약품유형'] = drug_type
 
-        # 데이터 처리
-        df, m = process_inventory_data(df_all, m)
+    # DB에 저장 (UPSERT이므로 기존 데이터는 업데이트, 신규는 추가)
+    result = inventory_db.upsert_inventory(inventory_data, show_summary=True)
 
-        if df is not None:
-            # 결과를 CSV로 저장할지 물어보기
-            save = input("\n결과를 CSV 파일로 저장하시겠습니까? (y/n): ")
-            if save.lower() == 'y':
-                output_file = 'processed_inventory.csv'
-                df.to_csv(output_file, index=False, encoding='utf-8-sig')
-                print(f"파일이 {output_file}에 저장되었습니다.")
+    print(f"✅ {drug_type} 데이터 DB 저장 완료!")
+    print(f"   업데이트: {result['updated']}개, 신규 추가: {result['inserted']}개")
 
-    except FileNotFoundError:
-        print(f"파일을 찾을 수 없습니다: {file_path}")
-    except Exception as e:
-        print(f"오류 발생: {e}")
 
 if __name__ == "__main__":
-    main()
+    # read_csv.py는 직접 실행하지 않습니다
+    # init_db.py를 사용하세요
+    print("=" * 60)
+    print("❌ 이 파일은 직접 실행할 수 없습니다.")
+    print("=" * 60)
+    print()
+    print("💡 대신 다음 명령어를 사용하세요:")
+    print("   python init_db.py       # DB 초기화")
+    print("   python app.py           # 보고서 생성 및 주문 산출")
+    print()
+    print("=" * 60)
+    sys.exit(1)

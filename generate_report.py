@@ -4,6 +4,7 @@ from plotly.subplots import make_subplots
 import os
 from datetime import datetime
 import json
+import inventory_db
 
 def create_sparkline_svg(timeseries_data, ma3_data):
     """
@@ -957,12 +958,74 @@ def create_and_save_report(df, months, mode='dispense', open_browser=True):
         mode: 'dispense' (전문약) 또는 'sale' (일반약)
         open_browser: 브라우저에서 자동으로 열기 여부
     """
+    print("\n=== 보고서 생성 준비 ===")
+
+    # 1. SQLite DB에서 최신 재고 데이터 가져오기
+    if not inventory_db.db_exists():
+        print("⚠️  recent_inventory.sqlite3 파일이 없습니다.")
+        print("   기존 CSV의 재고수량을 사용합니다.")
+        df_final = df.copy()
+    else:
+        print(f"✅ recent_inventory.sqlite3에서 최신 재고 데이터 로드 중...")
+        inventory_df = inventory_db.get_all_inventory_as_df()
+
+        if inventory_df.empty:
+            print("⚠️  DB에 재고 데이터가 없습니다. 기존 CSV의 재고수량을 사용합니다.")
+            df_final = df.copy()
+        else:
+            print(f"   {len(inventory_df)}개 약품의 재고 정보 로드 완료")
+
+            # 2. 통계 데이터와 최신 재고 데이터 병합
+            df_final = df.copy()
+
+            # 약품코드를 str로 정규화
+            df_final['약품코드'] = df_final['약품코드'].astype(str)
+            inventory_df['약품코드'] = inventory_df['약품코드'].astype(str)
+
+            # 병합 (최종_재고수량을 현재_재고수량으로 업데이트)
+            df_final = df_final.merge(
+                inventory_df[['약품코드', '현재_재고수량', '최종_업데이트일시']],
+                on='약품코드',
+                how='left'
+            )
+
+            # 최종_재고수량을 현재_재고수량으로 업데이트 (있는 경우)
+            df_final['최종_재고수량'] = df_final['현재_재고수량'].fillna(df_final['최종_재고수량'])
+
+            # 불필요한 컬럼 제거
+            df_final = df_final.drop(columns=['현재_재고수량'], errors='ignore')
+
+            # 3. 런웨이 재계산
+            print("🔄 런웨이 재계산 중...")
+            def calculate_runway(row):
+                if row['월평균_조제수량'] == 0:
+                    return '재고만 있음'
+
+                runway_months = row['최종_재고수량'] / row['월평균_조제수량']
+
+                if runway_months >= 1:
+                    return f"{runway_months:.2f}개월"
+                else:
+                    runway_days = runway_months * 30.417
+                    return f"{runway_days:.2f}일"
+
+            df_final['런웨이'] = df_final.apply(calculate_runway, axis=1)
+            print(f"   ✅ 런웨이 재계산 완료")
+
+            # 최종 업데이트 일시 출력
+            if '최종_업데이트일시' in df_final.columns:
+                latest_update = df_final['최종_업데이트일시'].dropna().unique()
+                if len(latest_update) > 0:
+                    print(f"   📅 재고 최종 업데이트: {latest_update[0]}")
+                df_final = df_final.drop(columns=['최종_업데이트일시'], errors='ignore')
+
     # 출력 디렉토리 생성
     output_dir = 'inventory_reports'
     os.makedirs(output_dir, exist_ok=True)
 
     # HTML 보고서 생성
-    html_content = generate_html_report(df, months, mode=mode)
+    print("\n📝 HTML 보고서 생성 중...")
+    html_content = generate_html_report(df_final, months, mode=mode)
 
     # 파일명에 모드 반영
     mode_suffix = 'dispense' if mode == 'dispense' else 'sale'

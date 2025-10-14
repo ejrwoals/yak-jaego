@@ -5,8 +5,8 @@
 Jaego - 약국 재고 관리 및 분석 시스템
 메인 워크플로우 애플리케이션
 
-이 파일은 read_excel.py와 generate_report.py의 기능을 통합하여
-하나의 명령어로 전체 워크플로우를 실행할 수 있게 합니다.
+보고서 생성 및 주문 수량 산출 기능을 제공합니다.
+DB 초기화는 init_db.py를 사용하세요.
 
 사용법: python app.py
 """
@@ -15,97 +15,136 @@ import os
 import sys
 
 # 로컬 모듈 import
-from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
 from generate_report import create_and_save_report
 from drug_order_calculator import run as run_order_calculator
+import inventory_db
+import processed_inventory_db
+
+
+def check_database_ready():
+    """두 개의 DB가 모두 준비되었는지 확인"""
+
+    print("\n🔍 데이터베이스 확인 중...")
+    print("-" * 60)
+
+    # recent_inventory.sqlite3 체크
+    if not inventory_db.db_exists():
+        print("❌ recent_inventory.sqlite3가 없습니다.")
+        print("\n💡 먼저 DB를 초기화해주세요:")
+        print("   python init_db.py")
+        return False
+
+    recent_count = inventory_db.get_inventory_count()
+    if recent_count == 0:
+        print("❌ recent_inventory.sqlite3에 데이터가 없습니다.")
+        print("\n💡 먼저 DB를 초기화해주세요:")
+        print("   python init_db.py")
+        return False
+
+    # processed_inventory.sqlite3 체크
+    if not processed_inventory_db.db_exists():
+        print("❌ processed_inventory.sqlite3가 없습니다.")
+        print("\n💡 먼저 DB를 초기화해주세요:")
+        print("   python init_db.py")
+        return False
+
+    processed_stats = processed_inventory_db.get_statistics()
+    if processed_stats['total'] == 0:
+        print("❌ processed_inventory.sqlite3에 데이터가 없습니다.")
+        print("\n💡 먼저 DB를 초기화해주세요:")
+        print("   python init_db.py")
+        return False
+
+    # 성공
+    print("✅ 데이터베이스 준비 완료")
+    print(f"   - 최신 재고 (recent_inventory.sqlite3): {recent_count}개")
+    print(f"   - 시계열 통계 (processed_inventory.sqlite3): {processed_stats['total']}개")
+
+    # 약품유형별 통계
+    if processed_stats['by_type']:
+        for drug_type, count in processed_stats['by_type'].items():
+            print(f"     * {drug_type}: {count}개")
+
+    return True
 
 
 def run_timeseries_analysis():
-    """시계열 분석 워크플로우"""
+    """시계열 분석 워크플로우 - 보고서 생성만"""
     print("=" * 60)
-    print("📊 약국 재고 관리 및 분석 시스템 (시계열 분석)")
+    print("📊 재고 관리 보고서 생성")
     print("=" * 60)
     print()
 
     try:
-        # Step 0: 보고서 유형 선택
+        # Step 1: 보고서 유형 선택
         print("📌 보고서 유형을 선택하세요:")
-        print("  1. 전문약 보고서 (조제수량 기준)")
-        print("  2. 일반약 보고서 (판매수량 기준)")
+        print("  1. 전문약 보고서")
+        print("  2. 일반약 보고서")
         print()
 
         while True:
             choice = input("선택 (1 또는 2): ").strip()
-            if choice == '1':
-                mode = 'dispense'
-                mode_name = '전문약'
+            if choice in ['1', '2']:
                 break
-            elif choice == '2':
-                mode = 'sale'
-                mode_name = '일반약'
-                break
-            else:
-                print("❌ 1 또는 2를 입력해주세요.")
+            print("❌ 1 또는 2를 입력해주세요.")
 
-        print(f"\n✅ {mode_name} 보고서 모드로 진행합니다.\n")
+        # 처리할 모드 결정
+        modes_to_process = []
+        if choice == '1':
+            modes_to_process = [('dispense', '전문약')]
+        elif choice == '2':
+            modes_to_process = [('sale', '일반약')]
 
-        # Step 1: 월별 CSV 파일들 자동 로드
-        print("🔍 Step 1: 월별 CSV 파일 자동 로드")
-        print("-" * 30)
-        monthly_data = load_multiple_csv_files(directory='data')
+        # Step 2: 각 모드별 보고서 생성
+        report_paths = []
 
-        if not monthly_data:
-            print("❌ CSV 파일을 로드할 수 없습니다. 프로그램을 종료합니다.")
-            sys.exit(1)
+        for mode, mode_name in modes_to_process:
+            print(f"\n{'='*60}")
+            print(f"📋 {mode_name} 보고서 생성 중...")
+            print(f"{'='*60}")
 
-        # Step 2: 약품코드 기준으로 데이터 통합
-        print("\n🔗 Step 2: 약품코드 기준으로 데이터 통합")
-        print("-" * 30)
-        df, months = merge_by_drug_code(monthly_data, mode=mode)
+            # processed_inventory DB에서 데이터 로드
+            df = processed_inventory_db.get_processed_data(drug_type=mode_name)
 
-        if df is None or df.empty:
-            print("❌ 데이터 통합에 실패했습니다.")
-            sys.exit(1)
+            if df.empty:
+                print(f"⚠️  {mode_name} 데이터가 없습니다. 건너뜁니다.")
+                continue
 
-        # Step 3: 통계 계산 (월평균, 3개월 이동평균, 런웨이)
-        print("\n⚙️ Step 3: 통계 계산")
-        print("-" * 30)
-        df = calculate_statistics(df, months)
+            print(f"✅ {mode_name} 데이터 로드 완료: {len(df)}개 약품")
 
-        # Step 4: CSV 저장 (자동으로 저장)
-        print("\n💾 Step 4: 처리된 데이터 저장")
-        print("-" * 30)
-        output_file = f'processed_inventory_{mode}.csv'
+            # 월 정보 추출 (월별_조제수량_리스트의 길이로 계산)
+            # 실제 월 정보는 리스트 길이로 추정 (간단한 구현)
+            first_record = df.iloc[0]
+            num_months = len(first_record['월별_조제수량_리스트'])
 
-        # 리스트 컬럼을 문자열로 변환하여 저장
-        df_to_save = df.copy()
-        df_to_save['월별_조제수량_리스트'] = df_to_save['월별_조제수량_리스트'].apply(str)
-        df_to_save['3개월_이동평균_리스트'] = df_to_save['3개월_이동평균_리스트'].apply(str)
-        df_to_save.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"✅ 처리된 데이터가 {output_file}에 저장되었습니다.")
+            # 간단히 연속된 월 생성 (실제로는 DB에 월 정보도 저장하면 더 좋음)
+            import datetime
+            today = datetime.datetime.now()
+            months = []
+            for i in range(num_months):
+                month_date = datetime.datetime(today.year, today.month, 1) - datetime.timedelta(days=30*(num_months-1-i))
+                months.append(month_date.strftime('%Y-%m'))
 
-        # Step 5: HTML 보고서 생성
-        print("\n📋 Step 5: HTML 보고서 생성")
-        print("-" * 30)
-        report_path = create_and_save_report(df, months, mode=mode, open_browser=True)
+            # HTML 보고서 생성
+            report_path = create_and_save_report(
+                df, months, mode=mode,
+                open_browser=(mode==modes_to_process[0][0])
+            )
+            report_paths.append(report_path)
+            print(f"✅ {mode_name} 보고서 생성 완료")
 
         # 완료 메시지
-        print("\n🎉 모든 작업이 완료되었습니다!")
+        print("\n" + "=" * 60)
+        print("🎉 보고서 생성 완료!")
         print("=" * 60)
-        print(f"📁 처리된 데이터: {output_file}")
-        print(f"📊 생성된 보고서: {report_path}")
-        print(f"📅 분석 기간: {months[0]} ~ {months[-1]} ({len(months)}개월)")
+        for path in report_paths:
+            print(f"📊 {path}")
         print("=" * 60)
 
-    except KeyboardInterrupt:
-        print("\n\n⚠️ 사용자에 의해 프로그램이 중단되었습니다.")
-        sys.exit(0)
     except Exception as e:
         print(f"\n❌ 오류가 발생했습니다: {e}")
-        print("\n문제가 지속되면 다음을 확인해보세요:")
-        print("1. 파일이 올바른 형식인지 확인")
-        print("2. data/ 폴더에 파일이 있는지 확인")
-        print("3. 필요한 Python 패키지가 설치되어 있는지 확인")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
@@ -132,8 +171,8 @@ def show_menu():
     print("🏥 Jaego - 약국 재고 관리 시스템")
     print("=" * 60)
     print("\n사용 가능한 워크플로우:")
-    print("  1. 약국 재고 관리 및 분석 시스템 (시계열 분석)")
-    print("  2. 약 주문 수량 산출 시스템")
+    print("  1. 재고 관리 보고서 생성 (시계열 분석)")
+    print("  2. 약 주문 수량 산출")
     print("  0. 종료")
     print("\n" + "=" * 60)
 
@@ -155,6 +194,11 @@ def get_user_choice():
 def main():
     """메인 함수 - 워크플로우 선택 및 실행"""
     try:
+        # DB 준비 상태 확인
+        if not check_database_ready():
+            sys.exit(1)
+
+        # 메뉴 표시 및 선택
         show_menu()
         choice = get_user_choice()
 

@@ -1,9 +1,11 @@
 /data
 /trash
 /order_calc_reports
+/inventory_reports
 
 *.html
 *.csv
+*.sqlite3
 .DS_Store
 __pycache__/
 

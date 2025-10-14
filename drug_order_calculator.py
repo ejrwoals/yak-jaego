@@ -12,82 +12,118 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import webbrowser
+import inventory_db
+import processed_inventory_db
 
 
 def check_required_files():
     """필수 파일 존재 여부 확인"""
-    # 전문약 또는 일반약 파일 중 하나라도 있는지 확인
-    has_dispense = os.path.exists('processed_inventory_dispense.csv')
-    has_sale = os.path.exists('processed_inventory_sale.csv')
-
-    if not has_dispense and not has_sale:
-        print("❌ processed_inventory_dispense.csv 또는 processed_inventory_sale.csv 파일이 존재하지 않습니다.")
-        print("⚠️  먼저 워크플로우 1번 (시계열 분석)을 실행해주세요.")
+    # processed_inventory DB 체크
+    if not processed_inventory_db.db_exists():
+        print("❌ processed_inventory.sqlite3가 없습니다.")
+        print("💡 먼저 DB 초기화를 실행하세요: python init_db.py")
         return False
 
-    if has_dispense:
-        print("✅ 전문약 데이터 파일 발견: processed_inventory_dispense.csv")
-    if has_sale:
-        print("✅ 일반약 데이터 파일 발견: processed_inventory_sale.csv")
-
-    if not os.path.exists('today.csv'):
-        print("❌ today.csv 파일이 존재하지 않습니다.")
+    stats = processed_inventory_db.get_statistics()
+    if stats['total'] == 0:
+        print("❌ processed_inventory.sqlite3에 데이터가 없습니다.")
+        print("💡 먼저 DB 초기화를 실행하세요: python init_db.py")
         return False
+
+    print(f"✅ 시계열 통계 데이터: {stats['total']}개")
+    for drug_type, count in stats['by_type'].items():
+        print(f"   - {drug_type}: {count}개")
+
+    # recent_inventory DB 체크
+    if not inventory_db.db_exists():
+        print("❌ recent_inventory.sqlite3가 없습니다.")
+        print("💡 먼저 DB 초기화를 실행하세요: python init_db.py")
+        return False
+
+    print(f"✅ 최신 재고 데이터 발견")
 
     return True
 
 
 def load_processed_data():
-    """전문약 및 일반약 데이터 로드 및 병합"""
+    """전문약 및 일반약 데이터 로드 (processed_inventory DB에서)"""
     print("🔍 Step 1: 시계열 분석 데이터 로드")
     print("-" * 30)
 
-    dfs = []
+    # DB에서 전체 데이터 로드 (약품유형 포함)
+    df = processed_inventory_db.get_processed_data()  # 전체 조회
 
-    # 전문약 데이터 로드
-    if os.path.exists('processed_inventory_dispense.csv'):
-        df_dispense = pd.read_csv('processed_inventory_dispense.csv', encoding='utf-8-sig')
-        df_dispense['약품유형'] = '전문약'
-        dfs.append(df_dispense)
-        print(f"  ✅ 전문약: {len(df_dispense)}개")
-
-    # 일반약 데이터 로드
-    if os.path.exists('processed_inventory_sale.csv'):
-        df_sale = pd.read_csv('processed_inventory_sale.csv', encoding='utf-8-sig')
-        df_sale['약품유형'] = '일반약'
-        dfs.append(df_sale)
-        print(f"  ✅ 일반약: {len(df_sale)}개")
-
-    # 두 데이터프레임 병합
-    df = pd.concat(dfs, ignore_index=True)
+    if df.empty:
+        print("❌ processed_inventory DB에 데이터가 없습니다.")
+        return None
 
     # 필요한 컬럼만 선택
     required_cols = ['약품코드', '약품명', '제약회사', '월별_조제수량_리스트', '3개월_이동평균_리스트', '약품유형']
     df = df[required_cols].copy()
 
     print(f"✅ 총 {len(df)}개 약품의 시계열 데이터를 로드했습니다.")
+
+    # 약품유형별 통계
+    type_counts = df['약품유형'].value_counts()
+    for drug_type, count in type_counts.items():
+        print(f"   - {drug_type}: {count}개")
+
     return df
 
 
-def load_today_data():
-    """today.csv 로드"""
-    print("\n🔍 Step 2: 오늘의 재고 데이터 로드")
+def load_recent_inventory():
+    """
+    SQLite DB에서 최신 재고 데이터 로드
+    today.csv가 있으면 먼저 DB를 업데이트하고, today.csv에 있는 약품들만 필터링
+    """
+    print("\n🔍 Step 2: 최신 재고 데이터 로드")
     print("-" * 30)
 
-    df = pd.read_csv('today.csv', encoding='utf-8-sig')
+    today_drug_codes = None
 
-    # 필요한 컬럼만 선택하고 재고수량 컬럼명 변경
-    required_cols = ['약품명', '약품코드', '제약회사', '재고수량']
-    df = df[required_cols].copy()
-    df = df.rename(columns={'재고수량': '현재 재고수량'})
+    # today.csv가 있으면 먼저 DB 업데이트 및 약품코드 추출
+    if os.path.exists('today.csv'):
+        print("📂 today.csv 발견 - DB 업데이트 중...")
+        try:
+            from inventory_updater import update_inventory_from_today_csv
+            result = update_inventory_from_today_csv('today.csv')
+            if result:
+                print(f"   ✅ DB 업데이트 완료 (업데이트: {result['updated']}건, 신규: {result['inserted']}건)")
 
-    # 약품코드가 NaN인 행 제거 (합계 행)
+            # today.csv에서 약품코드 추출
+            from read_csv import normalize_drug_code
+            today_df = pd.read_csv('today.csv', encoding='utf-8')
+            if '약품코드' in today_df.columns:
+                today_df['약품코드'] = today_df['약품코드'].apply(normalize_drug_code)
+                today_drug_codes = set(today_df['약품코드'].dropna().unique())
+                print(f"   📋 today.csv에서 {len(today_drug_codes)}개 약품 발견 (오늘 나간 약품)")
+        except Exception as e:
+            print(f"   ⚠️  today.csv 처리 실패: {e}")
+            print("   전체 DB 데이터를 사용합니다.")
+
+    # SQLite DB에서 재고 데이터 로드
+    print("📊 recent_inventory.sqlite3에서 재고 데이터 로드 중...")
+    df = inventory_db.get_all_inventory_as_df()
+
+    if df.empty:
+        print("❌ DB에 재고 데이터가 없습니다.")
+        return None
+
+    # 필요한 컬럼만 선택하고 컬럼명 변경
+    df = df[['약품코드', '약품명', '제약회사', '현재_재고수량']].copy()
+    df = df.rename(columns={'현재_재고수량': '현재 재고수량'})
+
+    # 약품코드가 NaN인 행 제거
     df = df.dropna(subset=['약품코드'])
 
-    # 재고수량 문자열을 숫자로 변환 (쉼표 제거)
-    df['현재 재고수량'] = df['현재 재고수량'].astype(str).str.replace(',', '').astype(float)
+    # today.csv가 있으면 해당 약품들만 필터링
+    if today_drug_codes:
+        original_count = len(df)
+        df = df[df['약품코드'].isin(today_drug_codes)]
+        print(f"✅ 오늘 나간 약품 {len(df)}개로 필터링 (전체 {original_count}개 중)")
+    else:
+        print(f"✅ {len(df)}개 약품의 최신 재고 데이터를 로드했습니다.")
 
-    print(f"✅ {len(df)}개 약품의 오늘 재고 데이터를 로드했습니다.")
     return df
 
 
@@ -343,10 +379,14 @@ def run():
 
         # 데이터 로드
         processed_df = load_processed_data()
-        today_df = load_today_data()
+        inventory_df = load_recent_inventory()
+
+        if inventory_df is None:
+            print("\n❌ 재고 데이터를 로드할 수 없습니다.")
+            return
 
         # 병합 및 계산
-        result_df = merge_and_calculate(today_df, processed_df)
+        result_df = merge_and_calculate(inventory_df, processed_df)
 
         # 보고서 생성
         html_file = generate_html_report(result_df)
