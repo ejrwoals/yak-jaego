@@ -178,6 +178,9 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
     # 결과 데이터프레임 구축
     result_rows = []
 
+    # 최신순으로 순회하기 위한 역순 리스트 생성
+    months_reversed = list(reversed(months))
+
     for drug_code in all_drug_codes:
         row_data = {
             '약품코드': drug_code,
@@ -188,10 +191,8 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
 
         monthly_quantities = []
 
-        # 최신순으로 순회하며 재고수량 찾기 위해 역순 리스트 생성
-        months_reversed = list(reversed(months))
-
-        for month in months:
+        # Step 1: 약품명/제약회사 채택 (최신 월 우선 - 역순 탐색)
+        for month in months_reversed:
             df = monthly_data[month]
             if '약품코드' not in df.columns:
                 continue
@@ -203,10 +204,24 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
             if not drug_row.empty:
                 drug_row = drug_row.iloc[0]
 
-                # 기본 정보 업데이트 (처음 발견시)
-                if row_data['약품명'] is None:
-                    row_data['약품명'] = drug_row.get('약품명', '')
+                # 최신 월의 약품명/제약회사 채택 (유효한 값이 있으면)
+                if pd.notna(drug_row.get('약품명')) and row_data['약품명'] is None:
+                    row_data['약품명'] = drug_row['약품명']
                     row_data['제약회사'] = drug_row.get('제약회사', '')
+                    break  # 최신 정보 발견 시 중단
+
+        # Step 2: 월별 조제/판매 수량 수집 (시간순 정방향)
+        for month in months:
+            df = monthly_data[month]
+            if '약품코드' not in df.columns:
+                continue
+
+            # 해당 약품코드 찾기 (정규화)
+            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
+            drug_row = df[df['약품코드'] == drug_code]
+
+            if not drug_row.empty:
+                drug_row = drug_row.iloc[0]
 
                 # mode에 따라 조제수량 또는 판매수량만 추출
                 qty = 0
@@ -233,29 +248,33 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
                 row_data[f'{month}_조제수량'] = 0
                 monthly_quantities.append(0)
 
-        # 최신순으로 재고수량 검색 (이미 채택 안 되었으면)
-        if row_data['최종_재고수량'] is None:
-            for month in months_reversed:
-                df = monthly_data[month]
-                if '약품코드' not in df.columns:
-                    continue
+        # Step 3: 최신 재고수량 채택 (최신 월 우선 - 역순 탐색)
+        for month in months_reversed:
+            df = monthly_data[month]
+            if '약품코드' not in df.columns:
+                continue
 
-                df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
-                drug_row = df[df['약품코드'] == drug_code]
+            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
+            drug_row = df[df['약품코드'] == drug_code]
 
-                if not drug_row.empty and '재고수량' in drug_row.columns:
-                    drug_row = drug_row.iloc[0]
-                    # 콤마만 제거 (음수 기호는 유지)
-                    stock = str(drug_row['재고수량']).replace(',', '')
-                    stock = pd.to_numeric(stock, errors='coerce')
-                    # 유효한 숫자면 채택 (음수 포함, NaN 제외)
-                    if pd.notna(stock):
-                        row_data['최종_재고수량'] = stock
-                        break  # 가장 최신의 유효한 재고를 찾았으므로 중단
+            if not drug_row.empty and '재고수량' in drug_row.columns:
+                drug_row = drug_row.iloc[0]
+                # 콤마만 제거 (음수 기호는 유지)
+                stock = str(drug_row['재고수량']).replace(',', '')
+                stock = pd.to_numeric(stock, errors='coerce')
+                # 유효한 숫자면 채택 (음수 포함, NaN 제외)
+                if pd.notna(stock):
+                    row_data['최종_재고수량'] = stock
+                    break  # 가장 최신의 유효한 재고를 찾았으므로 중단
 
         # 여전히 None이면 0으로 설정
         if row_data['최종_재고수량'] is None:
             row_data['최종_재고수량'] = 0
+
+        # 약품명이 여전히 None이면 빈 문자열로 설정
+        if row_data['약품명'] is None:
+            row_data['약품명'] = ''
+            row_data['제약회사'] = ''
 
         # 시계열 데이터 저장 (리스트 형태)
         row_data['월별_조제수량_리스트'] = monthly_quantities
