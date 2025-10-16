@@ -320,8 +320,8 @@ def generate_html_report(df, months, mode='dispense'):
                     <div class="value">{df['최종_재고수량'].sum():,.0f}개</div>
                 </div>
                 <div class="summary-card">
-                    <h3>월평균 총 조제량</h3>
-                    <div class="value">{df['월평균_조제수량'].sum():,.0f}개</div>
+                    <h3>1년 이동평균 총 조제량</h3>
+                    <div class="value">{df['1년_이동평균'].sum():,.0f}개</div>
                 </div>
             </div>
     """
@@ -387,7 +387,7 @@ def generate_html_report(df, months, mode='dispense'):
                             <th>제약회사</th>
                             <th>약품코드</th>
                             <th>재고수량</th>
-                            <th>월평균 조제수량</th>
+                            <th>1년 이동평균</th>
                             <th class="runway-header">런웨이</th>
                             <th>3개월 이동평균</th>
                             <th class="runway-header">3-MA 런웨이</th>
@@ -397,8 +397,8 @@ def generate_html_report(df, months, mode='dispense'):
                     <tbody>
     """
 
-    # 월평균 조제수량 기준 내림차순 정렬
-    df_sorted = df.sort_values('월평균_조제수량', ascending=False).reset_index(drop=True)
+    # 1년 이동평균 기준 내림차순 정렬
+    df_sorted = df.sort_values('1년_이동평균', ascending=False).reset_index(drop=True)
 
     # 데이터 행 추가 + 경량 스파크라인 생성
     for idx, row in df_sorted.iterrows():
@@ -431,7 +431,7 @@ def generate_html_report(df, months, mode='dispense'):
             months=months,
             timeseries_data=timeseries,
             ma3_data=ma3,
-            avg=row['월평균_조제수량'],
+            avg=row['1년_이동평균'],
             drug_name=row['약품명'],
             drug_code=str(row['약품코드'])
         )
@@ -454,7 +454,7 @@ def generate_html_report(df, months, mode='dispense'):
                             <td>{company_display}</td>
                             <td>{row['약품코드']}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
-                            <td>{row['월평균_조제수량']:.2f}</td>
+                            <td>{row['1년_이동평균']:.2f}</td>
                             <td class="runway-cell">{row['런웨이']}</td>
                             <td>{"N/A" if latest_ma3 is None else f"{latest_ma3:.2f}"}</td>
                             <td class="runway-cell">{ma3_runway_display}</td>
@@ -492,8 +492,8 @@ def generate_html_report(df, months, mode='dispense'):
                                         <div style="font-size: 1.8em; font-weight: bold;">{row['최종_재고수량']:,.0f}개</div>
                                     </div>
                                     <div style="background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); color: #2d3748; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;">월평균 조제수량</h4>
-                                        <div style="font-size: 1.8em; font-weight: bold;">{row['월평균_조제수량']:.1f}개</div>
+                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;">1년 이동평균</h4>
+                                        <div style="font-size: 1.8em; font-weight: bold;">{row['1년_이동평균']:.1f}개</div>
                                     </div>
                                     <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                                         <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.9;">런웨이</h4>
@@ -588,6 +588,14 @@ def generate_html_report(df, months, mode='dispense'):
                         line: {color: 'orange', width: 3}
                     },
                     {
+                        x: [chartData.months[0], chartData.months[Math.min(1, chartData.months.length - 1)]],
+                        y: [null, null],
+                        mode: 'lines',
+                        name: '최근 1년 평균',
+                        line: {color: 'green', width: 2, dash: 'dash'},
+                        showlegend: true
+                    },
+                    {
                         x: [chartData.months[0]],
                         y: [null],
                         mode: 'markers',
@@ -671,7 +679,8 @@ def generate_html_report(df, months, mode='dispense'):
                         ...winterShapes,
                         {
                             type: 'line',
-                            x0: chartData.months[0],
+                            // 1년 이동평균은 최근 12개월까지만 표시
+                            x0: chartData.months[Math.max(0, chartData.months.length - 12)],
                             x1: chartData.months[chartData.months.length - 1],
                             y0: chartData.avg,
                             y1: chartData.avg,
@@ -686,7 +695,7 @@ def generate_html_report(df, months, mode='dispense'):
                         {
                             x: chartData.months[chartData.months.length - 1],
                             y: chartData.avg,
-                            text: '평균: ' + chartData.avg.toFixed(1),
+                            text: '최근 1년 평균: ' + chartData.avg.toFixed(1),
                             showarrow: false,
                             xanchor: 'left',
                             xshift: 10
@@ -995,13 +1004,13 @@ def create_and_save_report(df, months, mode='dispense', open_browser=True):
             # 불필요한 컬럼 제거
             df_final = df_final.drop(columns=['현재_재고수량'], errors='ignore')
 
-            # 3. 런웨이 재계산
+            # 3. 런웨이 재계산 (1년 이동평균 기반)
             print("🔄 런웨이 재계산 중...")
             def calculate_runway(row):
-                if row['월평균_조제수량'] == 0:
+                if row['1년_이동평균'] == 0:
                     return '재고만 있음'
 
-                runway_months = row['최종_재고수량'] / row['월평균_조제수량']
+                runway_months = row['최종_재고수량'] / row['1년_이동평균']
 
                 if runway_months >= 1:
                     return f"{runway_months:.2f}개월"

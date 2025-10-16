@@ -297,13 +297,25 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
     return result_df, months
 
 def calculate_statistics(df, months):
-    """통계 계산: 월평균, 3개월 이동평균, 런웨이"""
+    """통계 계산: 1년 이동평균, 3개월 이동평균, 런웨이"""
     print("\n통계 계산 중...")
 
-    # 월평균 조제수량
-    df['월평균_조제수량'] = df['월별_조제수량_리스트'].apply(
-        lambda x: sum(x) / len(x) if len(x) > 0 else 0
-    )
+    # 1년 이동평균 계산 (12개월 이동평균, 최근 트렌드 반영)
+    def calculate_12ma(quantities):
+        """
+        12개월 이동평균 계산
+        - 12개월 이상 데이터: 최근 12개월 평균
+        - 12개월 미만 데이터: available months로 평균 (fallback)
+        """
+        if len(quantities) == 0:
+            return 0
+
+        # 최근 12개월 데이터 추출 (또는 가능한 모든 데이터)
+        recent_data = quantities[-12:] if len(quantities) >= 12 else quantities
+
+        return sum(recent_data) / len(recent_data)
+
+    df['1년_이동평균'] = df['월별_조제수량_리스트'].apply(calculate_12ma)
 
     # 3개월 이동평균 계산
     def calculate_ma3(quantities):
@@ -321,12 +333,12 @@ def calculate_statistics(df, months):
 
     df['3개월_이동평균_리스트'] = df['월별_조제수량_리스트'].apply(calculate_ma3)
 
-    # 런웨이 계산
+    # 런웨이 계산 (1년 이동평균 기반)
     def calculate_runway(row):
-        if row['월평균_조제수량'] == 0:
+        if row['1년_이동평균'] == 0:
             return '재고만 있음'
 
-        runway_months = row['최종_재고수량'] / row['월평균_조제수량']
+        runway_months = row['최종_재고수량'] / row['1년_이동평균']
 
         if runway_months >= 1:
             return f"{runway_months:.2f}개월"

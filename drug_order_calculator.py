@@ -57,8 +57,8 @@ def load_processed_data():
         print("❌ processed_inventory DB에 데이터가 없습니다.")
         return None
 
-    # 필요한 컬럼만 선택
-    required_cols = ['약품코드', '약품명', '제약회사', '월별_조제수량_리스트', '3개월_이동평균_리스트', '약품유형']
+    # 필요한 컬럼만 선택 (1년_이동평균 추가)
+    required_cols = ['약품코드', '약품명', '제약회사', '1년_이동평균', '월별_조제수량_리스트', '3개월_이동평균_리스트', '약품유형']
     df = df[required_cols].copy()
 
     print(f"✅ 총 {len(df)}개 약품의 시계열 데이터를 로드했습니다.")
@@ -158,13 +158,13 @@ def merge_and_calculate(today_df, processed_df):
     print("\n⚙️ Step 3: 데이터 병합 및 런웨이 계산")
     print("-" * 30)
 
-    # 월평균 조제수량과 3개월 이동평균 계산
-    processed_df['월평균 조제수량'] = parse_list_column(processed_df['월별_조제수량_리스트'])
+    # 1년 이동평균과 3개월 이동평균 준비
+    processed_df['1년 이동평균'] = processed_df['1년_이동평균']  # DB에서 이미 계산된 값 사용
     processed_df['3개월 이동평균'] = parse_list_column(processed_df['3개월_이동평균_리스트'])
 
     # 약품코드를 기준으로 병합 (약품유형 컬럼 포함)
     result_df = today_df.merge(
-        processed_df[['약품코드', '월평균 조제수량', '3개월 이동평균', '약품유형']],
+        processed_df[['약품코드', '1년 이동평균', '3개월 이동평균', '약품유형']],
         on='약품코드',
         how='left'
     )
@@ -172,8 +172,8 @@ def merge_and_calculate(today_df, processed_df):
     # 약품유형이 없는 경우 '미분류'로 표시
     result_df['약품유형'] = result_df['약품유형'].fillna('미분류')
 
-    # 런웨이 계산
-    result_df['런웨이'] = result_df['현재 재고수량'] / result_df['월평균 조제수량']
+    # 런웨이 계산 (1년 이동평균 기반)
+    result_df['런웨이'] = result_df['현재 재고수량'] / result_df['1년 이동평균']
     result_df['3-MA 런웨이'] = result_df['현재 재고수량'] / result_df['3개월 이동평균']
 
     # 무한대 값을 처리 (조제수량이 0인 경우)
@@ -297,7 +297,7 @@ def generate_html_report(df):
                 <th>제약회사</th>
                 <th>약품유형</th>
                 <th>현재 재고수량</th>
-                <th>월평균 조제수량</th>
+                <th>1년 이동평균</th>
                 <th>3개월 이동평균</th>
                 <th>런웨이 (개월)</th>
                 <th>3-MA 런웨이 (개월)</th>
@@ -330,7 +330,7 @@ def generate_html_report(df):
                 <td>{row['제약회사']}</td>
                 <td><span style="background-color: {type_badge_color}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px;">{drug_type}</span></td>
                 <td>{row['현재 재고수량']:.0f}</td>
-                <td>{row['월평균 조제수량']:.1f}</td>
+                <td>{row['1년 이동평균']:.1f}</td>
                 <td>{row['3개월 이동평균']:.1f}</td>
                 <td class="{runway_class}">{runway_display}</td>
                 <td class="{ma3_runway_class}">{ma3_runway_display}</td>
