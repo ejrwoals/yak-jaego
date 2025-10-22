@@ -474,7 +474,7 @@ if __name__ == "__main__":
     print()
     print("💡 대신 다음 명령어를 사용하세요:")
     print("   python init_db.py       # DB 초기화")
-    print("   python app.py           # 보고서 생성 및 주문 산출")
+    print("   python web_app.py       # 보고서 생성 및 주문 산출")
     print()
     print("=" * 60)
     sys.exit(1)

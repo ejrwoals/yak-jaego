@@ -129,7 +129,7 @@ def main():
 
     print("\n" + "=" * 60)
     print("🎉 이제 다음 명령어를 실행할 수 있습니다:")
-    print("   python app.py              # 보고서 생성 및 주문 산출")
+    print("   python web_app.py              # 보고서 생성 및 주문 산출")
     print("   python inventory_updater.py # today.csv로 재고 업데이트")
     print("=" * 60)
 

@@ -118,7 +118,7 @@ def main():
         print("✅ 재고 업데이트 완료!")
         print("="*50)
         print(f"\n최종 품목 수: {inventory_db.get_inventory_count()}개")
-        print("\n💡 이제 python app.py를 실행하여 보고서를 생성할 수 있습니다.")
+        print("\n💡 이제 python web_app.py를 실행하여 보고서를 생성할 수 있습니다.")
     else:
         print("\n⚠️  재고 업데이트를 수행하지 않았습니다.")
 
