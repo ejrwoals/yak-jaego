@@ -102,18 +102,20 @@ def extract_month_from_file(filename):
     return None
 
 def load_multiple_csv_files(directory='data'):
-    """여러 CSV 파일을 읽어 월별 데이터로 구성"""
+    """여러 월별 데이터 파일을 읽어 월별 데이터로 구성 (CSV, XLS, XLSX 지원)"""
     if not os.path.exists(directory):
         print(f"'{directory}' 디렉토리가 존재하지 않습니다.")
         return None
 
-    files = sorted([f for f in os.listdir(directory) if f.endswith('.csv')])
+    # CSV, XLS, XLSX 파일 모두 검색
+    files = sorted([f for f in os.listdir(directory)
+                   if f.endswith(('.csv', '.xls', '.xlsx'))])
 
     if not files:
-        print(f"'{directory}' 디렉토리에 CSV 파일이 없습니다.")
+        print(f"'{directory}' 디렉토리에 데이터 파일이 없습니다 (CSV, XLS, XLSX).")
         return None
 
-    print(f"\n'{directory}' 디렉토리에서 {len(files)}개의 CSV 파일을 발견했습니다.")
+    print(f"\n'{directory}' 디렉토리에서 {len(files)}개의 데이터 파일을 발견했습니다.")
 
     monthly_data = {}
 
@@ -123,14 +125,32 @@ def load_multiple_csv_files(directory='data'):
             file_path = os.path.join(directory, file)
             print(f"읽는 중: {file} → {month}")
 
-            # CSV 파일 읽기 (여러 인코딩 시도)
             df = None
-            for encoding in ['utf-8', 'cp949', 'euc-kr']:
+            ext = os.path.splitext(file)[1].lower()
+
+            # 파일 형식에 따라 읽기
+            if ext == '.csv':
+                # CSV 파일 읽기 (여러 인코딩 시도)
+                for encoding in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
+                    try:
+                        df = pd.read_csv(file_path, encoding=encoding)
+                        break
+                    except:
+                        continue
+
+            elif ext in ['.xls', '.xlsx']:
+                # Excel 파일 읽기
                 try:
-                    df = pd.read_csv(file_path, encoding=encoding)
-                    break
+                    # .xls는 calamine, .xlsx는 openpyxl 우선 사용
+                    engine = 'calamine' if ext == '.xls' else 'openpyxl'
+                    df = pd.read_excel(file_path, engine=engine)
                 except:
-                    continue
+                    # 실패 시 다른 엔진 시도
+                    try:
+                        fallback_engine = 'openpyxl' if ext == '.xls' else 'calamine'
+                        df = pd.read_excel(file_path, engine=fallback_engine)
+                    except:
+                        pass
 
             if df is not None:
                 monthly_data[month] = df
