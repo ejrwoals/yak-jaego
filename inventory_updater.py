@@ -1,78 +1,64 @@
 """
 재고 업데이트 모듈
 
-today.csv 파일을 이용하여 recent_inventory.sqlite3 데이터베이스를 업데이트합니다.
+today.csv, today.xls, today.xlsx 파일을 이용하여 recent_inventory.sqlite3 데이터베이스를 업데이트합니다.
 """
 
 import pandas as pd
 import os
 import sys
 import inventory_db
-from utils import normalize_drug_codes_in_df, validate_columns
+from utils import normalize_drug_codes_in_df, validate_columns, read_today_file
 
 
 def update_inventory_from_today_csv(today_csv_path='today.csv'):
     """
-    today.csv를 읽어서 recent_inventory.sqlite3를 업데이트
+    today.csv/xls/xlsx를 읽어서 recent_inventory.sqlite3를 업데이트
+
+    파일명이 'today.csv'로 지정되어 있어도 today.xls, today.xlsx도 자동으로 인식합니다.
 
     Args:
-        today_csv_path (str): today.csv 파일 경로
+        today_csv_path (str): today 파일 경로 (확장자 포함/미포함 모두 가능)
 
     Returns:
         dict: 업데이트 결과 {'updated': int, 'inserted': int, 'failed': int}
     """
-    print(f"\n=== today.csv로 재고 업데이트 ===")
+    print(f"\n=== today 파일로 재고 업데이트 ===")
 
-    # 1. today.csv 파일 확인
-    if not os.path.exists(today_csv_path):
-        print(f"⚠️  {today_csv_path} 파일이 없습니다. 업데이트를 건너뜁니다.")
+    # 1. today 파일 읽기 (CSV, XLS, XLSX 자동 감지)
+    # 확장자가 있는 경우 제거하여 base_name만 추출
+    base_name = os.path.splitext(today_csv_path)[0]
+
+    df, filepath = read_today_file(base_name)
+
+    if df is None:
+        print(f"⚠️  today 파일을 찾을 수 없습니다. 업데이트를 건너뜁니다.")
         return None
 
-    # 2. today.csv 읽기
-    print(f"📂 {today_csv_path} 파일 읽는 중...")
-    try:
-        # 여러 인코딩 시도
-        df = None
-        for encoding in ['utf-8', 'cp949', 'euc-kr']:
-            try:
-                df = pd.read_csv(today_csv_path, encoding=encoding)
-                print(f"   ✅ 파일 읽기 성공 ({encoding} 인코딩)")
-                break
-            except:
-                continue
+    print(f"   총 {len(df)}개 행 로드")
 
-        if df is None:
-            print(f"   ❌ 파일을 읽을 수 없습니다.")
-            return None
-
-        print(f"   총 {len(df)}개 행 로드")
-
-    except Exception as e:
-        print(f"❌ 파일 읽기 실패: {e}")
-        return None
-
-    # 3. 필수 컬럼 확인
+    # 2. 필수 컬럼 확인
     print("\n📋 컬럼 검증 중...")
     required_columns = ['약품코드', '약품명', '제약회사', '재고수량']
-    is_valid, missing = validate_columns(df, required_columns, 'today.csv')
+    is_valid, missing = validate_columns(df, required_columns, os.path.basename(filepath))
 
     if not is_valid:
         print(f"\n💡 해결 방법:")
-        print(f"   1. today.csv에 다음 컬럼이 있는지 확인: {required_columns}")
+        print(f"   1. today 파일에 다음 컬럼이 있는지 확인: {required_columns}")
         print(f"   2. 컬럼명의 철자와 띄어쓰기가 정확한지 확인")
-        print(f"\n현재 today.csv의 컬럼:")
+        print(f"\n현재 파일의 컬럼:")
         print(f"   {list(df.columns)}")
         return None
 
-    # 4. 약품코드 정규화
+    # 3. 약품코드 정규화
     print("\n🔧 약품코드 정규화 중...")
     df = normalize_drug_codes_in_df(df, code_column='약품코드')
 
-    # 5. 컬럼명 통일 (재고수량 → 현재_재고수량)
+    # 4. 컬럼명 통일 (재고수량 → 현재_재고수량)
     df_update = df[['약품코드', '약품명', '제약회사', '재고수량']].copy()
     df_update.rename(columns={'재고수량': '현재_재고수량'}, inplace=True)
 
-    # 6. 재고수량 데이터 정제 (숫자로 변환)
+    # 5. 재고수량 데이터 정제 (숫자로 변환)
     print("🧹 재고수량 데이터 정제 중...")
     df_update['현재_재고수량'] = df_update['현재_재고수량'].astype(str).str.replace(',', '').replace('-', '0')
     df_update['현재_재고수량'] = pd.to_numeric(df_update['현재_재고수량'], errors='coerce').fillna(0)
@@ -87,7 +73,7 @@ def update_inventory_from_today_csv(today_csv_path='today.csv'):
 
     print(f"   ✅ {len(df_update)}개 약품 데이터 준비 완료")
 
-    # 7. DB에 UPSERT
+    # 6. DB에 UPSERT
     print("\n💾 데이터베이스 업데이트 중...")
     result = inventory_db.upsert_inventory(df_update, show_summary=True)
 

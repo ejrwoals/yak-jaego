@@ -5,6 +5,7 @@
 """
 
 import pandas as pd
+import os
 
 
 def normalize_drug_code(code):
@@ -94,6 +95,82 @@ def safe_float_conversion(value, default=0.0):
         return float(value)
     except (ValueError, TypeError):
         return default
+
+
+def read_today_file(base_name='today'):
+    """
+    today.csv 또는 today.xls/today.xlsx 파일을 자동으로 찾아서 읽기
+
+    Args:
+        base_name (str): 기본 파일명 (확장자 제외)
+
+    Returns:
+        tuple: (pd.DataFrame, str) - (데이터프레임, 사용된 파일 경로)
+               파일이 없으면 (None, None) 반환
+
+    Examples:
+        >>> df, filepath = read_today_file('today')
+        >>> if df is not None:
+        >>>     print(f"파일 로드 성공: {filepath}")
+    """
+    # 지원하는 파일 확장자 우선순위 (CSV 우선)
+    extensions = ['.csv', '.xls', '.xlsx']
+
+    for ext in extensions:
+        filepath = f"{base_name}{ext}"
+
+        if not os.path.exists(filepath):
+            continue
+
+        print(f"📂 {filepath} 파일 발견")
+
+        try:
+            if ext == '.csv':
+                # CSV 파일 읽기 (다중 인코딩 시도)
+                df = None
+                for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                    try:
+                        df = pd.read_csv(filepath, encoding=encoding)
+                        print(f"   ✅ 파일 읽기 성공 ({encoding} 인코딩)")
+                        return df, filepath
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        print(f"   ⚠️  CSV 읽기 오류: {e}")
+                        return None, None
+
+                if df is None:
+                    print(f"   ❌ CSV 파일을 읽을 수 없습니다 (인코딩 문제)")
+                    return None, None
+
+            elif ext in ['.xls', '.xlsx']:
+                # Excel 파일 읽기
+                # calamine 엔진: 윈도우에서 생성된 오래된 .xls 파일도 지원
+                # openpyxl 엔진: .xlsx 파일에 최적화
+                try:
+                    # .xls는 calamine, .xlsx는 openpyxl 우선 사용
+                    engine = 'calamine' if ext == '.xls' else 'openpyxl'
+                    df = pd.read_excel(filepath, engine=engine)
+                    print(f"   ✅ Excel 파일 읽기 성공 ({engine} 엔진)")
+                    return df, filepath
+                except Exception as e:
+                    # 실패 시 다른 엔진 시도
+                    fallback_engine = 'openpyxl' if ext == '.xls' else 'calamine'
+                    try:
+                        df = pd.read_excel(filepath, engine=fallback_engine)
+                        print(f"   ✅ Excel 파일 읽기 성공 ({fallback_engine} 엔진)")
+                        return df, filepath
+                    except Exception as e2:
+                        print(f"   ❌ Excel 파일 읽기 실패: {e}")
+                        return None, None
+
+        except Exception as e:
+            print(f"   ❌ 파일 읽기 중 오류 발생: {e}")
+            return None, None
+
+    # 어떤 파일도 찾지 못함
+    print(f"⚠️  {base_name}.csv, {base_name}.xls, {base_name}.xlsx 파일을 찾을 수 없습니다.")
+    return None, None
 
 
 if __name__ == '__main__':

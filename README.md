@@ -102,13 +102,17 @@
    - 지원 형식: `YYYY-MM.csv`, `YYYYMM.csv`, `YYYY_MM.csv`, `YYYY년 MM월.csv`
    - 예시: `2025-01.csv`, `202501.csv`, `2025_01.csv`, `2025년 1월.csv`
 
-#### today.csv 파일 준비 (워크플로우 2에 필요)
+#### today 파일 준비 (워크플로우 2에 필요)
 
-1. **today.csv 파일**:
-   - 오늘 나간 약품의 재고 현황을 담은 CSV 파일
-   - 루트 디렉토리에 `today.csv`로 저장
+1. **today 파일** (CSV 또는 Excel 형식):
+   - 오늘 나간 약품의 재고 현황을 담은 파일
+   - 루트 디렉토리에 다음 형식 중 하나로 저장:
+     - `today.csv` (CSV 파일)
+     - `today.xls` (Excel 97-2003 파일, 윈도우 호환)
+     - `today.xlsx` (최신 Excel 파일)
    - 필수 컬럼: `약품명`, `약품코드`, `제약회사`, `재고수량`
-   - **중요**: today.csv에 있는 약품들만 주문 보고서에 표시됩니다
+   - **중요**: today 파일에 있는 약품들만 주문 보고서에 표시됩니다
+   - **편의성**: Excel 파일을 CSV로 수동 변환할 필요 없이 바로 사용 가능
 
 ## 📖 사용 방법
 
@@ -175,15 +179,15 @@ python web_app.py
 ### 워크플로우 2: 주문 수량 산출
 
 **실행 전 요구사항:**
-- `today.csv`: 오늘 나간 약품의 재고 현황 파일 (루트 디렉토리)
+- `today.csv/xls/xlsx`: 오늘 나간 약품의 재고 현황 파일 (루트 디렉토리, 형식 자유)
 - `processed_inventory.sqlite3`: init_db.py로 생성된 DB
 - `recent_inventory.sqlite3`: init_db.py로 생성된 DB
 
 **실행 과정:**
-1. today.csv 발견 시 자동으로 `recent_inventory.sqlite3` 업데이트
-2. today.csv에서 오늘 나간 약품 코드 추출
+1. today 파일 발견 시 자동으로 `recent_inventory.sqlite3` 업데이트
+2. today 파일에서 오늘 나간 약품 코드 추출
 3. processed_inventory DB에서 시계열 통계 로드
-4. recent_inventory DB에서 현재 재고 로드 → **today.csv 약품만 필터링**
+4. recent_inventory DB에서 현재 재고 로드 → **today 파일 약품만 필터링**
 5. 데이터 병합 및 런웨이 계산
 6. HTML/CSV 보고서 생성 (런웨이 오름차순 정렬)
 
@@ -193,20 +197,20 @@ python web_app.py
 
 **보고서 특징:**
 - 🚨 런웨이 < 1개월 약품은 빨간색으로 강조
-- 📋 오늘 나간 약품만 표시 (today.csv 기준)
+- 📋 오늘 나간 약품만 표시 (today 파일 기준)
 - 📊 긴급도 순서로 자동 정렬
 - 📈 1년 이동평균 및 3개월 이동평균 기반 이중 런웨이 제공
 
 ### 🔄 재고 업데이트 (선택 사항)
 
-today.csv를 업데이트한 후 DB만 갱신하고 싶을 때:
+today 파일을 업데이트한 후 DB만 갱신하고 싶을 때:
 
 ```bash
 python inventory_updater.py
 ```
 
 **동작:**
-- today.csv의 재고 정보를 `recent_inventory.sqlite3`에 반영
+- today 파일(csv/xls/xlsx)의 재고 정보를 `recent_inventory.sqlite3`에 반영
 - UPSERT 방식으로 안전하게 업데이트 (중복 실행해도 안전)
 - 워크플로우 2를 실행하면 자동으로 실행되므로 선택 사항
 
@@ -236,10 +240,10 @@ yak-jaego/
 ├── drug_order_calculator.py       # 주문 수량 산출 모듈
 ├── inventory_db.py                # recent_inventory.sqlite3 관리 모듈
 ├── processed_inventory_db.py      # processed_inventory.sqlite3 관리 모듈
-├── inventory_updater.py           # 재고 업데이트 모듈 (today.csv → DB)
-├── utils.py                       # 공통 유틸리티 함수
+├── inventory_updater.py           # 재고 업데이트 모듈 (today 파일 → DB)
+├── utils.py                       # 공통 유틸리티 함수 (Excel 파일 읽기 포함)
 ├── requirements.txt               # Python 의존성 목록
-├── today.csv                      # 오늘 나간 약품의 재고 현황 (사용자 제공)
+├── today.csv/xls/xlsx             # 오늘 나간 약품의 재고 현황 (사용자 제공)
 ├── recent_inventory.sqlite3       # 최신 재고 DB (자동 생성)
 ├── processed_inventory.sqlite3    # 시계열 통계 DB (자동 생성)
 └── README.md                      # 프로젝트 문서
@@ -398,11 +402,34 @@ for month in months_reversed:
 ### inventory_updater.py - 재고 업데이트
 
 #### 주요 기능:
-- today.csv → recent_inventory.sqlite3 업데이트
+- today 파일(csv/xls/xlsx) → recent_inventory.sqlite3 업데이트
+- 다양한 Excel 형식 자동 감지 및 처리
 - UPSERT 연산으로 안전한 업데이트
 - 중복 실행해도 문제없음
 
+### utils.py - 공통 유틸리티 함수
+
+#### 주요 기능:
+- **Excel 파일 읽기**: CSV, XLS, XLSX 형식 자동 감지
+  - `calamine` 엔진: 윈도우에서 생성된 오래된 .xls 파일 지원
+  - `openpyxl` 엔진: 최신 .xlsx 파일 지원
+- 약품코드 정규화 및 데이터 검증
+- 다중 인코딩 지원 (UTF-8, CP949, EUC-KR)
+
 ## 🎯 핵심 개선 사항
+
+### v3.2 업데이트 (Excel 파일 직접 지원)
+
+1. **Excel 파일 직접 읽기**
+   - today.xls, today.xlsx 파일을 수동 변환 없이 바로 사용 가능
+   - 윈도우에서 생성된 오래된 .xls 파일도 완벽 지원 (calamine 엔진)
+   - 매일 Excel → CSV 변환 작업 불필요
+   - 파일 형식 자동 감지 및 최적 엔진 선택
+
+2. **개선된 사용자 경험**
+   - 원본 Excel 파일을 그대로 사용
+   - 변환 과정에서 발생하는 인코딩 문제 제거
+   - 워크플로우 간소화
 
 ### v3.1 업데이트 (Robust 데이터 통합)
 
@@ -439,10 +466,11 @@ for month in months_reversed:
    - 마이너스 재고도 정확히 반영
    - 실제 약국 운영 상황 정확히 표현
 
-5. **today.csv 기반 필터링**
+5. **today 파일 기반 필터링**
    - 주문 보고서에 오늘 나간 약품만 표시
    - 실용적인 주문 계산
    - 불필요한 정보 제거
+   - CSV, XLS, XLSX 형식 모두 지원
 
 ### v2.0 업데이트 (시계열 분석)
 

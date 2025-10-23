@@ -74,31 +74,34 @@ def load_processed_data():
 def load_recent_inventory():
     """
     SQLite DB에서 최신 재고 데이터 로드
-    today.csv가 있으면 먼저 DB를 업데이트하고, today.csv에 있는 약품들만 필터링
+    today.csv/xls/xlsx가 있으면 먼저 DB를 업데이트하고, 해당 파일에 있는 약품들만 필터링
     """
     print("\n🔍 Step 2: 최신 재고 데이터 로드")
     print("-" * 30)
 
     today_drug_codes = None
+    today_filepath = None
 
-    # today.csv가 있으면 먼저 DB 업데이트 및 약품코드 추출
-    if os.path.exists('today.csv'):
-        print("📂 today.csv 발견 - DB 업데이트 중...")
+    # today 파일(csv/xls/xlsx)이 있는지 확인
+    from utils import read_today_file
+    today_df_temp, today_filepath = read_today_file('today')
+
+    if today_df_temp is not None and today_filepath:
+        print(f"📂 {today_filepath} 발견 - DB 업데이트 중...")
         try:
             from inventory_updater import update_inventory_from_today_csv
-            result = update_inventory_from_today_csv('today.csv')
+            result = update_inventory_from_today_csv('today')
             if result:
                 print(f"   ✅ DB 업데이트 완료 (업데이트: {result['updated']}건, 신규: {result['inserted']}건)")
 
-            # today.csv에서 약품코드 추출
+            # today 파일에서 약품코드 추출
             from read_csv import normalize_drug_code
-            today_df = pd.read_csv('today.csv', encoding='utf-8')
-            if '약품코드' in today_df.columns:
-                today_df['약품코드'] = today_df['약품코드'].apply(normalize_drug_code)
-                today_drug_codes = set(today_df['약품코드'].dropna().unique())
-                print(f"   📋 today.csv에서 {len(today_drug_codes)}개 약품 발견 (오늘 나간 약품)")
+            if '약품코드' in today_df_temp.columns:
+                today_df_temp['약품코드'] = today_df_temp['약품코드'].apply(normalize_drug_code)
+                today_drug_codes = set(today_df_temp['약품코드'].dropna().unique())
+                print(f"   📋 {os.path.basename(today_filepath)}에서 {len(today_drug_codes)}개 약품 발견 (오늘 나간 약품)")
         except Exception as e:
-            print(f"   ⚠️  today.csv 처리 실패: {e}")
+            print(f"   ⚠️  today 파일 처리 실패: {e}")
             print("   전체 DB 데이터를 사용합니다.")
 
     # SQLite DB에서 재고 데이터 로드

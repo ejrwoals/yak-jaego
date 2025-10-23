@@ -24,6 +24,7 @@ from drug_order_calculator import run as run_order_calculator
 import inventory_db
 import processed_inventory_db
 import inventory_updater
+from utils import read_today_file
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
@@ -135,13 +136,15 @@ def generate_report():
 def calculate_order():
     """주문 수량 산출 API"""
     try:
-        # today.csv 존재 여부 확인
-        if not os.path.exists('today.csv'):
-            return jsonify({'error': 'today.csv 파일이 없습니다.'}), 404
+        # today 파일(csv/xls/xlsx) 존재 여부 확인
+        df_today, today_filepath = read_today_file('today')
 
-        # today.csv가 있으면 재고 업데이트
-        print("📦 today.csv 발견 - 재고 업데이트 중...")
-        inventory_updater.update_inventory_from_today_csv()
+        if df_today is None:
+            return jsonify({'error': 'today.csv, today.xls, today.xlsx 파일이 없습니다.'}), 404
+
+        # today 파일이 있으면 재고 업데이트
+        print(f"📦 {os.path.basename(today_filepath)} 발견 - 재고 업데이트 중...")
+        inventory_updater.update_inventory_from_today_csv('today')
         print("✅ 재고 업데이트 완료")
 
         # 시계열 데이터 로드
@@ -149,15 +152,14 @@ def calculate_order():
         if df_processed.empty:
             return jsonify({'error': '시계열 통계 데이터가 없습니다.'}), 404
 
-        # today.csv에서 약품코드 추출
-        df_today = pd.read_csv('today.csv', encoding='utf-8-sig', dtype={'약품코드': str})
+        # today 파일에서 약품코드 추출
         today_codes = set(df_today['약품코드'].astype(str))
 
-        # processed 데이터를 today.csv 약품만 필터링
+        # processed 데이터를 today 파일 약품만 필터링
         df_processed_filtered = df_processed[df_processed['약품코드'].isin(today_codes)].copy()
 
         if df_processed_filtered.empty:
-            return jsonify({'error': 'today.csv 약품에 대한 시계열 데이터가 없습니다.'}), 404
+            return jsonify({'error': 'today 파일 약품에 대한 시계열 데이터가 없습니다.'}), 404
 
         # 현재 재고 로드
         df_recent = inventory_db.get_all_inventory_as_df()
