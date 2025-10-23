@@ -402,7 +402,6 @@ def generate_html_report(df, months, mode='dispense'):
 
     # 데이터 행 추가 + 경량 스파크라인 생성
     for idx, row in df_sorted.iterrows():
-        runway_class = get_runway_class(row['런웨이'])
 
         # 경량 SVG 스파크라인 생성
         timeseries = row['월별_조제수량_리스트']
@@ -425,6 +424,9 @@ def generate_html_report(df, months, mode='dispense'):
             else:
                 ma3_runway_days = ma3_runway_months * 30.417
                 ma3_runway_display = f"{ma3_runway_days:.2f}일"
+
+        # 런웨이 클래스 결정 (런웨이 또는 3-MA 런웨이가 1개월 미만이면 경고)
+        runway_class = get_runway_class(row['런웨이'], ma3_runway_display)
 
         # 차트 데이터를 JSON으로 변환 (모달에서 사용)
         chart_data_json = create_chart_data_json(
@@ -743,17 +745,30 @@ def generate_html_report(df, months, mode='dispense'):
     
     return html_content
 
-def get_runway_class(runway):
-    """런웨이 값에 따라 CSS 클래스 결정"""
+def get_runway_class(runway, ma3_runway_display):
+    """런웨이 값에 따라 CSS 클래스 결정 (런웨이 또는 3-MA 런웨이가 1개월 미만이면 경고)"""
+    # 런웨이 체크
+    is_runway_low = False
     if '일' in runway:
-        # 30일 미만이면 경고
         try:
             days = float(runway.replace('일', ''))
             if days < 30:
-                return 'warning'
+                is_runway_low = True
         except:
             pass
-    return ''
+
+    # 3-MA 런웨이 체크
+    is_ma3_runway_low = False
+    if '일' in ma3_runway_display:
+        try:
+            days = float(ma3_runway_display.replace('일', ''))
+            if days < 30:
+                is_ma3_runway_low = True
+        except:
+            pass
+
+    # 둘 중 하나라도 1개월 미만이면 경고
+    return 'warning' if (is_runway_low or is_ma3_runway_low) else ''
 
 def analyze_runway(df):
     """런웨이 분포 분석 차트 생성 (페이지네이션 지원)"""

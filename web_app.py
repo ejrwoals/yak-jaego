@@ -500,6 +500,28 @@ def serve_report(filename):
     return "파일을 찾을 수 없습니다.", 404
 
 
+@app.route('/api/shutdown', methods=['POST'])
+def shutdown():
+    """Flask 앱 종료 API"""
+    try:
+        print("\n🛑 웹 애플리케이션 종료 요청 받음...")
+
+        # Flask 종료 함수 호출
+        shutdown_server = request.environ.get('werkzeug.server.shutdown')
+        if shutdown_server is None:
+            # Werkzeug 버전에 따라 다른 방법 사용
+            import signal
+            print("✅ 서버를 종료합니다...")
+            os.kill(os.getpid(), signal.SIGINT)
+        else:
+            shutdown_server()
+
+        return jsonify({'success': True, 'message': '서버가 종료됩니다...'})
+    except Exception as e:
+        print(f"⚠️  종료 중 오류 발생: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 def open_browser():
     """브라우저 자동 열기"""
     webbrowser.open('http://127.0.0.1:5000/')

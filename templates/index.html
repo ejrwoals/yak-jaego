@@ -648,6 +648,36 @@
             color: #95a5a6;
             font-size: 0.9em;
         }
+
+        .btn-shutdown {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .btn-shutdown:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+        }
+
+        .btn-shutdown:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -745,6 +775,11 @@
             <p>Jaego v3.0 - SQLite 기반 재고 관리 시스템</p>
         </div>
     </div>
+
+    <button class="btn-shutdown" onclick="shutdownServer()">
+        <span>🛑</span>
+        <span>종료</span>
+    </button>
 
     <script>
         // DB 정보 토글
@@ -861,6 +896,34 @@
             loadReports('timeseries');
             reportsLoaded.timeseries = true;
         });
+
+        // 서버 종료
+        async function shutdownServer() {
+            if (!confirm('정말 애플리케이션을 종료하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/shutdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    alert('애플리케이션이 종료됩니다. 이 창을 닫아주세요.');
+                    // 페이지 비활성화
+                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                } else {
+                    alert('종료 요청에 실패했습니다.');
+                }
+            } catch (error) {
+                // 서버가 종료되면서 fetch가 실패할 수 있음 (정상 동작)
+                console.log('서버 종료됨');
+                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+            }
+        }
     </script>
 </body>
 </html>
