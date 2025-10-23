@@ -28,6 +28,16 @@ from utils import read_today_file
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
+app.config['UPLOAD_FOLDER'] = 'uploads'  # 임시 업로드 폴더
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 제한
+
+# 허용된 파일 확장자
+ALLOWED_EXTENSIONS = {'csv', 'xls', 'xlsx'}
+
+
+def allowed_file(filename):
+    """파일 확장자 검증"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def check_database_ready():
@@ -134,17 +144,49 @@ def generate_report():
 
 @app.route('/api/calculate-order', methods=['POST'])
 def calculate_order():
-    """주문 수량 산출 API"""
+    """주문 수량 산출 API (파일 업로드 지원)"""
+    temp_filepath = None
+
     try:
-        # today 파일(csv/xls/xlsx) 존재 여부 확인
-        df_today, today_filepath = read_today_file('today')
+        # 파일이 업로드 되었는지 확인
+        if 'todayFile' not in request.files:
+            return jsonify({'error': '파일이 업로드되지 않았습니다.'}), 400
+
+        file = request.files['todayFile']
+
+        # 파일이 실제로 선택되었는지 확인
+        if file.filename == '':
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
+
+        # 확장자 검증
+        if not allowed_file(file.filename):
+            return jsonify({'error': '허용되지 않는 파일 형식입니다. (csv, xls, xlsx만 가능)'}), 400
+
+        # 임시 파일명 생성 (충돌 방지)
+        import uuid
+        temp_filename = f"temp_today_{uuid.uuid4().hex[:8]}{os.path.splitext(file.filename)[1]}"
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+
+        # uploads 폴더가 없으면 생성
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+        # 파일 저장
+        file.save(temp_filepath)
+        print(f"📦 {file.filename} 업로드 완료 - 재고 업데이트 중...")
+
+        # 절대 경로로 변환
+        abs_temp_filepath = os.path.abspath(temp_filepath)
+
+        # 업로드된 파일 읽기
+        df_today, today_filepath = read_today_file(abs_temp_filepath)
 
         if df_today is None:
-            return jsonify({'error': 'today.csv, today.xls, today.xlsx 파일이 없습니다.'}), 404
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+            return jsonify({'error': '파일을 읽을 수 없습니다. 파일 형식을 확인해주세요.'}), 400
 
-        # today 파일이 있으면 재고 업데이트
-        print(f"📦 {os.path.basename(today_filepath)} 발견 - 재고 업데이트 중...")
-        inventory_updater.update_inventory_from_today_csv('today')
+        # 재고 업데이트
+        inventory_updater.update_inventory_from_today_csv(abs_temp_filepath)
         print("✅ 재고 업데이트 완료")
 
         # 시계열 데이터 로드
@@ -207,6 +249,11 @@ def calculate_order():
         # CSV 저장
         df_merged.to_csv(csv_path, index=False, encoding='utf-8-sig')
 
+        # 처리 완료 후 임시 파일 삭제
+        if temp_filepath and os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
+            print(f"🗑️  임시 파일 삭제: {temp_filepath}")
+
         return jsonify({
             'success': True,
             'html_path': html_path,
@@ -218,6 +265,11 @@ def calculate_order():
         })
 
     except Exception as e:
+        # 에러 발생 시에도 임시 파일 정리
+        if temp_filepath and os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
+            print(f"🗑️  임시 파일 삭제 (에러): {temp_filepath}")
+
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

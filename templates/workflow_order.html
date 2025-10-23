@@ -91,6 +91,39 @@
             margin: 5px 0;
         }
 
+        .upload-section {
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-name {
+            margin-top: 15px;
+            font-size: 0.95em;
+            color: #7f8c8d;
+            min-height: 24px;
+        }
+
+        .file-name.selected {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
         .calculate-btn {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
@@ -169,14 +202,22 @@
         <div class="info-box">
             <h3>⚠️ 실행 전 확인사항</h3>
             <ul>
-                <li><strong>today.xls</strong> (또는 <strong>.xlsx</strong>) 파일이 루트 디렉토리에 있어야 합니다</li>
-                <li>오늘 나간 약품의 재고 현황이 포함되어야 합니다</li>
+                <li>오늘 나간 약품의 재고 현황 파일을 업로드해주세요</li>
+                <li>지원 형식: <strong>.csv, .xls, .xlsx</strong></li>
+                <li>필수 컬럼: 약품명, 약품코드, 제약회사, 재고수량</li>
                 <li>런웨이 1개월 미만 약품은 빨간색으로 강조됩니다</li>
-                <li>긴급도 순서로 자동 정렬됩니다</li>
             </ul>
         </div>
 
-        <button class="calculate-btn" onclick="calculateOrder()" id="calculateBtn">
+        <div class="upload-section">
+            <label for="todayFileInput" class="file-label">
+                📂 재고 현황 파일 선택
+            </label>
+            <input type="file" id="todayFileInput" accept=".csv,.xls,.xlsx" style="display: none;">
+            <div id="fileName" class="file-name">파일이 선택되지 않았습니다</div>
+        </div>
+
+        <button class="calculate-btn" onclick="calculateOrder()" id="calculateBtn" disabled>
             주문 수량 계산하기
         </button>
 
@@ -184,8 +225,33 @@
     </div>
 
     <script>
+        // 파일 선택 핸들러
+        const fileInput = document.getElementById('todayFileInput');
+        const fileName = document.getElementById('fileName');
+        const calculateBtn = document.getElementById('calculateBtn');
+
+        // label의 for 속성이 자동으로 input과 연결되므로 클릭 이벤트는 불필요
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileName.textContent = `✅ ${file.name}`;
+                fileName.classList.add('selected');
+                calculateBtn.disabled = false;  // 버튼 활성화
+            } else {
+                fileName.textContent = '파일이 선택되지 않았습니다';
+                fileName.classList.remove('selected');
+                calculateBtn.disabled = true;  // 버튼 비활성화
+            }
+        });
+
         async function calculateOrder() {
-            const btn = document.getElementById('calculateBtn');
+            const file = fileInput.files[0];
+            if (!file) {
+                showStatus('❌ 파일을 먼저 선택해주세요', 'error');
+                return;
+            }
+
+            const btn = calculateBtn;
             const originalText = btn.innerHTML;
 
             try {
@@ -193,14 +259,16 @@
                 btn.disabled = true;
                 btn.innerHTML = '<span class="loading"></span> 계산 중...';
 
-                showStatus('today.csv를 확인하고 주문 수량을 계산하고 있습니다...', 'info');
+                // FormData 생성
+                const formData = new FormData();
+                formData.append('todayFile', file);
 
-                // API 호출
+                showStatus('파일을 업로드하고 주문 수량을 계산하고 있습니다...', 'info');
+
+                // API 호출 (multipart/form-data)
                 const response = await fetch('/api/calculate-order', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                    body: formData  // Content-Type은 자동으로 설정됨
                 });
 
                 const result = await response.json();
@@ -211,9 +279,15 @@
                     // 새 탭에서 보고서 열기
                     setTimeout(() => {
                         window.open(`/reports/${result.html_filename}`, '_blank');
-                        // 버튼 복원
-                        btn.disabled = false;
+
+                        // 버튼 복원 및 초기화
+                        btn.disabled = true;
                         btn.innerHTML = originalText;
+
+                        // 파일 선택 초기화
+                        fileInput.value = '';
+                        fileName.textContent = '파일이 선택되지 않았습니다';
+                        fileName.classList.remove('selected');
                     }, 800);
                 } else {
                     showStatus(`❌ 오류: ${result.error}`, 'error');

@@ -97,12 +97,13 @@ def safe_float_conversion(value, default=0.0):
         return default
 
 
-def read_today_file(base_name='today'):
+def read_today_file(base_name_or_path='today'):
     """
     today.csv 또는 today.xls/today.xlsx 파일을 자동으로 찾아서 읽기
+    절대 경로가 주어지면 해당 파일을 직접 읽기
 
     Args:
-        base_name (str): 기본 파일명 (확장자 제외)
+        base_name_or_path (str): 기본 파일명 (확장자 제외) 또는 절대 경로
 
     Returns:
         tuple: (pd.DataFrame, str) - (데이터프레임, 사용된 파일 경로)
@@ -112,12 +113,68 @@ def read_today_file(base_name='today'):
         >>> df, filepath = read_today_file('today')
         >>> if df is not None:
         >>>     print(f"파일 로드 성공: {filepath}")
+        >>>
+        >>> # 절대 경로 사용
+        >>> df, filepath = read_today_file('/path/to/file.xlsx')
     """
+
+    # 절대 경로가 주어진 경우 직접 처리
+    if os.path.isabs(base_name_or_path) and os.path.exists(base_name_or_path):
+        filepath = base_name_or_path
+        ext = os.path.splitext(filepath)[1].lower()
+
+        print(f"📂 {filepath} 파일 발견 (절대 경로)")
+
+        try:
+            if ext == '.csv':
+                # CSV 파일 읽기 (다중 인코딩 시도)
+                df = None
+                for encoding in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
+                    try:
+                        df = pd.read_csv(filepath, encoding=encoding)
+                        print(f"   ✅ 파일 읽기 성공 ({encoding} 인코딩)")
+                        return df, filepath
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        print(f"   ⚠️  CSV 읽기 오류: {e}")
+                        return None, None
+
+                if df is None:
+                    print(f"   ❌ CSV 파일을 읽을 수 없습니다 (인코딩 문제)")
+                    return None, None
+
+            elif ext in ['.xls', '.xlsx']:
+                # Excel 파일 읽기
+                try:
+                    engine = 'calamine' if ext == '.xls' else 'openpyxl'
+                    df = pd.read_excel(filepath, engine=engine)
+                    print(f"   ✅ Excel 파일 읽기 성공 ({engine} 엔진)")
+                    return df, filepath
+                except Exception as e:
+                    # 실패 시 다른 엔진 시도
+                    fallback_engine = 'openpyxl' if ext == '.xls' else 'calamine'
+                    try:
+                        df = pd.read_excel(filepath, engine=fallback_engine)
+                        print(f"   ✅ Excel 파일 읽기 성공 ({fallback_engine} 엔진)")
+                        return df, filepath
+                    except Exception as e2:
+                        print(f"   ❌ Excel 파일 읽기 실패: {e}")
+                        return None, None
+            else:
+                print(f"   ❌ 지원하지 않는 파일 형식입니다: {ext}")
+                return None, None
+
+        except Exception as e:
+            print(f"   ❌ 파일 읽기 중 오류 발생: {e}")
+            return None, None
+
+    # 기본 로직: base_name으로 루트 디렉토리에서 찾기
     # 지원하는 파일 확장자 우선순위 (CSV 우선)
     extensions = ['.csv', '.xls', '.xlsx']
 
     for ext in extensions:
-        filepath = f"{base_name}{ext}"
+        filepath = f"{base_name_or_path}{ext}"
 
         if not os.path.exists(filepath):
             continue
@@ -128,7 +185,7 @@ def read_today_file(base_name='today'):
             if ext == '.csv':
                 # CSV 파일 읽기 (다중 인코딩 시도)
                 df = None
-                for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                for encoding in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
                     try:
                         df = pd.read_csv(filepath, encoding=encoding)
                         print(f"   ✅ 파일 읽기 성공 ({encoding} 인코딩)")
@@ -169,7 +226,7 @@ def read_today_file(base_name='today'):
             return None, None
 
     # 어떤 파일도 찾지 못함
-    print(f"⚠️  {base_name}.csv, {base_name}.xls, {base_name}.xlsx 파일을 찾을 수 없습니다.")
+    print(f"⚠️  {base_name_or_path}.csv, {base_name_or_path}.xls, {base_name_or_path}.xlsx 파일을 찾을 수 없습니다.")
     return None, None
 
 

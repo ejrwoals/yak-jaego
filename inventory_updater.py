@@ -16,9 +16,10 @@ def update_inventory_from_today_csv(today_csv_path='today.csv'):
     today.csv/xls/xlsx를 읽어서 recent_inventory.sqlite3를 업데이트
 
     파일명이 'today.csv'로 지정되어 있어도 today.xls, today.xlsx도 자동으로 인식합니다.
+    절대 경로가 주어지면 해당 파일을 직접 읽습니다.
 
     Args:
-        today_csv_path (str): today 파일 경로 (확장자 포함/미포함 모두 가능)
+        today_csv_path (str): today 파일 경로 (확장자 포함/미포함 모두 가능) 또는 절대 경로
 
     Returns:
         dict: 업데이트 결과 {'updated': int, 'inserted': int, 'failed': int}
@@ -26,10 +27,14 @@ def update_inventory_from_today_csv(today_csv_path='today.csv'):
     print(f"\n=== today 파일로 재고 업데이트 ===")
 
     # 1. today 파일 읽기 (CSV, XLS, XLSX 자동 감지)
-    # 확장자가 있는 경우 제거하여 base_name만 추출
-    base_name = os.path.splitext(today_csv_path)[0]
+    # 절대 경로인 경우 그대로 전달, 아니면 base_name만 추출
+    if os.path.isabs(today_csv_path):
+        path_to_use = today_csv_path
+    else:
+        # 확장자가 있는 경우 제거하여 base_name만 추출
+        path_to_use = os.path.splitext(today_csv_path)[0]
 
-    df, filepath = read_today_file(base_name)
+    df, filepath = read_today_file(path_to_use)
 
     if df is None:
         print(f"⚠️  today 파일을 찾을 수 없습니다. 업데이트를 건너뜁니다.")
