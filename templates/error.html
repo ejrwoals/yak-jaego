@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오류 - Jaego</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .error-icon {
+            font-size: 5em;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #c62828;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .error-box {
+            background-color: #ffebee;
+            border-left: 4px solid #c62828;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .error-box h3 {
+            color: #c62828;
+            margin-bottom: 10px;
+        }
+
+        .error-box p {
+            color: #b71c1c;
+            line-height: 1.6;
+        }
+
+        .suggestion-box {
+            background-color: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .suggestion-box h3 {
+            color: #1565c0;
+            margin-bottom: 10px;
+        }
+
+        .suggestion-box p {
+            color: #0d47a1;
+            line-height: 1.6;
+        }
+
+        .suggestion-box code {
+            background-color: #263238;
+            color: #aed581;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+
+        .home-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 30px;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .home-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .divider {
+            height: 2px;
+            background: linear-gradient(to right, transparent, #e0e0e0, transparent);
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-icon">❌</div>
+        <h1>데이터베이스 오류</h1>
+
+        <div class="error-box">
+            <h3>오류 내용</h3>
+            <p>{{ error_message }}</p>
+        </div>
+
+        {% if suggestion %}
+        <div class="suggestion-box">
+            <h3>💡 해결 방법</h3>
+            <p>{{ suggestion }}</p>
+        </div>
+        {% endif %}
+
+        <div class="divider"></div>
+
+        <div style="text-align: left; color: #7f8c8d; margin: 20px 0;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">데이터베이스 초기화 방법</h3>
+            <ol style="line-height: 2; margin-left: 20px;">
+                <li><strong>월별 CSV 파일 준비:</strong> <code>data/</code> 폴더에 월별 약품 데이터 파일을 넣으세요</li>
+                <li><strong>DB 초기화 실행:</strong> 터미널에서 <code style="background-color: #263238; color: #aed581; padding: 4px 8px; border-radius: 4px; font-family: monospace;">python init_db.py</code> 명령어를 실행하세요</li>
+                <li><strong>완료 확인:</strong> 초기화가 완료되면 이 페이지로 돌아오세요</li>
+            </ol>
+        </div>
+
+        <a href="/" class="home-btn">홈으로 돌아가기</a>
+    </div>
+</body>
+</html>

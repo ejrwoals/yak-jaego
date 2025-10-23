@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jaego - 약국 재고 관리 시스템</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px;
+            max-width: 800px;
+            width: 100%;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header .emoji {
+            font-size: 2em;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1em;
+        }
+
+        .db-info {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            border-radius: 10px;
+            margin-bottom: 40px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .db-info-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .db-info-header:hover {
+            background-color: #e0f2f1;
+        }
+
+        .db-info-title {
+            color: #2e7d32;
+            font-size: 1.1em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .db-info-arrow {
+            color: #4caf50;
+            font-size: 0.9em;
+            transition: transform 0.3s ease;
+        }
+
+        .db-info-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .db-info-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .db-info-content.open {
+            max-height: 300px;
+        }
+
+        .db-info-body {
+            padding: 0 20px 20px 20px;
+        }
+
+        .db-info p {
+            color: #1b5e20;
+            margin: 8px 0;
+            font-size: 0.95em;
+        }
+
+        .db-info-summary {
+            color: #2e7d32;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .tabs-container {
+            margin-bottom: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .tab-button {
+            background: white;
+            border: 2px solid #e0e0e0;
+            color: #7f8c8d;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .tab-button:hover {
+            border-color: #cbd5e0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .tab-button.active.order-tab {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.4s ease-in;
+        }
+
+        .workflow-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .workflow-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .workflow-section {
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .workflow-section h3 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-new {
+            background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+            border: 2px solid #e8eeff;
+        }
+
+        .section-history {
+            background: linear-gradient(135deg, #fff8f8 0%, #fff0f0 100%);
+            border: 2px solid #ffe8e8;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-new {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            text-decoration: none;
+            display: block;
+            text-align: center;
+        }
+
+        .btn-new:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-new.order {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+        }
+
+        .btn-new.order:hover {
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+
+        .report-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .report-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .report-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .report-list::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 10px;
+        }
+
+        .report-list::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+
+        .report-item {
+            background: white;
+            border: 1px solid #e8ecef;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: block;
+            color: inherit;
+        }
+
+        .report-item:hover {
+            border-color: #cbd5e0;
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .report-item-time {
+            font-size: 0.8em;
+            color: #718096;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .report-item-type {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .report-item-type.dispense::before {
+            content: "💊";
+        }
+
+        .report-item-type.sale::before {
+            content: "🛒";
+        }
+
+        .report-item-type.order::before {
+            content: "📦";
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 30px;
+            color: #718096;
+        }
+
+        .workflow-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .workflow-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .workflow-card.timeseries {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .workflow-card.order {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .workflow-card .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .workflow-card h2 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        .workflow-card p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .workflow-wrapper {
+            position: relative;
+        }
+
+        .workflow-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: none;
+            color: inherit;
+            padding: 15px 24px;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .workflow-card.timeseries .btn-primary {
+            color: #667eea;
+        }
+
+        .workflow-card.order .btn-primary {
+            color: #f5576c;
+        }
+
+        .btn-primary:hover {
+            background-color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .dropdown-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .btn-dropdown {
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 0.95em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            white-space: nowrap;
+        }
+
+        .btn-dropdown:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .btn-dropdown-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-dropdown-arrow {
+            font-size: 0.8em;
+            transition: transform 0.3s ease;
+        }
+
+        .btn-dropdown-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 10px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+            z-index: 1000;
+            max-height: 320px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .dropdown-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .dropdown-menu::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .dropdown-menu::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 10px;
+        }
+
+        .dropdown-menu::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+            animation: dropdownFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes dropdownFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-15px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .dropdown-item {
+            padding: 14px 18px;
+            border-bottom: 1px solid #edf2f7;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #2d3748;
+            text-decoration: none;
+            display: block;
+        }
+
+        .dropdown-item:first-child {
+            border-radius: 12px 12px 0 0;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .dropdown-item:hover {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            padding-left: 22px;
+        }
+
+        .dropdown-item-time {
+            font-size: 0.8em;
+            color: #718096;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dropdown-item-time::before {
+            content: "🕐";
+            font-size: 0.9em;
+        }
+
+        .dropdown-item-type {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dropdown-item-type.dispense::before {
+            content: "💊";
+            font-size: 1em;
+        }
+
+        .dropdown-item-type.sale::before {
+            content: "🛒";
+            font-size: 1em;
+        }
+
+        .dropdown-item-type.order::before {
+            content: "📦";
+            font-size: 1em;
+        }
+
+        .dropdown-empty {
+            padding: 30px 20px;
+            text-align: center;
+            color: #a0aec0;
+            font-size: 0.9em;
+        }
+
+        .dropdown-empty::before {
+            content: "📭";
+            display: block;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            padding: 20px;
+            text-align: center;
+            color: #718096;
+        }
+
+        .loading::after {
+            content: "...";
+            animation: loadingDots 1.5s infinite;
+        }
+
+        @keyframes loadingDots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60%, 100% { content: "..."; }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab-button {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .workflow-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workflow-content {
+                padding: 20px;
+            }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #95a5a6;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span class="emoji">🏥</span>
+                <span>Jaego</span>
+            </h1>
+            <p>약국 재고 관리 및 분석 시스템</p>
+        </div>
+
+        <div class="db-info">
+            <div class="db-info-header" onclick="toggleDbInfo()">
+                <div class="db-info-title">
+                    <span>✅</span>
+                    <span>데이터베이스 준비 완료</span>
+                    <span class="db-info-summary">({{ db_stats.recent_count }}개 약품)</span>
+                </div>
+                <span class="db-info-arrow" id="db-info-arrow">▼</span>
+            </div>
+            <div class="db-info-content" id="db-info-content">
+                <div class="db-info-body">
+                    <p><strong>최신 재고:</strong> {{ db_stats.recent_count }}개 약품</p>
+                    <p><strong>시계열 통계:</strong> {{ db_stats.processed_stats.total }}개 약품</p>
+                    {% if db_stats.processed_stats.by_type %}
+                        {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
+                        <p style="margin-left: 20px;">• {{ drug_type }}: {{ count }}개</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="tabs-container">
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('timeseries')">
+                    <span>📊</span>
+                    <span>재고 관리 보고서</span>
+                </button>
+                <button class="tab-button order-tab" onclick="switchTab('order')">
+                    <span>📦</span>
+                    <span>주문 수량 산출</span>
+                </button>
+            </div>
+
+            <!-- 재고 관리 보고서 탭 -->
+            <div id="tab-timeseries" class="tab-content active">
+                <div class="workflow-content">
+                    <div class="workflow-grid">
+                        <!-- 새로 생성 섹션 -->
+                        <div class="workflow-section section-new">
+                            <h3>✨ 새로 생성하기</h3>
+                            <div class="action-buttons">
+                                <a href="/workflow/timeseries" class="btn-new">📊 재고 관리 보고서 생성</a>
+                            </div>
+                        </div>
+
+                        <!-- 과거 보고서 섹션 -->
+                        <div class="workflow-section section-history">
+                            <h3>📁 과거 보고서</h3>
+                            <div id="timeseries-reports" class="report-list">
+                                <div class="loading-state">로딩 중...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 주문 수량 산출 탭 -->
+            <div id="tab-order" class="tab-content">
+                <div class="workflow-content">
+                    <div class="workflow-grid">
+                        <!-- 새로 생성 섹션 -->
+                        <div class="workflow-section section-new">
+                            <h3>✨ 새로 생성하기</h3>
+                            <div class="action-buttons">
+                                <a href="/workflow/order" class="btn-new order">📦 주문 수량 산출</a>
+                            </div>
+                        </div>
+
+                        <!-- 과거 보고서 섹션 -->
+                        <div class="workflow-section section-history">
+                            <h3>📁 과거 보고서</h3>
+                            <div id="order-reports" class="report-list">
+                                <div class="loading-state">로딩 중...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Jaego v3.0 - SQLite 기반 재고 관리 시스템</p>
+        </div>
+    </div>
+
+    <script>
+        // DB 정보 토글
+        function toggleDbInfo() {
+            const content = document.getElementById('db-info-content');
+            const arrow = document.getElementById('db-info-arrow');
+
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        // 탭 전환
+        function switchTab(tabName) {
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // 모든 탭 컨텐츠 숨기기
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // 선택한 탭 활성화
+            const tabButton = event.target.closest('.tab-button');
+            if (tabButton) {
+                tabButton.classList.add('active');
+            }
+
+            const tabContent = document.getElementById(`tab-${tabName}`);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+
+            // 해당 탭의 보고서가 아직 로드되지 않았으면 로드
+            if (!reportsLoaded[tabName]) {
+                loadReports(tabName);
+                reportsLoaded[tabName] = true;
+            }
+        }
+
+        // 보고서 로드 상태 추적
+        const reportsLoaded = {
+            timeseries: false,
+            order: false
+        };
+
+        // 보고서 목록 로드
+        async function loadReports(type) {
+            const container = document.getElementById(`${type}-reports`);
+
+            try {
+                const response = await fetch(`/api/list-reports/${type}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <div>오류: ${data.error}</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (!data.reports || data.reports.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📭</div>
+                            <div>생성된 보고서가 없습니다</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 보고서 목록 렌더링
+                let html = '';
+                data.reports.forEach(report => {
+                    let typeClass = '';
+                    let typeText = '';
+
+                    if (type === 'timeseries') {
+                        typeText = report.drug_type;
+                        typeClass = report.drug_type === '전문약' ? 'dispense' : 'sale';
+                    } else {
+                        typeText = '주문 수량 산출';
+                        typeClass = 'order';
+                    }
+
+                    html += `
+                        <a href="/reports/${report.filename}" target="_blank" class="report-item">
+                            <div class="report-item-time">🕐 ${report.created_at}</div>
+                            <div class="report-item-type ${typeClass}">
+                                ${typeText}
+                            </div>
+                        </a>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('보고서 로드 실패:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">❌</div>
+                        <div>보고서를 불러오는데 실패했습니다</div>
+                    </div>
+                `;
+            }
+        }
+
+        // 페이지 로드 시 첫 번째 탭의 보고서 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            loadReports('timeseries');
+            reportsLoaded.timeseries = true;
+        });
+    </script>
+</body>
+</html>

@@ -368,6 +368,68 @@ def generate_order_report_html(df):
     return html
 
 
+@app.route('/api/list-reports/<report_type>')
+def list_reports(report_type):
+    """보고서 목록 조회 API"""
+    try:
+        if report_type == 'timeseries':
+            report_dir = 'inventory_reports'
+            file_prefix = 'inventory_report_'
+        elif report_type == 'order':
+            report_dir = 'order_calc_reports'
+            file_prefix = 'order_calculator_report_'
+        else:
+            return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
+
+        # 디렉토리 확인
+        if not os.path.exists(report_dir):
+            return jsonify({'reports': []})
+
+        # HTML 파일만 필터링
+        files = [f for f in os.listdir(report_dir)
+                if f.startswith(file_prefix) and f.endswith('.html')]
+
+        reports = []
+        for filename in files:
+            file_path = os.path.join(report_dir, filename)
+
+            # 파일 정보 추출
+            file_stat = os.stat(file_path)
+            created_time = datetime.fromtimestamp(file_stat.st_mtime)
+
+            # 파일명에서 정보 추출
+            report_info = {
+                'filename': filename,
+                'created_at': created_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'timestamp': file_stat.st_mtime,
+                'size': file_stat.st_size
+            }
+
+            # 시계열 보고서의 경우 전문약/일반약 구분
+            if report_type == 'timeseries':
+                if 'dispense' in filename:
+                    report_info['drug_type'] = '전문약'
+                elif 'sale' in filename:
+                    report_info['drug_type'] = '일반약'
+                else:
+                    report_info['drug_type'] = '미분류'
+
+            reports.append(report_info)
+
+        # 최신순 정렬
+        reports.sort(key=lambda x: x['timestamp'], reverse=True)
+
+        # 최대 10개만 반환 (드롭다운용)
+        reports = reports[:10]
+
+        return jsonify({'reports': reports})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/reports/<path:filename>')
 def serve_report(filename):
     """보고서 파일 제공"""
