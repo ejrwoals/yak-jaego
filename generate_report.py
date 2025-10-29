@@ -771,27 +771,45 @@ def get_runway_class(runway, ma3_runway_display):
     return 'warning' if (is_runway_low or is_ma3_runway_low) else ''
 
 def analyze_runway(df):
-    """런웨이 분포 분석 차트 생성 (페이지네이션 지원)"""
+    """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - 3-MA 런웨이 기준"""
     try:
-        # 런웨이를 숫자로 변환 (개월 단위)
+        # 3-MA 런웨이를 숫자로 변환 (개월 단위)
         low_data = []  # 3개월 이하
         high_data = []  # 3개월 초과
-        
+
         for _, row in df.iterrows():
-            runway = row['런웨이']
-            months = None
-            
-            if '개월' in runway:
-                months = float(runway.replace('개월', ''))
-            elif '일' in runway:
-                days = float(runway.replace('일', ''))
-                months = days / 30.417
-            
-            if months and months > 0:
-                if months <= 3:
-                    low_data.append((months, row['약품명']))
+            # 3개월 이동평균 (최신값) 계산
+            ma3_list = row['3개월_이동평균_리스트']
+            latest_ma3 = None
+            for val in reversed(ma3_list):
+                if val is not None:
+                    latest_ma3 = val
+                    break
+
+            # 3-MA 런웨이 계산
+            ma3_runway_months = None
+            if latest_ma3 and latest_ma3 > 0:
+                ma3_runway_months = row['최종_재고수량'] / latest_ma3
+
+            # 12-MA 런웨이 계산
+            ma12_runway_months = None
+            if row['1년_이동평균'] > 0:
+                ma12_runway_months = row['최종_재고수량'] / row['1년_이동평균']
+
+            if ma3_runway_months and ma3_runway_months > 0:
+                # 데이터 구조: (3-MA런웨이(개월), 약품명, 3개월평균, 12-MA런웨이(개월), 1년평균)
+                data_tuple = (
+                    ma3_runway_months,
+                    row['약품명'],
+                    latest_ma3,
+                    ma12_runway_months if ma12_runway_months else 0,
+                    row['1년_이동평균']
+                )
+
+                if ma3_runway_months <= 3:
+                    low_data.append(data_tuple)
                 else:
-                    high_data.append((months, row['약품명']))
+                    high_data.append(data_tuple)
         
         chart_js_low = None
         chart_js_high = None
@@ -801,26 +819,50 @@ def analyze_runway(df):
             import json
             low_data_sorted = sorted(low_data)
             low_data_json = json.dumps(low_data_sorted)
-            
+
             chart_js_low = f"""
                 var lowData = {low_data_json};
                 var currentPageLow = 0;
                 var itemsPerPage = 30;
-                
+
                 function updateChartLow() {{
                     var start = currentPageLow * itemsPerPage;
                     var end = start + itemsPerPage;
                     var pageData = lowData.slice(start, end);
-                    
+
                     if (pageData.length === 0) return;
-                    
+
+                    // 데이터 구조: [3-MA런웨이(개월), 약품명, 3개월평균, 12-MA런웨이(개월), 1년평균]
                     var values = pageData.map(function(item) {{ return item[0]; }});
                     var names = pageData.map(function(item) {{ return item[1]; }});
-                    
+                    var ma3Avg = pageData.map(function(item) {{ return item[2]; }});
+                    var ma12Runway = pageData.map(function(item) {{ return item[3]; }});
+                    var ma12Avg = pageData.map(function(item) {{ return item[4]; }});
+
                     // 하위 그룹: 런웨이가 짧은 것이 위에 오도록 역순
                     values.reverse();
                     names.reverse();
-                    
+                    ma3Avg.reverse();
+                    ma12Runway.reverse();
+                    ma12Avg.reverse();
+
+                    // 커스텀 호버 텍스트 생성
+                    var hoverTexts = [];
+                    for (var i = 0; i < values.length; i++) {{
+                        var ma3RunwayText = values[i] >= 1
+                            ? values[i].toFixed(2) + '개월'
+                            : (values[i] * 30.417).toFixed(2) + '일';
+
+                        var ma12RunwayText = ma12Runway[i] >= 1
+                            ? ma12Runway[i].toFixed(2) + '개월'
+                            : (ma12Runway[i] * 30.417).toFixed(2) + '일';
+
+                        hoverTexts.push(
+                            '- 3-MA 런웨이: ' + ma3RunwayText + '  (3개월 이동평균: ' + ma3Avg[i].toFixed(2) + ')<br>' +
+                            '- 12-MA 런웨이: ' + ma12RunwayText + '  (1년 이동평균: ' + ma12Avg[i].toFixed(2) + ')'
+                        );
+                    }}
+
                     var data = [{{
                         x: values,
                         y: names,
@@ -829,6 +871,8 @@ def analyze_runway(df):
                         text: values,
                         texttemplate: '%{{text:.2f}}개월',
                         textposition: 'outside',
+                        hovertext: hoverTexts,
+                        hoverinfo: 'text',
                         marker: {{
                             color: values,
                             colorscale: [
@@ -883,26 +927,50 @@ def analyze_runway(df):
         if high_data:
             high_data_sorted = sorted(high_data, reverse=True)
             high_data_json = json.dumps(high_data_sorted)
-            
+
             chart_js_high = f"""
                 var highData = {high_data_json};
                 var currentPageHigh = 0;
                 var itemsPerPageHigh = 30;
-                
+
                 function updateChartHigh() {{
                     var start = currentPageHigh * itemsPerPageHigh;
                     var end = start + itemsPerPageHigh;
                     var pageData = highData.slice(start, end);
-                    
+
                     if (pageData.length === 0) return;
-                    
+
+                    // 데이터 구조: [3-MA런웨이(개월), 약품명, 3개월평균, 12-MA런웨이(개월), 1년평균]
                     var values = pageData.map(function(item) {{ return item[0]; }});
                     var names = pageData.map(function(item) {{ return item[1]; }});
-                    
+                    var ma3Avg = pageData.map(function(item) {{ return item[2]; }});
+                    var ma12Runway = pageData.map(function(item) {{ return item[3]; }});
+                    var ma12Avg = pageData.map(function(item) {{ return item[4]; }});
+
                     // 상위 그룹: 런웨이가 긴 것이 위에 오도록 역순
                     values.reverse();
                     names.reverse();
-                    
+                    ma3Avg.reverse();
+                    ma12Runway.reverse();
+                    ma12Avg.reverse();
+
+                    // 커스텀 호버 텍스트 생성
+                    var hoverTexts = [];
+                    for (var i = 0; i < values.length; i++) {{
+                        var ma3RunwayText = values[i] >= 1
+                            ? values[i].toFixed(2) + '개월'
+                            : (values[i] * 30.417).toFixed(2) + '일';
+
+                        var ma12RunwayText = ma12Runway[i] >= 1
+                            ? ma12Runway[i].toFixed(2) + '개월'
+                            : (ma12Runway[i] * 30.417).toFixed(2) + '일';
+
+                        hoverTexts.push(
+                            '- 3-MA 런웨이: ' + ma3RunwayText + '  (3개월 이동평균: ' + ma3Avg[i].toFixed(2) + ')<br>' +
+                            '- 12-MA 런웨이: ' + ma12RunwayText + '  (1년 이동평균: ' + ma12Avg[i].toFixed(2) + ')'
+                        );
+                    }}
+
                     var data = [{{
                         x: values,
                         y: names,
@@ -911,6 +979,8 @@ def analyze_runway(df):
                         text: values,
                         texttemplate: '%{{text:.2f}}개월',
                         textposition: 'outside',
+                        hovertext: hoverTexts,
+                        hoverinfo: 'text',
                         marker: {{
                             color: 'rgb(34, 197, 94)'
                         }},
