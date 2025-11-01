@@ -114,7 +114,7 @@
         }
 
         .db-info-content.open {
-            max-height: 300px;
+            max-height: 450px;
         }
 
         .db-info-body {
@@ -131,6 +131,65 @@
             color: #2e7d32;
             font-size: 0.9em;
             font-weight: 500;
+        }
+
+        .btn-rebuild-db {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-rebuild-db:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn-rebuild-db:disabled {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .rebuild-status {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .rebuild-status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .rebuild-status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .rebuild-status.loading {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
         }
 
         .tabs-container {
@@ -701,13 +760,25 @@
             </div>
             <div class="db-info-content" id="db-info-content">
                 <div class="db-info-body">
-                    <p><strong>최신 재고:</strong> {{ db_stats.recent_count }}개 약품</p>
-                    <p><strong>시계열 통계:</strong> {{ db_stats.processed_stats.total }}개 약품</p>
+                    <p><strong>최신 재고:</strong> <span id="recent-count">{{ db_stats.recent_count }}</span>개 약품</p>
+                    <p><strong>시계열 통계:</strong> <span id="processed-total">{{ db_stats.processed_stats.total }}</span>개 약품</p>
                     {% if db_stats.processed_stats.by_type %}
+                        <div id="drug-type-stats">
                         {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
                         <p style="margin-left: 20px;">• {{ drug_type }}: {{ count }}개</p>
                         {% endfor %}
+                        </div>
                     {% endif %}
+                    {% if db_stats.data_period %}
+                    <p><strong>데이터 기간:</strong> <span id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</span></p>
+                    {% endif %}
+
+                    <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
+                        <span>🔄</span>
+                        <span>DB 재생성 (새 데이터 반영)</span>
+                    </button>
+
+                    <div class="rebuild-status" id="rebuild-status"></div>
                 </div>
             </div>
         </div>
@@ -896,6 +967,83 @@
             loadReports('timeseries');
             reportsLoaded.timeseries = true;
         });
+
+        // DB 재생성
+        async function rebuildDatabase() {
+            if (!confirm('⚠️ DB를 재생성하시겠습니까?\n\n기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.\n이 작업은 수 분이 소요될 수 있습니다.')) {
+                return;
+            }
+
+            const button = document.getElementById('btn-rebuild-db');
+            const statusDiv = document.getElementById('rebuild-status');
+
+            // 버튼 비활성화
+            button.disabled = true;
+            button.innerHTML = '<span>⏳</span><span>DB 재생성 중...</span>';
+
+            // 로딩 상태 표시
+            statusDiv.className = 'rebuild-status loading';
+            statusDiv.innerHTML = '🔄 DB 재생성 중입니다. 잠시만 기다려주세요...';
+
+            try {
+                const response = await fetch('/api/rebuild-db', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // 성공 상태 표시
+                    statusDiv.className = 'rebuild-status success';
+                    statusDiv.innerHTML = '✅ ' + data.message;
+
+                    // DB 통계 업데이트
+                    if (data.stats) {
+                        document.getElementById('recent-count').textContent = data.stats.recent_count;
+                        document.getElementById('processed-total').textContent = data.stats.processed_stats.total;
+
+                        // 약품 유형별 통계 업데이트
+                        const drugTypeStats = document.getElementById('drug-type-stats');
+                        if (drugTypeStats && data.stats.processed_stats.by_type) {
+                            let html = '';
+                            for (const [drugType, count] of Object.entries(data.stats.processed_stats.by_type)) {
+                                html += `<p style="margin-left: 20px;">• ${drugType}: ${count}개</p>`;
+                            }
+                            drugTypeStats.innerHTML = html;
+                        }
+
+                        // 데이터 기간 업데이트
+                        if (data.stats.data_period) {
+                            const dataPeriod = document.getElementById('data-period');
+                            if (dataPeriod) {
+                                dataPeriod.textContent = `${data.stats.data_period.start_month} ~ ${data.stats.data_period.end_month} (${data.stats.data_period.total_months}개월)`;
+                            }
+                        }
+                    }
+
+                    // 3초 후 상태 메시지 숨기기
+                    setTimeout(() => {
+                        statusDiv.className = 'rebuild-status';
+                        statusDiv.innerHTML = '';
+                    }, 5000);
+                } else {
+                    // 에러 상태 표시
+                    statusDiv.className = 'rebuild-status error';
+                    statusDiv.innerHTML = '❌ ' + (data.error || '알 수 없는 오류가 발생했습니다.');
+                }
+            } catch (error) {
+                console.error('DB 재생성 실패:', error);
+                statusDiv.className = 'rebuild-status error';
+                statusDiv.innerHTML = '❌ DB 재생성 중 오류가 발생했습니다: ' + error.message;
+            } finally {
+                // 버튼 다시 활성화
+                button.disabled = false;
+                button.innerHTML = '<span>🔄</span><span>DB 재생성 (새 데이터 반영)</span>';
+            }
+        }
 
         // 서버 종료
         async function shutdownServer() {

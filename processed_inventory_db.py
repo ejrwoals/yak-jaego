@@ -56,7 +56,7 @@ def init_db():
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 테이블 생성
+        # 메인 테이블 생성
         cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                 약품코드 TEXT PRIMARY KEY,
@@ -69,6 +69,14 @@ def init_db():
                 월별_조제수량_리스트 TEXT,
                 "3개월_이동평균_리스트" TEXT,
                 최종_업데이트일시 TEXT
+            )
+        ''')
+
+        # 메타데이터 테이블 생성 (데이터 기간 정보 저장)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT
             )
         ''')
 
@@ -230,6 +238,79 @@ def get_statistics():
     except Exception as e:
         print(f"❌ 통계 조회 실패: {e}")
         return {'total': 0, 'by_type': {}}
+
+
+def save_metadata(months):
+    """
+    데이터 기간 메타데이터를 DB에 저장
+
+    Args:
+        months (list): 월 리스트 (예: ['2023-10', '2023-11', ...])
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        if months and len(months) > 0:
+            start_month = months[0]
+            end_month = months[-1]
+            total_months = len(months)
+
+            cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                         ("start_month", start_month))
+            cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                         ("end_month", end_month))
+            cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                         ("total_months", str(total_months)))
+
+            conn.commit()
+            print(f"   📅 데이터 기간 메타데이터 저장: {start_month} ~ {end_month} ({total_months}개월)")
+
+        conn.close()
+
+    except Exception as e:
+        print(f"⚠️  메타데이터 저장 실패: {e}")
+
+
+def get_metadata():
+    """
+    데이터 기간 메타데이터 조회
+
+    Returns:
+        dict: {'start_month': str, 'end_month': str, 'total_months': int} 또는 None
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # metadata 테이블이 존재하는지 확인
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='metadata'")
+        if not cursor.fetchone():
+            conn.close()
+            return None
+
+        cursor.execute("SELECT key, value FROM metadata WHERE key IN ('start_month', 'end_month', 'total_months')")
+        rows = cursor.fetchall()
+
+        conn.close()
+
+        if not rows:
+            return None
+
+        metadata = dict(rows)
+
+        if 'start_month' in metadata and 'end_month' in metadata and 'total_months' in metadata:
+            return {
+                'start_month': metadata['start_month'],
+                'end_month': metadata['end_month'],
+                'total_months': int(metadata['total_months'])
+            }
+
+        return None
+
+    except Exception as e:
+        print(f"⚠️  메타데이터 조회 실패: {e}")
+        return None
 
 
 def db_exists():

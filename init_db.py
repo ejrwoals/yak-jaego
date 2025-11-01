@@ -80,6 +80,9 @@ def main():
     print("   💾 processed_inventory.sqlite3에 저장 중...")
     processed_inventory_db.upsert_processed_data(df_dispense, drug_type='전문약')
 
+    # 메타데이터 저장 (첫 번째 처리 시에만)
+    processed_inventory_db.save_metadata(months)
+
     # 재고 DB에 저장 (최종_재고수량만)
     print("   💾 recent_inventory.sqlite3에 저장 중...")
     inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()

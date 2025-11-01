@@ -59,9 +59,13 @@ def check_database_ready():
     if processed_stats['total'] == 0:
         return False, "processed_inventory.sqlite3에 데이터가 없습니다."
 
+    # DB에 저장된 데이터 기간 정보 조회
+    data_period = processed_inventory_db.get_metadata()
+
     return True, {
         'recent_count': recent_count,
-        'processed_stats': processed_stats
+        'processed_stats': processed_stats,
+        'data_period': data_period
     }
 
 
@@ -110,17 +114,27 @@ def generate_report():
         if df.empty:
             return jsonify({'error': f'{drug_type} 데이터가 없습니다.'}), 404
 
-        # 월 정보 추출
-        first_record = df.iloc[0]
-        num_months = len(first_record['월별_조제수량_리스트'])
+        # DB 메타데이터에서 월 정보 추출
+        data_period = processed_inventory_db.get_metadata()
 
-        # 연속된 월 생성
-        today = datetime.now()
-        months = []
-        from datetime import timedelta
-        for i in range(num_months):
-            month_date = datetime(today.year, today.month, 1) - timedelta(days=30*(num_months-1-i))
-            months.append(month_date.strftime('%Y-%m'))
+        if data_period:
+            # 메타데이터에서 정확한 월 범위 가져오기
+            start_month = data_period['start_month']
+            end_month = data_period['end_month']
+            total_months = data_period['total_months']
+
+            # 시작 월부터 종료 월까지 연속된 월 생성
+            from dateutil.relativedelta import relativedelta
+            start_date = datetime.strptime(start_month, '%Y-%m')
+            months = []
+            for i in range(total_months):
+                month_date = start_date + relativedelta(months=i)
+                months.append(month_date.strftime('%Y-%m'))
+        else:
+            # 메타데이터가 없는 경우 (fallback)
+            first_record = df.iloc[0]
+            num_months = len(first_record['월별_조제수량_리스트'])
+            months = [f"Month {i+1}" for i in range(num_months)]
 
         # HTML 보고서 생성 (브라우저 자동 열기 비활성화)
         report_path = create_and_save_report(df, months, mode=report_type, open_browser=False)
@@ -498,6 +512,87 @@ def serve_report(filename):
             return send_file(file_path, mimetype='text/html' if filename.endswith('.html') else 'text/csv')
 
     return "파일을 찾을 수 없습니다.", 404
+
+
+@app.route('/api/rebuild-db', methods=['POST'])
+def rebuild_db():
+    """DB 재생성 API (init_db.py 기능 실행)"""
+    try:
+        print("\n🔄 DB 재생성 요청 받음...")
+
+        from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
+
+        # Step 1: 월별 CSV 로드
+        print("🔍 월별 CSV 파일 로드 중...")
+        monthly_data = load_multiple_csv_files(directory='data')
+
+        if not monthly_data:
+            return jsonify({'error': 'CSV 파일을 로드할 수 없습니다.'}), 400
+
+        # 기존 DB 삭제
+        print("🗑️  기존 DB 삭제 중...")
+        if inventory_db.db_exists():
+            os.remove('recent_inventory.sqlite3')
+        if processed_inventory_db.db_exists():
+            os.remove('processed_inventory.sqlite3')
+
+        # Step 2: DB 초기화
+        print("💽 데이터베이스 초기화 중...")
+        inventory_db.init_db()
+        processed_inventory_db.init_db()
+
+        # Step 3: 전문약 처리
+        print("🔄 전문약 데이터 처리 중...")
+        df_dispense, months = merge_by_drug_code(monthly_data, mode='dispense')
+        df_dispense = calculate_statistics(df_dispense, months)
+
+        # 통계 DB에 저장
+        processed_inventory_db.upsert_processed_data(df_dispense, drug_type='전문약', show_summary=False)
+
+        # 메타데이터 저장
+        processed_inventory_db.save_metadata(months)
+
+        # 재고 DB에 저장
+        inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
+        inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
+        inventory_data['약품유형'] = '전문약'
+        inventory_db.upsert_inventory(inventory_data, show_summary=False)
+
+        # Step 4: 일반약 처리
+        print("🔄 일반약 데이터 처리 중...")
+        df_sale, months = merge_by_drug_code(monthly_data, mode='sale')
+        df_sale = calculate_statistics(df_sale, months)
+
+        # 통계 DB에 저장
+        processed_inventory_db.upsert_processed_data(df_sale, drug_type='일반약', show_summary=False)
+
+        # 재고 DB에 저장
+        inventory_data = df_sale[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
+        inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
+        inventory_data['약품유형'] = '일반약'
+        inventory_db.upsert_inventory(inventory_data, show_summary=False)
+
+        print("✅ DB 재생성 완료!")
+
+        # 최종 통계
+        recent_count = inventory_db.get_inventory_count()
+        processed_stats = processed_inventory_db.get_statistics()
+        data_period = processed_inventory_db.get_metadata()
+
+        return jsonify({
+            'success': True,
+            'message': 'DB 재생성이 완료되었습니다.',
+            'stats': {
+                'recent_count': recent_count,
+                'processed_stats': processed_stats,
+                'data_period': data_period
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'DB 재생성 실패: {str(e)}'}), 500
 
 
 @app.route('/api/shutdown', methods=['POST'])

@@ -441,12 +441,12 @@ def generate_html_report(df, months, mode='dispense'):
         modal_id = f"modal_{idx}"
 
         # 약품명 30자 제한
-        drug_name_display = row['약품명']
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
         if len(drug_name_display) > 30:
             drug_name_display = drug_name_display[:30] + "..."
 
         # 제약회사 12자 제한
-        company_display = row['제약회사']
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
@@ -580,14 +580,16 @@ def generate_html_report(df, months, mode='dispense'):
                         mode: 'lines+markers',
                         name: '실제 조제수량',
                         line: {color: 'black', width: 2, dash: 'dot'},
-                        marker: {size: 8, color: 'black'}
+                        marker: {size: 8, color: 'black'},
+                        hovertemplate: '실제 조제수량: %{y:,.0f}개<extra></extra>'
                     },
                     {
                         x: chartData.months,
                         y: ma3Clean,
                         mode: 'lines',
                         name: '3개월 이동평균',
-                        line: {color: 'orange', width: 3}
+                        line: {color: 'orange', width: 3},
+                        hovertemplate: '3개월 이동평균: %{y:,.2f}개<extra></extra>'
                     },
                     {
                         x: [chartData.months[0], chartData.months[Math.min(1, chartData.months.length - 1)]],
@@ -662,6 +664,7 @@ def generate_html_report(df, months, mode='dispense'):
                     title: chartData.drug_name + ' (' + chartData.drug_code + ') 월별 조제수량 추이',
                     xaxis: {
                         title: '월',
+                        type: 'category',
                         showgrid: true,
                         gridwidth: 1,
                         gridcolor: 'lightgray'
