@@ -24,6 +24,7 @@ from drug_order_calculator import run as run_order_calculator
 import inventory_db
 import processed_inventory_db
 import inventory_updater
+import checked_items_db
 from utils import read_today_file
 
 app = Flask(__name__)
@@ -593,6 +594,32 @@ def rebuild_db():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'DB 재생성 실패: {str(e)}'}), 500
+
+
+@app.route('/api/toggle_checked_item', methods=['POST'])
+def toggle_checked_item():
+    """체크 상태 업데이트 API"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        category = data.get('category', '재고소진')
+        is_checked = data.get('checked', False)
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
+
+        # 체크 상태에 따라 DB 업데이트
+        if is_checked:
+            checked_items_db.add_checked_item(drug_code, category)
+        else:
+            checked_items_db.remove_checked_item(drug_code, category)
+
+        return jsonify({'status': 'success', 'message': '체크 상태가 업데이트되었습니다.'})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/shutdown', methods=['POST'])

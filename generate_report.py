@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 import json
 import inventory_db
+import checked_items_db
 
 def create_sparkline_svg(timeseries_data, ma3_data):
     """
@@ -298,6 +299,14 @@ def generate_html_report(df, months, mode='dispense'):
                 max-height: 0;
                 opacity: 0;
             }}
+            .checked-row {{
+                background: rgba(200, 200, 200, 0.3) !important;
+                opacity: 0.6;
+                color: #718096;
+            }}
+            .checked-row td {{
+                color: #718096 !important;
+            }}
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
@@ -551,6 +560,73 @@ def generate_html_report(df, months, mode='dispense'):
                 section.classList.toggle('collapsed');
                 icon.classList.toggle('collapsed');
             }
+
+            // 긴급 약품 체크박스 핸들러
+            function handleUrgentCheckbox(checkbox) {
+                const drugCode = checkbox.getAttribute('data-drug-code');
+                const isChecked = checkbox.checked;
+                const row = checkbox.closest('tr');
+
+                // 체크 상태에 따라 스타일 적용
+                if (isChecked) {
+                    row.classList.add('checked-row');
+                } else {
+                    row.classList.remove('checked-row');
+                }
+
+                // 서버에 체크 상태 저장
+                fetch('/api/toggle_checked_item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        category: '재고소진',
+                        checked: isChecked
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        console.log('체크 상태 업데이트 완료:', drugCode);
+                        // 테이블 정렬
+                        sortUrgentTable();
+                    } else {
+                        console.error('체크 상태 업데이트 실패:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('API 요청 실패:', error);
+                });
+            }
+
+            // 긴급 약품 테이블 정렬 (체크된 항목을 하단으로)
+            function sortUrgentTable() {
+                const table = document.getElementById('urgent-drugs-table');
+                if (!table) return;
+
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr.urgent-row'));
+
+                // 체크 여부에 따라 정렬
+                rows.sort((a, b) => {
+                    const aChecked = a.classList.contains('checked-row');
+                    const bChecked = b.classList.contains('checked-row');
+
+                    if (aChecked && !bChecked) return 1;  // a를 뒤로
+                    if (!aChecked && bChecked) return -1; // b를 뒤로
+                    return 0; // 동일 그룹 내에서는 순서 유지
+                });
+
+                // 테이블 재구성
+                rows.forEach(row => tbody.appendChild(row));
+            }
+
+            // 페이지 로드 시 테이블 정렬
+            window.addEventListener('DOMContentLoaded', function() {
+                sortUrgentTable();
+            });
 
             // 검색 기능
             document.getElementById('searchInput').addEventListener('keyup', function() {
@@ -834,7 +910,10 @@ def classify_drugs_by_special_cases(df):
     return urgent_drugs, dead_stock_drugs
 
 def generate_urgent_drugs_section(urgent_drugs):
-    """긴급 약품 섹션 HTML 생성 (테이블 형식)"""
+    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스)"""
+
+    # 체크된 약품 코드 목록 가져오기
+    checked_codes = checked_items_db.get_checked_items(category='재고소진')
 
     html = f"""
             <div class="chart-container" style="background: #fff5f5; border: 2px solid #f56565;">
@@ -849,9 +928,10 @@ def generate_urgent_drugs_section(urgent_drugs):
                         </p>
                     </div>
                     <div class="table-container">
-                        <table style="font-size: 13px;">
+                        <table id="urgent-drugs-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
+                                    <th style="width: 50px;">확인</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -865,6 +945,9 @@ def generate_urgent_drugs_section(urgent_drugs):
     """
 
     for _, row in urgent_drugs.iterrows():
+        drug_code = str(row['약품코드'])
+        is_checked = drug_code in checked_codes
+
         # 3개월 이동평균 (최신값)
         ma3_list = row['3개월_이동평균_리스트']
         latest_ma3 = None
@@ -898,10 +981,17 @@ def generate_urgent_drugs_section(urgent_drugs):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
+        # 체크 상태에 따라 클래스 적용
+        row_class = "checked-row" if is_checked else ""
+        checked_attr = "checked" if is_checked else ""
+
         html += f"""
-                                <tr style="background: rgba(255, 245, 245, 0.7);">
+                                <tr class="urgent-row {row_class}" data-drug-code="{drug_code}">
+                                    <td style="text-align: center;">
+                                        <input type="checkbox" class="urgent-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleUrgentCheckbox(this)">
+                                    </td>
                                     <td style="font-weight: bold;">{drug_name_display}</td>
-                                    <td>{row['약품코드']}</td>
+                                    <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td style="color: #c53030; font-weight: bold;">0</td>
                                     <td style="color: #2d5016; font-weight: bold;">{row['1년_이동평균']:.2f}</td>

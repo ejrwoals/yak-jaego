@@ -13,8 +13,10 @@
 **SQLite 데이터베이스 기반 시스템**
 - `recent_inventory.sqlite3`: 각 약품의 최신 재고 수량 저장
 - `processed_inventory.sqlite3`: 시계열 통계 데이터 (1년 이동평균, 3개월 이동평균, 런웨이 등)
+- `checked_items.sqlite3`: 긴급 약품 확인 상태 저장 (v3.5 신규)
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
 - **음수 재고 지원**: 마이너스 재고도 정확히 반영
+- **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소
 
 ### 🔀 두 가지 워크플로우
 
@@ -45,6 +47,7 @@
 - **⚡ 경량 스파크라인**: SVG 기반 초경량 트렌드 차트로 빠른 로딩
 - **🎯 On-demand 상세 차트**: 클릭시에만 Plotly 차트 동적 생성으로 성능 최적화
 - **🔍 즉각 검색**: 전체 약품 목록에서 실시간 검색
+- **✅ 긴급 약품 체크박스**: 재고 소진 약품 확인 상태를 영구 저장하여 재확인 피로 감소 (v3.5)
 
 #### 워크플로우 2: 주문 수량 산출
 - **📋 today.csv 기반 필터링**: 오늘 나간 약품만 표시
@@ -251,12 +254,14 @@ yak-jaego/
 ├── drug_order_calculator.py       # 주문 수량 산출 모듈
 ├── inventory_db.py                # recent_inventory.sqlite3 관리 모듈
 ├── processed_inventory_db.py      # processed_inventory.sqlite3 관리 모듈
+├── checked_items_db.py            # checked_items.sqlite3 관리 모듈 (체크 상태 저장)
 ├── inventory_updater.py           # 재고 업데이트 모듈 (today 파일 → DB)
 ├── utils.py                       # 공통 유틸리티 함수 (Excel 파일 읽기 포함)
 ├── requirements.txt               # Python 의존성 목록
 ├── today.csv/xls/xlsx             # 오늘 나간 약품의 재고 현황 (사용자 제공)
 ├── recent_inventory.sqlite3       # 최신 재고 DB (자동 생성)
 ├── processed_inventory.sqlite3    # 시계열 통계 DB (자동 생성)
+├── checked_items.sqlite3          # 체크 상태 DB (자동 생성)
 └── README.md                      # 프로젝트 문서
 ```
 
@@ -430,6 +435,27 @@ for month in months_reversed:
 - 다중 인코딩 지원 (UTF-8, CP949, EUC-KR)
 
 ## 🎯 핵심 개선 사항
+
+### v3.5 업데이트 (긴급 약품 확인 관리 기능)
+
+1. **체크박스를 통한 확인 상태 관리**
+   - ✅ **영구 저장**: 긴급 재고 소진 약품 확인 상태를 SQLite DB(`checked_items.sqlite3`)에 저장
+   - 🔄 **자동 복원**: 다음 보고서 생성 시에도 체크 상태가 자동으로 유지됨
+   - 📋 **체크박스 UI**: 각 긴급 약품 row에 체크박스 추가로 직관적인 확인 관리
+   - 🎨 **시각적 구분**: 체크된 약품은 회색 톤다운으로 표시 (opacity 0.6, 회색 배경)
+   - ⬇️ **자동 정렬**: 체크된 약품은 테이블 하단으로 자동 이동하여 미확인 약품에 집중
+
+2. **사용자 경험 향상**
+   - 반복적인 확인 작업에서 발생하는 피로감 감소
+   - 이미 처리한 약품과 미처리 약품을 명확하게 구분
+   - 체크 해제로 다시 미확인 상태로 변경 가능 (유연한 관리)
+   - 실시간 서버 동기화로 안정적인 상태 관리
+
+3. **기술 구현**
+   - `checked_items_db.py`: 체크 상태 저장/조회/삭제 기능 제공
+   - Flask API (`/api/toggle_checked_item`): 체크 상태 실시간 업데이트
+   - JavaScript 기반 클라이언트 정렬 및 스타일 적용
+   - 약품코드와 카테고리를 PRIMARY KEY로 사용하여 데이터 무결성 보장
 
 ### v3.4 업데이트 (특수 케이스 경고 및 데이터 무결성 개선)
 
