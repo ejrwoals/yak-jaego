@@ -333,10 +333,6 @@ def generate_html_report(df, months, mode='dispense'):
     if not urgent_drugs.empty:
         html_content += generate_urgent_drugs_section(urgent_drugs)
 
-    # 악성 재고 섹션 생성 (있는 경우)
-    if not dead_stock_drugs.empty:
-        html_content += generate_dead_stock_section(dead_stock_drugs)
-
     # 런웨이 분석 차트 생성
     runtime_analysis_low, runtime_analysis_high = analyze_runway(df)
     if runtime_analysis_low:
@@ -384,7 +380,11 @@ def generate_html_report(df, months, mode='dispense'):
                 {runtime_analysis_high}
             </script>
         """
-    
+
+    # 악성 재고 섹션 생성 (있는 경우)
+    if not dead_stock_drugs.empty:
+        html_content += generate_dead_stock_section(dead_stock_drugs)
+
     # 테이블 생성
     html_content += """
             <h2>📋 약품 목록</h2>
@@ -840,9 +840,9 @@ def generate_urgent_drugs_section(urgent_drugs):
             <div class="chart-container" style="background: #fff5f5; border: 2px solid #f56565;">
                 <div class="toggle-header" onclick="toggleSection('urgent-drugs-section')" style="background: rgba(255, 230, 230, 0.7);">
                     <h2 style="margin: 0; color: #c53030;">🚨 긴급: 재고 소진 약품 (사용 중)</h2>
-                    <span class="toggle-icon" id="toggle-icon-urgent-drugs-section">▼</span>
+                    <span class="toggle-icon collapsed" id="toggle-icon-urgent-drugs-section">▼</span>
                 </div>
-                <div id="urgent-drugs-section" class="toggle-content">
+                <div id="urgent-drugs-section" class="toggle-content collapsed">
                     <div style="padding: 15px; background: #fff8f8; border-radius: 8px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #c53030; font-weight: bold;">
                             ⚠️ 총 {len(urgent_drugs)}개 약품이 현재 사용되고 있으나 재고가 소진되었습니다. 즉시 주문이 필요합니다!
