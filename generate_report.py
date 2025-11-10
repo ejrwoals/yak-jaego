@@ -325,7 +325,18 @@ def generate_html_report(df, months, mode='dispense'):
                 </div>
             </div>
     """
-    
+
+    # 특수 케이스 약품 분류
+    urgent_drugs, dead_stock_drugs = classify_drugs_by_special_cases(df)
+
+    # 긴급 약품 섹션 생성 (있는 경우)
+    if not urgent_drugs.empty:
+        html_content += generate_urgent_drugs_section(urgent_drugs)
+
+    # 악성 재고 섹션 생성 (있는 경우)
+    if not dead_stock_drugs.empty:
+        html_content += generate_dead_stock_section(dead_stock_drugs)
+
     # 런웨이 분석 차트 생성
     runtime_analysis_low, runtime_analysis_high = analyze_runway(df)
     if runtime_analysis_low:
@@ -416,7 +427,7 @@ def generate_html_report(df, months, mode='dispense'):
                 break
 
         # 3-MA 런웨이 계산
-        ma3_runway_display = "N/A"
+        ma3_runway_display = "재고만 있음"  # 기본값 통일
         if latest_ma3 and latest_ma3 > 0:
             ma3_runway_months = row['최종_재고수량'] / latest_ma3
             if ma3_runway_months >= 1:
@@ -450,9 +461,18 @@ def generate_html_report(df, months, mode='dispense'):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
+        # 특수 케이스 아이콘 결정
+        special_icon = ""
+        if row['1년_이동평균'] > 0 and row['최종_재고수량'] == 0:
+            # 긴급: 사용되는데 재고 없음
+            special_icon = '<span style="color: #c53030; font-size: 16px; margin-right: 5px;" title="긴급: 재고 소진 (사용 중)">🚨</span>'
+        elif row['1년_이동평균'] == 0 and row['최종_재고수량'] > 0:
+            # 악성 재고: 안 쓰이는데 재고만 있음
+            special_icon = '<span style="color: #4a5568; font-size: 16px; margin-right: 5px;" title="악성 재고: 미사용 약품">📦</span>'
+
         html_content += f"""
                         <tr class="{runway_class} clickable-row" onclick="openModalWithChart('{modal_id}', {idx})" data-chart-data='{chart_data_json}'>
-                            <td>{drug_name_display}</td>
+                            <td>{special_icon}{drug_name_display}</td>
                             <td>{company_display}</td>
                             <td>{row['약품코드']}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
@@ -772,6 +792,210 @@ def get_runway_class(runway, ma3_runway_display):
 
     # 둘 중 하나라도 1개월 미만이면 경고
     return 'warning' if (is_runway_low or is_ma3_runway_low) else ''
+
+def classify_drugs_by_special_cases(df):
+    """특수 케이스 약품 분류
+
+    Returns:
+        urgent_drugs: 사용되고 있는데 재고가 0인 약품 (긴급)
+        dead_stock_drugs: 사용되지 않는데 재고만 있는 약품 (악성 재고)
+    """
+
+    # Case 1: 긴급 - 사용되는데 재고 없음 (1년 이동평균 > 0 AND 재고 = 0)
+    urgent_drugs = df[
+        (df['1년_이동평균'] > 0) &
+        (df['최종_재고수량'] == 0)
+    ].copy()
+
+    # Case 2: 악성 재고 - 안 쓰이는데 재고만 있음 (1년 이동평균 = 0 AND 재고 > 0)
+    dead_stock_drugs = df[
+        (df['1년_이동평균'] == 0) &
+        (df['최종_재고수량'] > 0)
+    ].copy()
+
+    # 긴급 약품: 마지막 조제월 기준으로 정렬 (최신 사용이 위로)
+    if not urgent_drugs.empty:
+        # 마지막 조제 인덱스 계산 (월별_조제수량_리스트에서 마지막 0이 아닌 값의 인덱스)
+        def get_last_use_index(row):
+            timeseries = row['월별_조제수량_리스트']
+            for i in range(len(timeseries) - 1, -1, -1):
+                if timeseries[i] > 0:
+                    return i  # 마지막 사용 인덱스 (클수록 최신)
+            return -1  # 사용 기록 없음
+
+        urgent_drugs['_last_use_index'] = urgent_drugs.apply(get_last_use_index, axis=1)
+        urgent_drugs = urgent_drugs.sort_values('_last_use_index', ascending=False)  # 최신순
+        urgent_drugs = urgent_drugs.drop(columns=['_last_use_index'])
+
+    # 재고수량 기준 내림차순 정렬 (악성 재고 크기 순)
+    if not dead_stock_drugs.empty:
+        dead_stock_drugs = dead_stock_drugs.sort_values('최종_재고수량', ascending=False)
+
+    return urgent_drugs, dead_stock_drugs
+
+def generate_urgent_drugs_section(urgent_drugs):
+    """긴급 약품 섹션 HTML 생성 (테이블 형식)"""
+
+    html = f"""
+            <div class="chart-container" style="background: #fff5f5; border: 2px solid #f56565;">
+                <div class="toggle-header" onclick="toggleSection('urgent-drugs-section')" style="background: rgba(255, 230, 230, 0.7);">
+                    <h2 style="margin: 0; color: #c53030;">🚨 긴급: 재고 소진 약품 (사용 중)</h2>
+                    <span class="toggle-icon" id="toggle-icon-urgent-drugs-section">▼</span>
+                </div>
+                <div id="urgent-drugs-section" class="toggle-content">
+                    <div style="padding: 15px; background: #fff8f8; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #c53030; font-weight: bold;">
+                            ⚠️ 총 {len(urgent_drugs)}개 약품이 현재 사용되고 있으나 재고가 소진되었습니다. 즉시 주문이 필요합니다!
+                        </p>
+                    </div>
+                    <div class="table-container">
+                        <table style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>현재 재고</th>
+                                    <th>1년 이동평균</th>
+                                    <th>3개월 이동평균</th>
+                                    <th>마지막 조제월</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    for _, row in urgent_drugs.iterrows():
+        # 3개월 이동평균 (최신값)
+        ma3_list = row['3개월_이동평균_리스트']
+        latest_ma3 = None
+        for val in reversed(ma3_list):
+            if val is not None:
+                latest_ma3 = val
+                break
+
+        # 마지막 조제월 찾기 (월별_조제수량_리스트에서 마지막 0이 아닌 값의 인덱스)
+        timeseries = row['월별_조제수량_리스트']
+        last_use_month = "N/A"
+        for i in range(len(timeseries) - 1, -1, -1):
+            if timeseries[i] > 0:
+                # i번째 월이 마지막 사용 월
+                months_ago = len(timeseries) - 1 - i
+                if months_ago == 0:
+                    last_use_month = "이번 달"
+                elif months_ago == 1:
+                    last_use_month = "지난 달"
+                else:
+                    last_use_month = f"{months_ago}개월 전"
+                break
+
+        # 약품명 30자 제한
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        html += f"""
+                                <tr style="background: rgba(255, 245, 245, 0.7);">
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{row['약품코드']}</td>
+                                    <td>{company_display}</td>
+                                    <td style="color: #c53030; font-weight: bold;">0</td>
+                                    <td style="color: #2d5016; font-weight: bold;">{row['1년_이동평균']:.2f}</td>
+                                    <td>{"N/A" if latest_ma3 is None else f"{latest_ma3:.2f}"}</td>
+                                    <td>{last_use_month}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+    """
+
+    return html
+
+def generate_dead_stock_section(dead_stock_drugs):
+    """악성 재고 섹션 HTML 생성 (테이블 형식)"""
+
+    total_dead_stock = dead_stock_drugs['최종_재고수량'].sum()
+
+    html = f"""
+            <div class="chart-container" style="background: #f7fafc; border: 2px solid #a0aec0;">
+                <div class="toggle-header" onclick="toggleSection('dead-stock-section')" style="background: rgba(226, 232, 240, 0.7);">
+                    <h2 style="margin: 0; color: #4a5568;">📦 악성 재고: 미사용 약품</h2>
+                    <span class="toggle-icon collapsed" id="toggle-icon-dead-stock-section">▼</span>
+                </div>
+                <div id="dead-stock-section" class="toggle-content collapsed">
+                    <div style="padding: 15px; background: #edf2f7; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #4a5568; font-weight: bold;">
+                            📊 총 {len(dead_stock_drugs)}개 약품이 1년 동안 사용되지 않았으나 재고가 {total_dead_stock:,.0f}개 남아있습니다.
+                        </p>
+                        <p style="margin: 5px 0 0 0; color: #718096; font-size: 14px;">
+                            💡 재고 정리 또는 반품을 고려해보세요.
+                        </p>
+                    </div>
+                    <div class="table-container">
+                        <table style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>재고수량</th>
+                                    <th>1년 이동평균</th>
+                                    <th>3개월 이동평균</th>
+                                    <th>상태</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    for _, row in dead_stock_drugs.iterrows():
+        # 3개월 이동평균 (최신값)
+        ma3_list = row['3개월_이동평균_리스트']
+        latest_ma3 = None
+        for val in reversed(ma3_list):
+            if val is not None:
+                latest_ma3 = val
+                break
+
+        # 약품명 30자 제한
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        html += f"""
+                                <tr style="background: rgba(247, 250, 252, 0.7);">
+                                    <td>{drug_name_display}</td>
+                                    <td>{row['약품코드']}</td>
+                                    <td>{company_display}</td>
+                                    <td style="color: #2d5016; font-weight: bold;">{row['최종_재고수량']:,.0f}</td>
+                                    <td style="color: #c53030;">0</td>
+                                    <td>{"0" if latest_ma3 is None or latest_ma3 == 0 else f"{latest_ma3:.2f}"}</td>
+                                    <td style="color: #a0aec0; font-style: italic;">미사용</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+    """
+
+    return html
 
 def analyze_runway(df):
     """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - 3-MA 런웨이 기준"""

@@ -131,24 +131,26 @@ def load_multiple_csv_files(directory='data'):
             # 파일 형식에 따라 읽기
             if ext == '.csv':
                 # CSV 파일 읽기 (여러 인코딩 시도)
+                # dtype={'약품코드': str}로 약품코드의 선행 0 보존
                 for encoding in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
                     try:
-                        df = pd.read_csv(file_path, encoding=encoding)
+                        df = pd.read_csv(file_path, encoding=encoding, dtype={'약품코드': str})
                         break
                     except:
                         continue
 
             elif ext in ['.xls', '.xlsx']:
                 # Excel 파일 읽기
+                # dtype={'약품코드': str}로 약품코드의 선행 0 보존
                 try:
                     # .xls는 calamine, .xlsx는 openpyxl 우선 사용
                     engine = 'calamine' if ext == '.xls' else 'openpyxl'
-                    df = pd.read_excel(file_path, engine=engine)
+                    df = pd.read_excel(file_path, engine=engine, dtype={'약품코드': str})
                 except:
                     # 실패 시 다른 엔진 시도
                     try:
                         fallback_engine = 'openpyxl' if ext == '.xls' else 'calamine'
-                        df = pd.read_excel(file_path, engine=fallback_engine)
+                        df = pd.read_excel(file_path, engine=fallback_engine, dtype={'약품코드': str})
                     except:
                         pass
 

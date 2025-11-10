@@ -128,10 +128,11 @@ def read_today_file(base_name_or_path='today'):
         try:
             if ext == '.csv':
                 # CSV 파일 읽기 (다중 인코딩 시도)
+                # dtype={'약품코드': str}로 약품코드의 선행 0 보존
                 df = None
                 for encoding in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
                     try:
-                        df = pd.read_csv(filepath, encoding=encoding)
+                        df = pd.read_csv(filepath, encoding=encoding, dtype={'약품코드': str})
                         print(f"   ✅ 파일 읽기 성공 ({encoding} 인코딩)")
                         return df, filepath
                     except UnicodeDecodeError:
@@ -146,16 +147,17 @@ def read_today_file(base_name_or_path='today'):
 
             elif ext in ['.xls', '.xlsx']:
                 # Excel 파일 읽기
+                # dtype={'약품코드': str}로 약품코드의 선행 0 보존
                 try:
                     engine = 'calamine' if ext == '.xls' else 'openpyxl'
-                    df = pd.read_excel(filepath, engine=engine)
+                    df = pd.read_excel(filepath, engine=engine, dtype={'약품코드': str})
                     print(f"   ✅ Excel 파일 읽기 성공 ({engine} 엔진)")
                     return df, filepath
                 except Exception as e:
                     # 실패 시 다른 엔진 시도
                     fallback_engine = 'openpyxl' if ext == '.xls' else 'calamine'
                     try:
-                        df = pd.read_excel(filepath, engine=fallback_engine)
+                        df = pd.read_excel(filepath, engine=fallback_engine, dtype={'약품코드': str})
                         print(f"   ✅ Excel 파일 읽기 성공 ({fallback_engine} 엔진)")
                         return df, filepath
                     except Exception as e2:
@@ -184,10 +186,11 @@ def read_today_file(base_name_or_path='today'):
         try:
             if ext == '.csv':
                 # CSV 파일 읽기 (다중 인코딩 시도)
+                # dtype={'약품코드': str}로 약품코드의 선행 0 보존
                 df = None
                 for encoding in ['utf-8', 'utf-8-sig', 'cp949', 'euc-kr']:
                     try:
-                        df = pd.read_csv(filepath, encoding=encoding)
+                        df = pd.read_csv(filepath, encoding=encoding, dtype={'약품코드': str})
                         print(f"   ✅ 파일 읽기 성공 ({encoding} 인코딩)")
                         return df, filepath
                     except UnicodeDecodeError:
@@ -204,17 +207,18 @@ def read_today_file(base_name_or_path='today'):
                 # Excel 파일 읽기
                 # calamine 엔진: 윈도우에서 생성된 오래된 .xls 파일도 지원
                 # openpyxl 엔진: .xlsx 파일에 최적화
+                # dtype={'약품코드': str}로 약품코드의 선행 0 보존
                 try:
                     # .xls는 calamine, .xlsx는 openpyxl 우선 사용
                     engine = 'calamine' if ext == '.xls' else 'openpyxl'
-                    df = pd.read_excel(filepath, engine=engine)
+                    df = pd.read_excel(filepath, engine=engine, dtype={'약품코드': str})
                     print(f"   ✅ Excel 파일 읽기 성공 ({engine} 엔진)")
                     return df, filepath
                 except Exception as e:
                     # 실패 시 다른 엔진 시도
                     fallback_engine = 'openpyxl' if ext == '.xls' else 'calamine'
                     try:
-                        df = pd.read_excel(filepath, engine=fallback_engine)
+                        df = pd.read_excel(filepath, engine=fallback_engine, dtype={'약품코드': str})
                         print(f"   ✅ Excel 파일 읽기 성공 ({fallback_engine} 엔진)")
                         return df, filepath
                     except Exception as e2:
