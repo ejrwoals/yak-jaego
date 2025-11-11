@@ -622,6 +622,50 @@ def toggle_checked_item():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/update_memo', methods=['POST'])
+def update_memo():
+    """메모 업데이트 API"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        category = data.get('category', '재고소진')
+        memo = data.get('memo', '')
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
+
+        # 메모 업데이트
+        checked_items_db.update_memo(drug_code, category, memo)
+
+        return jsonify({'status': 'success', 'message': '메모가 저장되었습니다.'})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/get_memo', methods=['GET'])
+def get_memo():
+    """메모 조회 API"""
+    try:
+        drug_code = request.args.get('drug_code')
+        category = request.args.get('category', '재고소진')
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
+
+        # 메모 조회
+        memo = checked_items_db.get_memo(drug_code, category)
+
+        return jsonify({'status': 'success', 'memo': memo})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
     """Flask 앱 종료 API"""

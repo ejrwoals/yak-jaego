@@ -21,6 +21,7 @@ def init_checked_items_db():
     - 약품코드: 약품의 고유 식별자 (PRIMARY KEY)
     - 카테고리: '재고소진' 또는 '악성재고' (구분용)
     - 체크일시: 체크한 날짜 및 시간
+    - 메모: 사용자가 작성한 메모 (선택사항)
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -30,6 +31,7 @@ def init_checked_items_db():
             약품코드 TEXT,
             카테고리 TEXT,
             체크일시 TEXT,
+            메모 TEXT DEFAULT '',
             PRIMARY KEY (약품코드, 카테고리)
         )
     ''')
@@ -137,6 +139,87 @@ def get_all_checked_items():
 
     conn.close()
     return result
+
+
+def update_memo(drug_code, category, memo):
+    """
+    약품의 메모 업데이트
+
+    Args:
+        drug_code (str): 약품코드
+        category (str): '재고소진' 또는 '악성재고'
+        memo (str): 메모 내용
+    """
+    init_checked_items_db()  # DB가 없으면 생성
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # 체크 항목이 없으면 생성, 있으면 메모만 업데이트
+    cursor.execute('''
+        INSERT OR REPLACE INTO checked_items (약품코드, 카테고리, 체크일시, 메모)
+        VALUES (?, ?, ?, ?)
+    ''', (drug_code, category, now, memo))
+
+    conn.commit()
+    conn.close()
+
+
+def get_memo(drug_code, category='재고소진'):
+    """
+    약품의 메모 조회
+
+    Args:
+        drug_code (str): 약품코드
+        category (str): '재고소진' 또는 '악성재고'
+
+    Returns:
+        str: 메모 내용 (없으면 빈 문자열)
+    """
+    if not os.path.exists(DB_PATH):
+        return ''
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT 메모 FROM checked_items
+        WHERE 약품코드 = ? AND 카테고리 = ?
+    ''', (drug_code, category))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result and result[0] else ''
+
+
+def get_all_memos(category='재고소진'):
+    """
+    특정 카테고리의 모든 메모 조회
+
+    Args:
+        category (str): '재고소진' 또는 '악성재고'
+
+    Returns:
+        dict: {약품코드: 메모내용}
+    """
+    if not os.path.exists(DB_PATH):
+        return {}
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT 약품코드, 메모 FROM checked_items
+        WHERE 카테고리 = ? AND 메모 IS NOT NULL AND 메모 != ''
+    ''', (category,))
+
+    memos = {row[0]: row[1] for row in cursor.fetchall()}
+
+    conn.close()
+    return memos
 
 
 if __name__ == '__main__':

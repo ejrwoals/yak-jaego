@@ -307,6 +307,33 @@ def generate_html_report(df, months, mode='dispense'):
             .checked-row td {{
                 color: #718096 !important;
             }}
+            .memo-btn {{
+                background: transparent;
+                border: 2px solid #cbd5e0;
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.2s;
+                color: #718096;
+            }}
+            .memo-btn:hover {{
+                border-color: #a0aec0;
+                color: #4a5568;
+            }}
+            .memo-btn.has-memo {{
+                border-color: #f6ad55;
+                color: #f6ad55;
+            }}
+            .memo-btn.has-memo:hover {{
+                border-color: #ed8936;
+                color: #ed8936;
+            }}
+            .checkbox-memo-container {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }}
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
@@ -628,6 +655,80 @@ def generate_html_report(df, months, mode='dispense'):
                 sortUrgentTable();
             });
 
+            // 메모 모달 열기
+            function openMemoModal(drugCode) {
+                const modal = document.getElementById('memo-modal');
+                const drugCodeElement = document.getElementById('memo-drug-code');
+                const textarea = document.getElementById('memo-textarea');
+
+                drugCodeElement.textContent = drugCode;
+                textarea.value = drugMemos[drugCode] || '';
+                textarea.setAttribute('data-drug-code', drugCode);
+
+                modal.style.display = 'block';
+            }
+
+            // 메모 모달 닫기
+            function closeMemoModal() {
+                const modal = document.getElementById('memo-modal');
+                modal.style.display = 'none';
+            }
+
+            // 메모 저장
+            function saveMemo() {
+                const textarea = document.getElementById('memo-textarea');
+                const drugCode = textarea.getAttribute('data-drug-code');
+                const memo = textarea.value;
+
+                // 서버에 메모 저장
+                fetch('/api/update_memo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        category: '재고소진',
+                        memo: memo
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        console.log('메모 저장 완료:', drugCode);
+
+                        // 메모 데이터 업데이트
+                        if (memo) {
+                            drugMemos[drugCode] = memo;
+                        } else {
+                            delete drugMemos[drugCode];
+                        }
+
+                        // 메모 버튼 스타일 업데이트
+                        const memoBtn = document.querySelector(`.memo-btn[data-drug-code="${drugCode}"]`);
+                        if (memoBtn) {
+                            if (memo) {
+                                memoBtn.classList.add('has-memo');
+                                const preview = memo.length > 50 ? memo.substring(0, 50) + '...' : memo;
+                                memoBtn.setAttribute('title', preview);
+                            } else {
+                                memoBtn.classList.remove('has-memo');
+                                memoBtn.setAttribute('title', '메모 추가');
+                            }
+                        }
+
+                        closeMemoModal();
+                    } else {
+                        console.error('메모 저장 실패:', data.message);
+                        alert('메모 저장에 실패했습니다: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('API 요청 실패:', error);
+                    alert('메모 저장에 실패했습니다.');
+                });
+            }
+
             // 검색 기능
             document.getElementById('searchInput').addEventListener('keyup', function() {
                 const searchValue = this.value.toLowerCase();
@@ -910,10 +1011,24 @@ def classify_drugs_by_special_cases(df):
     return urgent_drugs, dead_stock_drugs
 
 def generate_urgent_drugs_section(urgent_drugs):
-    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스)"""
+    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모)"""
 
-    # 체크된 약품 코드 목록 가져오기
+    # 현재 긴급 목록에 있는 약품 코드들
+    current_urgent_codes = set(urgent_drugs['약품코드'].astype(str))
+
+    # DB에서 체크된 약품 코드 목록 가져오기
     checked_codes = checked_items_db.get_checked_items(category='재고소진')
+
+    # 현재 긴급 목록에 없는 약품의 체크 상태 삭제 (메모는 유지)
+    for code in checked_codes:
+        if code not in current_urgent_codes:
+            checked_items_db.remove_checked_item(code, category='재고소진')
+
+    # 정리 후 체크된 약품 코드 목록 다시 가져오기
+    checked_codes = checked_items_db.get_checked_items(category='재고소진')
+
+    # 메모 목록 가져오기
+    memos = checked_items_db.get_all_memos(category='재고소진')
 
     html = f"""
             <div class="chart-container" style="background: #fff5f5; border: 2px solid #f56565;">
@@ -985,10 +1100,26 @@ def generate_urgent_drugs_section(urgent_drugs):
         row_class = "checked-row" if is_checked else ""
         checked_attr = "checked" if is_checked else ""
 
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_escaped = memo.replace("'", "\\'").replace('"', '&quot;').replace('\n', '\\n')
+
+        # 메모 버튼 스타일 (메모가 있으면 주황색)
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
         html += f"""
                                 <tr class="urgent-row {row_class}" data-drug-code="{drug_code}">
                                     <td style="text-align: center;">
-                                        <input type="checkbox" class="urgent-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleUrgentCheckbox(this)">
+                                        <div class="checkbox-memo-container">
+                                            <input type="checkbox" class="urgent-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleUrgentCheckbox(this)">
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="openMemoModal('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
                                     </td>
                                     <td style="font-weight: bold;">{drug_name_display}</td>
                                     <td>{drug_code}</td>
@@ -1006,6 +1137,33 @@ def generate_urgent_drugs_section(urgent_drugs):
                     </div>
                 </div>
             </div>
+
+            <!-- 메모 모달 -->
+            <div id="memo-modal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <span class="close-btn" onclick="closeMemoModal()">&times;</span>
+                    <h2 style="margin-bottom: 20px;">📝 메모 작성</h2>
+                    <p style="color: #718096; margin-bottom: 10px;">약품코드: <strong id="memo-drug-code"></strong></p>
+                    <textarea id="memo-textarea"
+                              style="width: 100%; height: 200px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"
+                              placeholder="메모를 입력하세요..."></textarea>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                        <button onclick="closeMemoModal()" style="padding: 10px 20px; border: 2px solid #cbd5e0; background: white; border-radius: 5px; cursor: pointer; font-size: 14px;">취소</button>
+                        <button onclick="saveMemo()" style="padding: 10px 20px; border: none; background: #667eea; color: white; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">저장</button>
+                    </div>
+                </div>
+            </div>
+    """
+
+    # 메모 데이터를 JSON으로 변환하여 JavaScript에서 사용
+    import json
+    memos_json = json.dumps(memos, ensure_ascii=False)
+
+    html += f"""
+            <script>
+                // 메모 데이터 (JavaScript 객체로 변환)
+                const drugMemos = {memos_json};
+            </script>
     """
 
     return html
