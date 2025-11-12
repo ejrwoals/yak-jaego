@@ -107,7 +107,7 @@ def generate_html_report(df, months, mode='dispense'):
                 font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
                 margin: 0;
                 padding: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #f5f5f5;
                 min-height: 100vh;
             }}
             .container {{
@@ -125,9 +125,9 @@ def generate_html_report(df, months, mode='dispense'):
                 font-size: 2.5em;
             }}
             .date {{
-                text-align: center;
+                text-align: left;
                 color: #718096;
-                margin-bottom: 30px;
+                margin-bottom: 10px;
             }}
             .summary-grid {{
                 display: grid;
@@ -136,7 +136,7 @@ def generate_html_report(df, months, mode='dispense'):
                 margin: 30px 0;
             }}
             .summary-card {{
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #f5f5f5;
                 color: white;
                 padding: 25px;
                 border-radius: 15px;
@@ -282,7 +282,7 @@ def generate_html_report(df, months, mode='dispense'):
                 font-weight: bold;
                 transition: transform 0.3s ease;
                 display: inline-block;
-                color: #667eea;
+                color: #6b7280;
                 min-width: 30px;
                 text-align: center;
             }}
@@ -341,85 +341,163 @@ def generate_html_report(df, months, mode='dispense'):
         <div class="container">
             <h1>📊 {report_title}</h1>
             <div class="date">생성일: {datetime.now().strftime('%Y년 %m월 %d일 %H:%M')}</div>
-            
-            <div class="summary-grid">
-                <div class="summary-card">
-                    <h3>총 약품 수</h3>
-                    <div class="value">{len(df):,}개</div>
-                </div>
-                <div class="summary-card">
-                    <h3>데이터 기간</h3>
-                    <div class="value">{len(months)}개월</div>
-                </div>
-                <div class="summary-card">
-                    <h3>총 재고 수량</h3>
-                    <div class="value">{df['최종_재고수량'].sum():,.0f}개</div>
-                </div>
-                <div class="summary-card">
-                    <h3>1년 이동평균 총 조제량</h3>
-                    <div class="value">{df['1년_이동평균'].sum():,.0f}개</div>
-                </div>
-            </div>
+            <div class="date">데이터 기간: {months[0][:4]}년 {months[0][5:]}월 ~ {months[-1][:4]}년 {months[-1][5:]}월 (총 {len(months)}개월)</div>
     """
 
     # 특수 케이스 약품 분류
     urgent_drugs, dead_stock_drugs = classify_drugs_by_special_cases(df)
 
-    # 긴급 약품 섹션 생성 (있는 경우)
-    if not urgent_drugs.empty:
-        html_content += generate_urgent_drugs_section(urgent_drugs)
-
     # 런웨이 분석 차트 생성
-    runtime_analysis_low, runtime_analysis_high = analyze_runway(df)
-    if runtime_analysis_low:
-        html_content += f"""
-            <div class="chart-container">
-                <div class="toggle-header" onclick="toggleSection('low-runway-section')">
-                    <h2 style="margin: 0;">⚠️ 재고 부족 약품 (런웨이 3개월 이하)</h2>
-                    <span class="toggle-icon collapsed" id="toggle-icon-low-runway-section">▼</span>
+    runtime_analysis_low, runtime_analysis_high, low_count, high_count = analyze_runway(df)
+
+    # 전체 약품 수
+    total_count = len(df)
+    urgent_count = len(urgent_drugs) if not urgent_drugs.empty else 0
+    dead_count = len(dead_stock_drugs) if not dead_stock_drugs.empty else 0
+
+    # 통합 인디케이터 생성
+    html_content += f"""
+        <!-- 통합 재고 현황 인디케이터 -->
+        <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 2px solid #e5e7eb;">
+            <h2 style="margin: 0 0 15px 0; color: #2d3748;">📊 재고 현황 분포</h2>
+            <div style="display: flex; height: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: relative;">
+                <div style="background: #dc2626; flex: {urgent_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)">
+                    {urgent_count if urgent_count > 0 else ''}
                 </div>
-                <div id="low-runway-section" class="toggle-content collapsed">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
-                            <span id="page-info-low" style="margin: 0 20px;"></span>
-                            <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
-                        </div>
-                    </div>
-                    <div id="runway-chart-low"></div>
+                <div style="background: #eab308; flex: {low_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)">
+                    {low_count if low_count > 0 else ''}
                 </div>
-            </div>
-            <script>
-                {runtime_analysis_low}
-            </script>
-        """
-    
-    if runtime_analysis_high:
-        html_content += f"""
-            <div class="chart-container">
-                <div class="toggle-header" onclick="toggleSection('high-runway-section')">
-                    <h2 style="margin: 0;">✅ 재고 충분 약품 (런웨이 3개월 초과)</h2>
-                    <span class="toggle-icon collapsed" id="toggle-icon-high-runway-section">▼</span>
+                <div style="background: #22c55e; flex: {high_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
+                    {high_count if high_count > 0 else ''}
                 </div>
-                <div id="high-runway-section" class="toggle-content collapsed">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
-                            <span id="page-info-high" style="margin: 0 20px;"></span>
-                            <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
-                        </div>
-                    </div>
-                    <div id="runway-chart-high"></div>
+                <div style="background: #94a3b8; flex: {dead_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
+                    {dead_count if dead_count > 0 else ''}
                 </div>
             </div>
-            <script>
-                {runtime_analysis_high}
-            </script>
+            <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; color: #4a5568;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #dc2626; border-radius: 2px;"></span>
+                    <span>긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #eab308; border-radius: 2px;"></span>
+                    <span>부족: {low_count}개 ({low_count/total_count*100:.1f}%)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span>
+                    <span>충분: {high_count}개 ({high_count/total_count*100:.1f}%)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #94a3b8; border-radius: 2px;"></span>
+                    <span>악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)</span>
+                </div>
+            </div>
+        </div>
+    """
+
+    # 2단계 계층 구조: "주의 필요" 그룹
+    has_urgent = not urgent_drugs.empty
+    has_low_runway = runtime_analysis_low is not None
+
+    if has_urgent or has_low_runway:
+        html_content += f"""
+            <!-- 주의 필요 그룹 -->
+            <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 3px solid #f87171;">
+                <div style="margin-bottom: 20px;">
+                    <h2 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5em;">⚠️</span>
+                        <span>주의 필요</span>
+                        <span style="font-size: 0.8em; opacity: 0.7; margin-left: auto;">즉시 조치 필요</span>
+                    </h2>
+                </div>
         """
 
-    # 악성 재고 섹션 생성 (있는 경우)
-    if not dead_stock_drugs.empty:
-        html_content += generate_dead_stock_section(dead_stock_drugs)
+        # 긴급 약품 섹션
+        if has_urgent:
+            html_content += generate_urgent_drugs_section(urgent_drugs)
+
+        # 재고 부족 약품 섹션
+        if has_low_runway:
+            html_content += f"""
+                <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 20px; padding: 15px;">
+                    <div class="toggle-header" onclick="toggleSection('low-runway-section')" style="background: transparent;">
+                        <h2 style="margin: 0; color: #ca8a04; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.3em;">🟡</span>
+                            <span>재고 부족 약품 (런웨이 3개월 이하)</span>
+                        </h2>
+                        <span class="toggle-icon collapsed" id="toggle-icon-low-runway-section">▼</span>
+                    </div>
+                    <div id="low-runway-section" class="toggle-content collapsed">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div>
+                                <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
+                                <span id="page-info-low" style="margin: 0 20px;"></span>
+                                <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
+                            </div>
+                        </div>
+                        <div id="runway-chart-low"></div>
+                    </div>
+                </div>
+                <script>
+                    {runtime_analysis_low}
+                </script>
+            """
+
+        html_content += """
+            </div>
+        """
+
+    # 2단계 계층 구조: "여유 있음" 그룹
+    has_high_runway = runtime_analysis_high is not None
+    has_dead_stock = not dead_stock_drugs.empty
+
+    if has_high_runway or has_dead_stock:
+        html_content += f"""
+            <!-- 여유 있음 그룹 -->
+            <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 3px solid #60a5fa;">
+                <div style="margin-bottom: 20px;">
+                    <h2 style="margin: 0; color: #1e40af; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.5em;">✅</span>
+                        <span>여유 있음</span>
+                        <span style="font-size: 0.8em; opacity: 0.7; margin-left: auto;">정기 검토 필요</span>
+                    </h2>
+                </div>
+        """
+
+        # 재고 충분 약품 섹션
+        if has_high_runway:
+            html_content += f"""
+                <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; padding: 15px;">
+                    <div class="toggle-header" onclick="toggleSection('high-runway-section')" style="background: transparent;">
+                        <h2 style="margin: 0; color: #16a34a; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.3em;">🟢</span>
+                            <span>재고 충분 약품 (런웨이 3개월 초과)</span>
+                        </h2>
+                        <span class="toggle-icon collapsed" id="toggle-icon-high-runway-section">▼</span>
+                    </div>
+                    <div id="high-runway-section" class="toggle-content collapsed">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div>
+                                <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
+                                <span id="page-info-high" style="margin: 0 20px;"></span>
+                                <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
+                            </div>
+                        </div>
+                        <div id="runway-chart-high"></div>
+                    </div>
+                </div>
+                <script>
+                    {runtime_analysis_high}
+                </script>
+            """
+
+        # 악성 재고 섹션
+        if has_dead_stock:
+            html_content += generate_dead_stock_section(dead_stock_drugs)
+
+        html_content += """
+            </div>
+        """
 
     # 테이블 생성
     html_content += """
@@ -1022,9 +1100,12 @@ def generate_urgent_drugs_section(urgent_drugs):
     memos = checked_items_db.get_all_memos(category='재고소진')
 
     html = f"""
-            <div class="chart-container" style="background: #fff5f5; border: 2px solid #f56565;">
-                <div class="toggle-header" onclick="toggleSection('urgent-drugs-section')" style="background: rgba(255, 230, 230, 0.7);">
-                    <h2 style="margin: 0; color: #c53030;">🚨 긴급: 재고 소진 약품 (사용 중)</h2>
+            <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; padding: 15px;">
+                <div class="toggle-header" onclick="toggleSection('urgent-drugs-section')" style="background: transparent;">
+                    <h2 style="margin: 0; color: #b91c1c; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.3em;">🔴</span>
+                        <span>긴급: 재고 0인 약품 (1년 내 사용이력 있음)</span>
+                    </h2>
                     <span class="toggle-icon collapsed" id="toggle-icon-urgent-drugs-section">▼</span>
                 </div>
                 <div id="urgent-drugs-section" class="toggle-content collapsed">
@@ -1140,7 +1221,7 @@ def generate_urgent_drugs_section(urgent_drugs):
                               placeholder="메모를 입력하세요..."></textarea>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                         <button onclick="closeMemoModal()" style="padding: 10px 20px; border: 2px solid #cbd5e0; background: white; border-radius: 5px; cursor: pointer; font-size: 14px;">취소</button>
-                        <button onclick="saveMemo()" style="padding: 10px 20px; border: none; background: #667eea; color: white; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">저장</button>
+                        <button onclick="saveMemo()" style="padding: 10px 20px; border: none; background: #4b5563; color: white; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">저장</button>
                     </div>
                 </div>
             </div>
@@ -1165,9 +1246,12 @@ def generate_dead_stock_section(dead_stock_drugs):
     total_dead_stock = dead_stock_drugs['최종_재고수량'].sum()
 
     html = f"""
-            <div class="chart-container" style="background: #f7fafc; border: 2px solid #a0aec0;">
-                <div class="toggle-header" onclick="toggleSection('dead-stock-section')" style="background: rgba(226, 232, 240, 0.7);">
-                    <h2 style="margin: 0; color: #4a5568;">📦 악성 재고: 미사용 약품</h2>
+            <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 20px; padding: 15px;">
+                <div class="toggle-header" onclick="toggleSection('dead-stock-section')" style="background: transparent;">
+                    <h2 style="margin: 0; color: #475569; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.3em;">⚪</span>
+                        <span>악성 재고 (1년간 미사용 약품)</span>
+                    </h2>
                     <span class="toggle-icon collapsed" id="toggle-icon-dead-stock-section">▼</span>
                 </div>
                 <div id="dead-stock-section" class="toggle-content collapsed">
@@ -1237,7 +1321,11 @@ def generate_dead_stock_section(dead_stock_drugs):
     return html
 
 def analyze_runway(df):
-    """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - 3-MA 런웨이 기준"""
+    """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - 3-MA 런웨이 기준
+
+    Returns:
+        tuple: (chart_js_low, chart_js_high, low_count, high_count)
+    """
     try:
         # 3-MA 런웨이를 숫자로 변환 (개월 단위)
         low_data = []  # 3개월 이하
@@ -1276,9 +1364,11 @@ def analyze_runway(df):
                     low_data.append(data_tuple)
                 else:
                     high_data.append(data_tuple)
-        
+
         chart_js_low = None
         chart_js_high = None
+        low_count = len(low_data)
+        high_count = len(high_data)
         
         # 하위 차트 (3개월 이하, 오름차순 정렬)
         if low_data:
@@ -1503,11 +1593,11 @@ def analyze_runway(df):
                 }}
             """
         
-        return chart_js_low, chart_js_high
+        return chart_js_low, chart_js_high, low_count, high_count
     except Exception as e:
         print(f"Error in analyze_runway: {e}")
         pass
-    return None, None
+    return None, None, 0, 0
 
 def create_and_save_report(df, months, mode='dispense', open_browser=True):
     """보고서를 생성하고 파일로 저장하는 함수
