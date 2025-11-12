@@ -497,18 +497,9 @@ def generate_html_report(df, months, mode='dispense'):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
-        # 특수 케이스 아이콘 결정
-        special_icon = ""
-        if row['1년_이동평균'] > 0 and row['최종_재고수량'] == 0:
-            # 긴급: 사용되는데 재고 없음
-            special_icon = '<span style="color: #c53030; font-size: 16px; margin-right: 5px;" title="긴급: 재고 소진 (사용 중)">🚨</span>'
-        elif row['1년_이동평균'] == 0 and row['최종_재고수량'] > 0:
-            # 악성 재고: 안 쓰이는데 재고만 있음
-            special_icon = '<span style="color: #4a5568; font-size: 16px; margin-right: 5px;" title="악성 재고: 미사용 약품">📦</span>'
-
         html_content += f"""
                         <tr class="{runway_class} clickable-row" onclick="openModalWithChart('{modal_id}', {idx})" data-chart-data='{chart_data_json}'>
-                            <td>{special_icon}{drug_name_display}</td>
+                            <td>{drug_name_display}</td>
                             <td>{company_display}</td>
                             <td>{row['약품코드']}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
