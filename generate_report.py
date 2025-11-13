@@ -334,6 +334,124 @@ def generate_html_report(df, months, mode='dispense'):
                 align-items: center;
                 gap: 8px;
             }}
+
+            /* 책갈피 사이드바 스타일 */
+            .bookmark-sidebar {{
+                position: fixed;
+                right: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                z-index: 999;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                padding-right: 0;
+            }}
+            .bookmark-item {{
+                position: relative;
+                right: -140px;
+                padding: 15px 20px;
+                border-radius: 10px 0 0 10px;
+                cursor: pointer;
+                transition: right 0.3s ease, box-shadow 0.3s ease;
+                box-shadow: -4px 4px 12px rgba(0, 0, 0, 0.3);
+                min-width: 180px;
+                color: white;
+                font-weight: bold;
+                font-size: 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                user-select: none;
+            }}
+            .bookmark-item:hover {{
+                right: 0;
+                box-shadow: -8px 8px 20px rgba(0, 0, 0, 0.4);
+            }}
+            .bookmark-item .bookmark-icon {{
+                font-size: 1.3em;
+                margin-bottom: 3px;
+            }}
+            .bookmark-item .bookmark-title {{
+                font-size: 1.1em;
+            }}
+            .bookmark-item .bookmark-count {{
+                font-size: 1.8em;
+                font-weight: bold;
+                text-align: center;
+                margin-top: 5px;
+            }}
+            .bookmark-urgent {{
+                background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            }}
+            .bookmark-low {{
+                background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+            }}
+            .bookmark-high {{
+                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            }}
+            .bookmark-dead {{
+                background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+            }}
+
+            /* 카테고리 모달 스타일 */
+            .category-modal {{
+                display: none;
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                background-color: rgba(0,0,0,0.7);
+                animation: fadeIn 0.3s ease;
+            }}
+            @keyframes fadeIn {{
+                from {{ opacity: 0; }}
+                to {{ opacity: 1; }}
+            }}
+            .category-modal-content {{
+                background-color: white;
+                margin: 3% auto;
+                padding: 40px;
+                border-radius: 20px;
+                width: 90%;
+                max-width: 1400px;
+                max-height: 85vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                animation: slideIn 0.3s ease;
+            }}
+            @keyframes slideIn {{
+                from {{
+                    transform: translateY(-50px);
+                    opacity: 0;
+                }}
+                to {{
+                    transform: translateY(0);
+                    opacity: 1;
+                }}
+            }}
+            .category-modal-header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 3px solid #e5e7eb;
+            }}
+            .category-modal-close {{
+                color: #aaa;
+                font-size: 36px;
+                font-weight: bold;
+                cursor: pointer;
+                line-height: 30px;
+                transition: color 0.2s;
+            }}
+            .category-modal-close:hover {{
+                color: #000;
+            }}
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
@@ -393,41 +511,71 @@ def generate_html_report(df, months, mode='dispense'):
                 </div>
             </div>
         </div>
+
+        <!-- 책갈피 사이드바 -->
+        <div class="bookmark-sidebar">
+            <div class="bookmark-item bookmark-urgent" onclick="openCategoryModal('urgent-modal')">
+                <div class="bookmark-icon">🔴</div>
+                <div class="bookmark-title">긴급</div>
+                <div class="bookmark-count">{urgent_count}</div>
+            </div>
+            <div class="bookmark-item bookmark-low" onclick="openCategoryModal('low-modal')">
+                <div class="bookmark-icon">🟡</div>
+                <div class="bookmark-title">부족</div>
+                <div class="bookmark-count">{low_count}</div>
+            </div>
+            <div class="bookmark-item bookmark-high" onclick="openCategoryModal('high-modal')">
+                <div class="bookmark-icon">🟢</div>
+                <div class="bookmark-title">충분</div>
+                <div class="bookmark-count">{high_count}</div>
+            </div>
+            <div class="bookmark-item bookmark-dead" onclick="openCategoryModal('dead-modal')">
+                <div class="bookmark-icon">⚪</div>
+                <div class="bookmark-title">악성재고</div>
+                <div class="bookmark-count">{dead_count}</div>
+            </div>
+        </div>
     """
 
-    # 2단계 계층 구조: "주의 필요" 그룹
+    # 모달 컨테이너 생성
     has_urgent = not urgent_drugs.empty
     has_low_runway = runtime_analysis_low is not None
+    has_high_runway = runtime_analysis_high is not None
+    has_dead_stock = not dead_stock_drugs.empty
 
-    if has_urgent or has_low_runway:
+    # 긴급 약품 모달
+    if has_urgent:
+        urgent_section_html = generate_urgent_drugs_section(urgent_drugs)
         html_content += f"""
-            <!-- 주의 필요 그룹 -->
-            <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 3px solid #f87171;">
-                <div style="margin-bottom: 20px;">
-                    <h2 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.5em;">⚠️</span>
-                        <span>주의 필요</span>
-                        <span style="font-size: 0.8em; opacity: 0.7; margin-left: auto;">즉시 조치 필요</span>
-                    </h2>
+            <!-- 긴급 약품 모달 -->
+            <div id="urgent-modal" class="category-modal">
+                <div class="category-modal-content">
+                    <div class="category-modal-header">
+                        <h2 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.5em;">🔴</span>
+                            <span>긴급: 재고 0인 약품 (1년 내 사용이력 있음)</span>
+                        </h2>
+                        <span class="category-modal-close" onclick="closeCategoryModal('urgent-modal')">&times;</span>
+                    </div>
+                    {urgent_section_html}
                 </div>
+            </div>
         """
 
-        # 긴급 약품 섹션
-        if has_urgent:
-            html_content += generate_urgent_drugs_section(urgent_drugs)
-
-        # 재고 부족 약품 섹션
-        if has_low_runway:
-            html_content += f"""
-                <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 20px; padding: 15px;">
-                    <div class="toggle-header" onclick="toggleSection('low-runway-section')" style="background: transparent;">
+    # 재고 부족 약품 모달
+    if has_low_runway:
+        html_content += f"""
+            <!-- 재고 부족 약품 모달 -->
+            <div id="low-modal" class="category-modal">
+                <div class="category-modal-content">
+                    <div class="category-modal-header">
                         <h2 style="margin: 0; color: #ca8a04; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.3em;">🟡</span>
+                            <span style="font-size: 1.5em;">🟡</span>
                             <span>재고 부족 약품 (런웨이 3개월 이하)</span>
                         </h2>
-                        <span class="toggle-icon collapsed" id="toggle-icon-low-runway-section">▼</span>
+                        <span class="category-modal-close" onclick="closeCategoryModal('low-modal')">&times;</span>
                     </div>
-                    <div id="low-runway-section" class="toggle-content collapsed">
+                    <div class="chart-container" style="background: white;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <div>
                                 <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
@@ -438,44 +586,26 @@ def generate_html_report(df, months, mode='dispense'):
                         <div id="runway-chart-low"></div>
                     </div>
                 </div>
-                <script>
-                    {runtime_analysis_low}
-                </script>
-            """
-
-        html_content += """
             </div>
+            <script>
+                {runtime_analysis_low}
+            </script>
         """
 
-    # 2단계 계층 구조: "여유 있음" 그룹
-    has_high_runway = runtime_analysis_high is not None
-    has_dead_stock = not dead_stock_drugs.empty
-
-    if has_high_runway or has_dead_stock:
+    # 재고 충분 약품 모달
+    if has_high_runway:
         html_content += f"""
-            <!-- 여유 있음 그룹 -->
-            <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 3px solid #60a5fa;">
-                <div style="margin-bottom: 20px;">
-                    <h2 style="margin: 0; color: #1e40af; display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.5em;">✅</span>
-                        <span>여유 있음</span>
-                        <span style="font-size: 0.8em; opacity: 0.7; margin-left: auto;">정기 검토 필요</span>
-                    </h2>
-                </div>
-        """
-
-        # 재고 충분 약품 섹션
-        if has_high_runway:
-            html_content += f"""
-                <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; padding: 15px;">
-                    <div class="toggle-header" onclick="toggleSection('high-runway-section')" style="background: transparent;">
+            <!-- 재고 충분 약품 모달 -->
+            <div id="high-modal" class="category-modal">
+                <div class="category-modal-content">
+                    <div class="category-modal-header">
                         <h2 style="margin: 0; color: #16a34a; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.3em;">🟢</span>
+                            <span style="font-size: 1.5em;">🟢</span>
                             <span>재고 충분 약품 (런웨이 3개월 초과)</span>
                         </h2>
-                        <span class="toggle-icon collapsed" id="toggle-icon-high-runway-section">▼</span>
+                        <span class="category-modal-close" onclick="closeCategoryModal('high-modal')">&times;</span>
                     </div>
-                    <div id="high-runway-section" class="toggle-content collapsed">
+                    <div class="chart-container" style="background: white;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <div>
                                 <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
@@ -486,16 +616,28 @@ def generate_html_report(df, months, mode='dispense'):
                         <div id="runway-chart-high"></div>
                     </div>
                 </div>
-                <script>
-                    {runtime_analysis_high}
-                </script>
-            """
+            </div>
+            <script>
+                {runtime_analysis_high}
+            </script>
+        """
 
-        # 악성 재고 섹션
-        if has_dead_stock:
-            html_content += generate_dead_stock_section(dead_stock_drugs)
-
-        html_content += """
+    # 악성 재고 모달
+    if has_dead_stock:
+        dead_stock_section_html = generate_dead_stock_section(dead_stock_drugs)
+        html_content += f"""
+            <!-- 악성 재고 모달 -->
+            <div id="dead-modal" class="category-modal">
+                <div class="category-modal-content">
+                    <div class="category-modal-header">
+                        <h2 style="margin: 0; color: #475569; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.5em;">⚪</span>
+                            <span>악성 재고 (1년간 미사용 약품)</span>
+                        </h2>
+                        <span class="category-modal-close" onclick="closeCategoryModal('dead-modal')">&times;</span>
+                    </div>
+                    {dead_stock_section_html}
+                </div>
             </div>
         """
 
@@ -646,15 +788,56 @@ def generate_html_report(df, months, mode='dispense'):
                 </table>
             </div>
         </div>
-        
+
         <script>
-            // 토글 기능
+            // 카테고리 모달 열기
+            function openCategoryModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.style.display = 'block';
+                    document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+                }
+            }
+
+            // 카테고리 모달 닫기
+            function closeCategoryModal(modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = 'auto'; // 배경 스크롤 복원
+                }
+            }
+
+            // ESC 키로 모달 닫기
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    const modals = document.querySelectorAll('.category-modal');
+                    modals.forEach(modal => {
+                        if (modal.style.display === 'block') {
+                            modal.style.display = 'none';
+                        }
+                    });
+                    document.body.style.overflow = 'auto';
+                }
+            });
+
+            // 모달 배경 클릭 시 닫기
+            window.addEventListener('click', function(event) {
+                if (event.target.classList.contains('category-modal')) {
+                    event.target.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+
+            // 토글 기능 (모달 내부용)
             function toggleSection(sectionId) {
                 const section = document.getElementById(sectionId);
                 const icon = document.getElementById('toggle-icon-' + sectionId);
 
-                section.classList.toggle('collapsed');
-                icon.classList.toggle('collapsed');
+                if (section && icon) {
+                    section.classList.toggle('collapsed');
+                    icon.classList.toggle('collapsed');
+                }
             }
 
             // 긴급 약품 체크박스 핸들러
@@ -1080,7 +1263,7 @@ def classify_drugs_by_special_cases(df):
     return urgent_drugs, dead_stock_drugs
 
 def generate_urgent_drugs_section(urgent_drugs):
-    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모)"""
+    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모) - 모달용"""
 
     # 현재 긴급 목록에 있는 약품 코드들
     current_urgent_codes = set(urgent_drugs['약품코드'].astype(str))
@@ -1100,15 +1283,6 @@ def generate_urgent_drugs_section(urgent_drugs):
     memos = checked_items_db.get_all_memos(category='재고소진')
 
     html = f"""
-            <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; padding: 15px;">
-                <div class="toggle-header" onclick="toggleSection('urgent-drugs-section')" style="background: transparent;">
-                    <h2 style="margin: 0; color: #b91c1c; display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.3em;">🔴</span>
-                        <span>긴급: 재고 0인 약품 (1년 내 사용이력 있음)</span>
-                    </h2>
-                    <span class="toggle-icon collapsed" id="toggle-icon-urgent-drugs-section">▼</span>
-                </div>
-                <div id="urgent-drugs-section" class="toggle-content collapsed">
                     <div style="padding: 15px; background: #fff8f8; border-radius: 8px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #c53030; font-weight: bold;">
                             ⚠️ 총 {len(urgent_drugs)}개 약품이 현재 사용되고 있으나 재고가 소진되었습니다. 즉시 주문이 필요합니다!
@@ -1207,8 +1381,6 @@ def generate_urgent_drugs_section(urgent_drugs):
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
 
             <!-- 메모 모달 -->
             <div id="memo-modal" class="modal">
@@ -1241,20 +1413,11 @@ def generate_urgent_drugs_section(urgent_drugs):
     return html
 
 def generate_dead_stock_section(dead_stock_drugs):
-    """악성 재고 섹션 HTML 생성 (테이블 형식)"""
+    """악성 재고 섹션 HTML 생성 (테이블 형식) - 모달용"""
 
     total_dead_stock = dead_stock_drugs['최종_재고수량'].sum()
 
     html = f"""
-            <div class="chart-container" style="background: transparent; border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 20px; padding: 15px;">
-                <div class="toggle-header" onclick="toggleSection('dead-stock-section')" style="background: transparent;">
-                    <h2 style="margin: 0; color: #475569; display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.3em;">⚪</span>
-                        <span>악성 재고 (1년간 미사용 약품)</span>
-                    </h2>
-                    <span class="toggle-icon collapsed" id="toggle-icon-dead-stock-section">▼</span>
-                </div>
-                <div id="dead-stock-section" class="toggle-content collapsed">
                     <div style="padding: 15px; background: #edf2f7; border-radius: 8px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #4a5568; font-weight: bold;">
                             📊 총 {len(dead_stock_drugs)}개 약품이 1년 동안 사용되지 않았으나 재고가 {total_dead_stock:,.0f}개 남아있습니다.
@@ -1314,8 +1477,6 @@ def generate_dead_stock_section(dead_stock_drugs):
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
     """
 
     return html
