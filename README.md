@@ -258,18 +258,21 @@ yak-jaego/
 │   └── ...                        # 기타 월별 데이터
 ├── templates/                     # 웹 UI HTML 템플릿 폴더
 │   ├── index.html                 # 랜딩 페이지
-│   ├── workflow_timeseries.html   # 시계열 분석 워크플로우 페이지
+│   ├── workflow_simple.html       # 단순 재고 관리 워크플로우 페이지 (v3.6)
+│   ├── workflow_timeseries.html   # 상세 재고 관리 워크플로우 페이지
 │   ├── workflow_order.html        # 주문 계산 워크플로우 페이지
 │   └── error.html                 # 에러 페이지
-├── inventory_reports/             # 시계열 분석 보고서 폴더 (자동 생성)
-│   └── inventory_report_YYYYMMDD_HHMMSS.html
+├── inventory_reports/             # 재고 관리 보고서 폴더 (자동 생성)
+│   ├── simple_report_YYYYMMDD_HHMMSS.html      # 단순 보고서 (N-MA) (v3.6)
+│   └── inventory_report_YYYYMMDD_HHMMSS.html   # 상세 보고서 (12-MA + 3-MA)
 ├── order_calc_reports/            # 주문 수량 산출 보고서 폴더 (자동 생성)
 │   ├── order_calculator_report_YYYYMMDD_HHMMSS.html
 │   └── order_calculator_report_YYYYMMDD_HHMMSS.csv
 ├── init_db.py                     # 🔧 DB 초기화 스크립트 (관리자용)
 ├── web_app.py                     # 🌐 웹 UI 메인 애플리케이션 (사용자용)
 ├── read_csv.py                    # CSV 데이터 읽기 및 시계열 통합 모듈
-├── generate_report.py             # 시계열 분석 HTML 보고서 생성 모듈
+├── generate_report.py             # 상세 재고 관리 HTML 보고서 생성 모듈 (12-MA + 3-MA)
+├── generate_single_ma_report.py   # 단순 재고 관리 HTML 보고서 생성 모듈 (N-MA) (v3.6)
 ├── drug_order_calculator.py       # 주문 수량 산출 모듈
 ├── inventory_db.py                # recent_inventory.sqlite3 관리 모듈
 ├── processed_inventory_db.py      # processed_inventory.sqlite3 관리 모듈
