@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>단순 재고 관리 보고서</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px;
+            max-width: 600px;
+            width: 100%;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            color: #2d3748;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 40px;
+            font-size: 1em;
+        }
+
+        .form-group {
+            margin-bottom: 30px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #2d3748;
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .radio-option {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .radio-option input[type="radio"] {
+            display: none;
+        }
+
+        .radio-option label {
+            display: block;
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            background: #f7fafc;
+        }
+
+        .radio-option input[type="radio"]:checked + label {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .radio-option label:hover {
+            border-color: #cbd5e0;
+            transform: translateY(-2px);
+        }
+
+        .radio-option input[type="radio"]:checked + label:hover {
+            border-color: #667eea;
+        }
+
+        .select-wrapper {
+            position: relative;
+        }
+
+        select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            transition: all 0.3s;
+        }
+
+        select:hover {
+            border-color: #cbd5e0;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .select-wrapper::after {
+            content: '▼';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: #718096;
+        }
+
+        .tooltip {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: #4299e1;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 14px;
+            cursor: help;
+            margin-left: 8px;
+            position: relative;
+        }
+
+        .tooltip:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2d3748;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            white-space: nowrap;
+            font-size: 13px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .tooltip:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #2d3748;
+        }
+
+        .info-box {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+            color: #2c5282;
+        }
+
+        .info-box strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #2b6cb0;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #718096;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .back-btn:hover {
+            color: #2d3748;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .exit-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .exit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+        }
+
+        .exit-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">← 메인으로 돌아가기</a>
+
+        <h1>📊 단순 재고 관리 보고서</h1>
+        <p class="subtitle">사용자 정의 이동평균 기반 간편 분석</p>
+
+        <div class="info-box">
+            <strong>💡 이 보고서는?</strong>
+            하나의 이동평균만 사용하여 더 간단하고 직관적인 재고 분석을 제공합니다.
+            처음 사용하시는 분께 추천합니다!
+        </div>
+
+        <form id="reportForm" method="POST" action="/generate/simple_report">
+            <div class="form-group">
+                <label>
+                    약품 유형 선택
+                </label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="dispense" name="mode" value="dispense" checked>
+                        <label for="dispense">
+                            <div style="font-size: 1.8em; margin-bottom: 10px;">💊</div>
+                            <div style="font-weight: bold; margin-bottom: 5px;">전문약</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">조제수량 기준</div>
+                        </label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="sale" name="mode" value="sale">
+                        <label for="sale">
+                            <div style="font-size: 1.8em; margin-bottom: 10px;">🏥</div>
+                            <div style="font-weight: bold; margin-bottom: 5px;">일반약</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">판매수량 기준</div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="ma_months">
+                    이동평균 개월 수
+                    <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.&#10;• 3개월: 단기 트렌드 (권장)&#10;• 6개월: 중기 트렌드&#10;• 12개월: 장기 트렌드">ⓘ</span>
+                </label>
+                <div class="select-wrapper">
+                    <select name="ma_months" id="ma_months">
+                        <option value="1">1개월 (매우 단기)</option>
+                        <option value="2">2개월 (단기)</option>
+                        <option value="3" selected>3개월 (권장 - 단기 트렌드)</option>
+                        <option value="4">4개월</option>
+                        <option value="5">5개월</option>
+                        <option value="6">6개월 (중기 트렌드)</option>
+                        <option value="9">9개월</option>
+                        <option value="12">12개월 (장기 트렌드)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                🚀 보고서 생성하기
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="color: #718096;">보고서를 생성하고 있습니다...</p>
+        </div>
+    </div>
+
+    <button class="exit-btn" onclick="exitApp()">
+        <span>🛑</span>
+        <span>종료</span>
+    </button>
+
+    <script>
+        document.getElementById('reportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+
+            // 버튼 비활성화 및 로딩 표시
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ 생성 중...';
+            loading.classList.add('active');
+
+            const formData = new FormData(this);
+
+            fetch('/generate/simple_report', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 새 탭에서 보고서 열기
+                    window.open(data.report_url, '_blank');
+
+                    // 버튼 복원
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '🚀 보고서 생성하기';
+                    loading.classList.remove('active');
+
+                    // 성공 메시지
+                    alert('✅ 보고서가 성공적으로 생성되었습니다!');
+                } else {
+                    throw new Error(data.message || '보고서 생성 실패');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('❌ 보고서 생성 중 오류가 발생했습니다:\n' + error.message);
+
+                // 버튼 복원
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 보고서 생성하기';
+                loading.classList.remove('active');
+            });
+        });
+
+        function exitApp() {
+            if (confirm('정말로 앱을 종료하시겠습니까?')) {
+                fetch('/shutdown', {method: 'POST'})
+                    .then(() => {
+                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: white;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
+                    })
+                    .catch(() => {
+                        alert('종료 중 오류가 발생했습니다. 터미널에서 Ctrl+C를 눌러주세요.');
+                    });
+            }
+        }
+    </script>
+</body>
+</html>

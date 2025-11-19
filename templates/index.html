@@ -803,7 +803,13 @@
                         <div class="workflow-section section-new">
                             <h3>✨ 새로 생성하기</h3>
                             <div class="action-buttons">
-                                <a href="/workflow/timeseries" class="btn-new">📊 재고 관리 보고서 생성</a>
+                                <a href="/workflow/simple" class="btn-new" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                                    <span style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                        <span>📊 단순 재고 관리 보고서</span>
+                                        <span style="background: rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 12px; font-size: 0.75em;">권장</span>
+                                    </span>
+                                </a>
+                                <a href="/workflow/timeseries" class="btn-new">📈 상세 재고 관리 보고서</a>
                             </div>
                         </div>
 
@@ -931,10 +937,19 @@
                 data.reports.forEach(report => {
                     let typeClass = '';
                     let typeText = '';
+                    let styleText = '';
 
                     if (type === 'timeseries') {
                         typeText = report.drug_type;
                         typeClass = report.drug_type === '전문약' ? 'dispense' : 'sale';
+
+                        // 단순/상세 보고서 표시
+                        if (report.report_style) {
+                            styleText = `<span style="font-size: 0.85em; opacity: 0.8;">[${report.report_style}]</span> `;
+                            if (report.ma_months) {
+                                styleText += `<span style="font-size: 0.75em; opacity: 0.7;">(${report.ma_months})</span>`;
+                            }
+                        }
                     } else {
                         typeText = '주문 수량 산출';
                         typeClass = 'order';
@@ -944,7 +959,7 @@
                         <a href="/reports/${report.filename}" target="_blank" class="report-item">
                             <div class="report-item-time">🕐 ${report.created_at}</div>
                             <div class="report-item-type ${typeClass}">
-                                ${typeText}
+                                ${styleText}${typeText}
                             </div>
                         </a>
                     `;

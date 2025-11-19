@@ -20,6 +20,7 @@ import pandas as pd
 
 # 로컬 모듈 import
 from generate_report import create_and_save_report
+from generate_single_ma_report import create_and_save_report as create_simple_report
 from drug_order_calculator import run as run_order_calculator
 import inventory_db
 import processed_inventory_db
@@ -90,6 +91,12 @@ def workflow_timeseries():
     return render_template('workflow_timeseries.html')
 
 
+@app.route('/workflow/simple')
+def workflow_simple():
+    """단순 재고 관리 보고서 워크플로우 페이지"""
+    return render_template('workflow_simple.html')
+
+
 @app.route('/workflow/order')
 def workflow_order():
     """주문 수량 산출 워크플로우 페이지"""
@@ -98,7 +105,7 @@ def workflow_order():
 
 @app.route('/api/generate-report', methods=['POST'])
 def generate_report():
-    """시계열 분석 보고서 생성 API"""
+    """시계열 분석 보고서 생성 API (상세 보고서 - Dual MA)"""
     try:
         data = request.get_json()
         report_type = data.get('report_type')  # 'dispense' 또는 'sale'
@@ -155,6 +162,71 @@ def generate_report():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/generate/simple_report', methods=['POST'])
+def generate_simple_report_route():
+    """단순 재고 관리 보고서 생성 API (Single MA)"""
+    try:
+        mode = request.form.get('mode', 'dispense')
+        ma_months = int(request.form.get('ma_months', 3))
+
+        if mode not in ['dispense', 'sale']:
+            return jsonify({'status': 'error', 'message': '잘못된 보고서 유형입니다.'}), 400
+
+        if not (1 <= ma_months <= 12):
+            return jsonify({'status': 'error', 'message': '이동평균 개월 수는 1~12 사이여야 합니다.'}), 400
+
+        # 약품 유형 결정
+        drug_type = '전문약' if mode == 'dispense' else '일반약'
+
+        # processed_inventory DB에서 데이터 로드
+        df = processed_inventory_db.get_processed_data(drug_type=drug_type)
+
+        if df.empty:
+            return jsonify({'status': 'error', 'message': f'{drug_type} 데이터가 없습니다.'}), 404
+
+        # DB 메타데이터에서 월 정보 추출
+        data_period = processed_inventory_db.get_metadata()
+
+        if data_period:
+            # 메타데이터에서 정확한 월 범위 가져오기
+            start_month = data_period['start_month']
+            end_month = data_period['end_month']
+            total_months = data_period['total_months']
+
+            # 시작 월부터 종료 월까지 연속된 월 생성
+            from dateutil.relativedelta import relativedelta
+            start_date = datetime.strptime(start_month, '%Y-%m')
+            months = []
+            for i in range(total_months):
+                month_date = start_date + relativedelta(months=i)
+                months.append(month_date.strftime('%Y-%m'))
+        else:
+            # 메타데이터가 없는 경우 (fallback)
+            first_record = df.iloc[0]
+            num_months = len(first_record['월별_조제수량_리스트'])
+            months = [f"Month {i+1}" for i in range(num_months)]
+
+        # HTML 보고서 생성 (브라우저 자동 열기 비활성화)
+        report_path = create_simple_report(df, months, mode=mode, ma_months=ma_months, open_browser=False)
+
+        # 파일명만 추출
+        report_filename = os.path.basename(report_path)
+
+        return jsonify({
+            'status': 'success',
+            'report_url': f'/reports/{report_filename}',
+            'report_filename': report_filename,
+            'drug_type': drug_type,
+            'drug_count': len(df),
+            'ma_months': ma_months
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/calculate-order', methods=['POST'])
@@ -441,10 +513,11 @@ def list_reports(report_type):
     try:
         if report_type == 'timeseries':
             report_dir = 'inventory_reports'
-            file_prefix = 'inventory_report_'
+            # 단순 보고서와 상세 보고서 모두 포함
+            file_prefixes = ['inventory_report_', 'simple_report_']
         elif report_type == 'order':
             report_dir = 'order_calc_reports'
-            file_prefix = 'order_calculator_report_'
+            file_prefixes = ['order_calculator_report_']
         else:
             return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
 
@@ -452,9 +525,9 @@ def list_reports(report_type):
         if not os.path.exists(report_dir):
             return jsonify({'reports': []})
 
-        # HTML 파일만 필터링
+        # HTML 파일만 필터링 (여러 prefix 지원)
         files = [f for f in os.listdir(report_dir)
-                if f.startswith(file_prefix) and f.endswith('.html')]
+                if any(f.startswith(prefix) for prefix in file_prefixes) and f.endswith('.html')]
 
         reports = []
         for filename in files:
@@ -472,7 +545,7 @@ def list_reports(report_type):
                 'size': file_stat.st_size
             }
 
-            # 시계열 보고서의 경우 전문약/일반약 구분
+            # 시계열 보고서의 경우 전문약/일반약 및 보고서 유형 구분
             if report_type == 'timeseries':
                 if 'dispense' in filename:
                     report_info['drug_type'] = '전문약'
@@ -480,6 +553,20 @@ def list_reports(report_type):
                     report_info['drug_type'] = '일반약'
                 else:
                     report_info['drug_type'] = '미분류'
+
+                # 단순/상세 보고서 구분
+                if filename.startswith('simple_report_'):
+                    report_info['report_style'] = '단순'
+                    # 파일명에서 MA 개월 수 추출 (예: simple_report_dispense_3ma_20251119.html)
+                    try:
+                        ma_part = filename.split('_')[3]  # "3ma"
+                        ma_months = ma_part.replace('ma', '')
+                        report_info['ma_months'] = f'{ma_months}개월'
+                    except:
+                        report_info['ma_months'] = 'N/A'
+                else:
+                    report_info['report_style'] = '상세'
+                    report_info['ma_months'] = '1년+3개월'
 
             reports.append(report_info)
 
@@ -501,7 +588,7 @@ def list_reports(report_type):
 def serve_report(filename):
     """보고서 파일 제공"""
     # 시계열 보고서 (inventory_reports 디렉토리)
-    if filename.startswith('inventory_report_'):
+    if filename.startswith('inventory_report_') or filename.startswith('simple_report_'):
         file_path = os.path.join(os.getcwd(), 'inventory_reports', filename)
         if os.path.exists(file_path):
             return send_file(file_path, mimetype='text/html')
