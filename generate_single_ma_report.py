@@ -487,8 +487,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     # 특수 케이스 약품 분류
     urgent_drugs, dead_stock_drugs = classify_drugs_by_special_cases(df, ma_months)
 
-    # 런웨이 분석 차트 생성
-    runtime_analysis_low, runtime_analysis_high, low_count, high_count = analyze_runway(df, months, ma_months)
+    # 런웨이 분석 차트 생성 + 부족/충분 약품 DataFrame
+    runtime_analysis_low, runtime_analysis_high, low_count, high_count, low_drugs_df, high_drugs_df = analyze_runway(df, months, ma_months)
 
     # 전체 약품 수
     total_count = len(df)
@@ -584,8 +584,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             </div>
         """
 
-    # 재고 부족 약품 모달
+    # 재고 부족 약품 모달 (테이블 + 차트 토글)
     if has_low_runway:
+        low_section_html = generate_low_stock_section(low_drugs_df, ma_months)
         html_content += f"""
             <!-- 재고 부족 약품 모달 -->
             <div id="low-modal" class="category-modal">
@@ -595,27 +596,62 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                             <span style="font-size: 1.5em;">🟡</span>
                             <span>재고 부족 약품 (런웨이 3개월 이하)</span>
                         </h2>
-                        <span class="category-modal-close" onclick="closeCategoryModal('low-modal')">&times;</span>
-                    </div>
-                    <div class="chart-container" style="background: white;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <div>
-                                <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
-                                <span id="page-info-low" style="margin: 0 20px;"></span>
-                                <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
-                            </div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <button id="toggle-view-low" class="nav-btn" onclick="toggleLowView()">📊 막대 그래프 보기</button>
+                            <span class="category-modal-close" onclick="closeCategoryModal('low-modal')">&times;</span>
                         </div>
-                        <div id="runway-chart-low"></div>
+                    </div>
+                    <!-- 테이블 뷰 (기본) -->
+                    <div id="table-view-low" style="display: block;">
+                        {low_section_html}
+                    </div>
+                    <!-- 차트 뷰 (숨김) -->
+                    <div id="chart-view-low" style="display: none;">
+                        <div class="chart-container" style="background: white;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div>
+                                    <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
+                                    <span id="page-info-low" style="margin: 0 20px;"></span>
+                                    <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
+                                </div>
+                            </div>
+                            <div id="runway-chart-low"></div>
+                        </div>
                     </div>
                 </div>
             </div>
             <script>
                 {runtime_analysis_low}
+
+                // 부족 탭 뷰 토글
+                var lowViewMode = 'table';
+                function toggleLowView() {{
+                    var tableView = document.getElementById('table-view-low');
+                    var chartView = document.getElementById('chart-view-low');
+                    var toggleBtn = document.getElementById('toggle-view-low');
+
+                    if (lowViewMode === 'table') {{
+                        tableView.style.display = 'none';
+                        chartView.style.display = 'block';
+                        toggleBtn.textContent = '📋 테이블 보기';
+                        lowViewMode = 'chart';
+                        // 차트 초기화 (처음 표시될 때)
+                        if (typeof updateChartLow === 'function') {{
+                            updateChartLow();
+                        }}
+                    }} else {{
+                        tableView.style.display = 'block';
+                        chartView.style.display = 'none';
+                        toggleBtn.textContent = '📊 막대 그래프 보기';
+                        lowViewMode = 'table';
+                    }}
+                }}
             </script>
         """
 
-    # 재고 충분 약품 모달
+    # 재고 충분 약품 모달 (테이블 + 차트 토글)
     if has_high_runway:
+        high_section_html = generate_high_stock_section(high_drugs_df, ma_months)
         html_content += f"""
             <!-- 재고 충분 약품 모달 -->
             <div id="high-modal" class="category-modal">
@@ -625,22 +661,56 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                             <span style="font-size: 1.5em;">🟢</span>
                             <span>재고 충분 약품 (런웨이 3개월 초과)</span>
                         </h2>
-                        <span class="category-modal-close" onclick="closeCategoryModal('high-modal')">&times;</span>
-                    </div>
-                    <div class="chart-container" style="background: white;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <div>
-                                <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
-                                <span id="page-info-high" style="margin: 0 20px;"></span>
-                                <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
-                            </div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <button id="toggle-view-high" class="nav-btn" onclick="toggleHighView()">📊 막대 그래프 보기</button>
+                            <span class="category-modal-close" onclick="closeCategoryModal('high-modal')">&times;</span>
                         </div>
-                        <div id="runway-chart-high"></div>
+                    </div>
+                    <!-- 테이블 뷰 (기본) -->
+                    <div id="table-view-high" style="display: block;">
+                        {high_section_html}
+                    </div>
+                    <!-- 차트 뷰 (숨김) -->
+                    <div id="chart-view-high" style="display: none;">
+                        <div class="chart-container" style="background: white;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div>
+                                    <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
+                                    <span id="page-info-high" style="margin: 0 20px;"></span>
+                                    <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
+                                </div>
+                            </div>
+                            <div id="runway-chart-high"></div>
+                        </div>
                     </div>
                 </div>
             </div>
             <script>
                 {runtime_analysis_high}
+
+                // 충분 탭 뷰 토글
+                var highViewMode = 'table';
+                function toggleHighView() {{
+                    var tableView = document.getElementById('table-view-high');
+                    var chartView = document.getElementById('chart-view-high');
+                    var toggleBtn = document.getElementById('toggle-view-high');
+
+                    if (highViewMode === 'table') {{
+                        tableView.style.display = 'none';
+                        chartView.style.display = 'block';
+                        toggleBtn.textContent = '📋 테이블 보기';
+                        highViewMode = 'chart';
+                        // 차트 초기화 (처음 표시될 때)
+                        if (typeof updateChartHigh === 'function') {{
+                            updateChartHigh();
+                        }}
+                    }} else {{
+                        tableView.style.display = 'block';
+                        chartView.style.display = 'none';
+                        toggleBtn.textContent = '📊 막대 그래프 보기';
+                        highViewMode = 'table';
+                    }}
+                }}
             </script>
         """
 
@@ -693,12 +763,13 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     print(f"✅ 정렬 완료: 총 {len(df_sorted)}개 약품")
 
-    # 테이블 생성
+    # 테이블 생성 (기본 숨김, 검색 시에만 표시)
     html_content += f"""
-            <h2>📋 약품 목록</h2>
+            <h2>🔍 약품 검색</h2>
             <input type="text" class="search-box" id="searchInput" placeholder="약품명, 제약회사, 약품코드로 검색...">
+            <p id="searchHint" style="color: #718096; font-size: 14px; margin: 10px 0 20px 0;">검색어를 입력하면 일치하는 약품이 표시됩니다.</p>
 
-            <div class="table-container">
+            <div class="table-container" id="searchTableContainer" style="display: none;">
                 <table id="dataTable">
                     <thead>
                         <tr>
@@ -883,7 +954,6 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     },
                     body: JSON.stringify({
                         drug_code: drugCode,
-                        category: '재고소진',
                         checked: isChecked
                     })
                 })
@@ -927,9 +997,255 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             // 페이지 로드 시 테이블 정렬
             window.addEventListener('DOMContentLoaded', function() {
                 sortUrgentTable();
+                sortLowTable();
+                sortHighTable();
+                sortDeadTable();
             });
 
-            // 메모 모달 열기
+            // 부족 약품 체크박스 핸들러
+            function handleLowCheckbox(checkbox) {
+                const drugCode = checkbox.getAttribute('data-drug-code');
+                const isChecked = checkbox.checked;
+                const row = checkbox.closest('tr');
+
+                if (isChecked) {
+                    row.classList.add('checked-row');
+                } else {
+                    row.classList.remove('checked-row');
+                }
+
+                fetch('/api/toggle_checked_item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        checked: isChecked
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        sortLowTable();
+                        // 같은 약품이 다른 탭에도 있을 수 있으므로 모든 탭 동기화
+                        syncCheckboxState(drugCode, isChecked);
+                    }
+                })
+                .catch(error => console.error('API 요청 실패:', error));
+            }
+
+            // 부족 약품 테이블 정렬
+            function sortLowTable() {
+                const table = document.getElementById('low-drugs-table');
+                if (!table) return;
+
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr.low-row'));
+
+                rows.sort((a, b) => {
+                    const aChecked = a.classList.contains('checked-row');
+                    const bChecked = b.classList.contains('checked-row');
+                    if (aChecked && !bChecked) return 1;
+                    if (!aChecked && bChecked) return -1;
+                    return 0;
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            }
+
+            // 충분 약품 체크박스 핸들러
+            function handleHighCheckbox(checkbox) {
+                const drugCode = checkbox.getAttribute('data-drug-code');
+                const isChecked = checkbox.checked;
+                const row = checkbox.closest('tr');
+
+                if (isChecked) {
+                    row.classList.add('checked-row');
+                } else {
+                    row.classList.remove('checked-row');
+                }
+
+                fetch('/api/toggle_checked_item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        checked: isChecked
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        sortHighTable();
+                        syncCheckboxState(drugCode, isChecked);
+                    }
+                })
+                .catch(error => console.error('API 요청 실패:', error));
+            }
+
+            // 충분 약품 테이블 정렬
+            function sortHighTable() {
+                const table = document.getElementById('high-drugs-table');
+                if (!table) return;
+
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr.high-row'));
+
+                rows.sort((a, b) => {
+                    const aChecked = a.classList.contains('checked-row');
+                    const bChecked = b.classList.contains('checked-row');
+                    if (aChecked && !bChecked) return 1;
+                    if (!aChecked && bChecked) return -1;
+                    return 0;
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            }
+
+            // 악성재고 약품 체크박스 핸들러
+            function handleDeadCheckbox(checkbox) {
+                const drugCode = checkbox.getAttribute('data-drug-code');
+                const isChecked = checkbox.checked;
+                const row = checkbox.closest('tr');
+
+                if (isChecked) {
+                    row.classList.add('checked-row');
+                } else {
+                    row.classList.remove('checked-row');
+                }
+
+                fetch('/api/toggle_checked_item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        checked: isChecked
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        sortDeadTable();
+                        syncCheckboxState(drugCode, isChecked);
+                    }
+                })
+                .catch(error => console.error('API 요청 실패:', error));
+            }
+
+            // 모든 탭에서 같은 약품의 체크 상태 동기화
+            function syncCheckboxState(drugCode, isChecked) {
+                // 모든 체크박스에서 같은 약품코드를 가진 것들 찾기
+                const allCheckboxes = document.querySelectorAll(`input[type="checkbox"][data-drug-code="${drugCode}"]`);
+                allCheckboxes.forEach(cb => {
+                    if (cb.checked !== isChecked) {
+                        cb.checked = isChecked;
+                        const row = cb.closest('tr');
+                        if (row) {
+                            if (isChecked) {
+                                row.classList.add('checked-row');
+                            } else {
+                                row.classList.remove('checked-row');
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 악성재고 약품 테이블 정렬
+            function sortDeadTable() {
+                const table = document.getElementById('dead-drugs-table');
+                if (!table) return;
+
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr.dead-row'));
+
+                rows.sort((a, b) => {
+                    const aChecked = a.classList.contains('checked-row');
+                    const bChecked = b.classList.contains('checked-row');
+                    if (aChecked && !bChecked) return 1;
+                    if (!aChecked && bChecked) return -1;
+                    return 0;
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            }
+
+            // 범용 메모 모달 열기 (카테고리 없이 약품코드만 사용)
+            function openMemoModalGeneric(drugCode) {
+                const modal = document.getElementById('memo-modal-generic');
+                const drugCodeElement = document.getElementById('memo-drug-code-generic');
+                const textarea = document.getElementById('memo-textarea-generic');
+
+                // 전역 메모 데이터에서 가져오기
+                const memo = typeof drugMemos !== 'undefined' ? (drugMemos[drugCode] || '') : '';
+
+                drugCodeElement.textContent = drugCode;
+                textarea.value = memo;
+                textarea.setAttribute('data-drug-code', drugCode);
+
+                modal.style.display = 'block';
+            }
+
+            // 범용 메모 모달 닫기
+            function closeMemoModalGeneric() {
+                const modal = document.getElementById('memo-modal-generic');
+                modal.style.display = 'none';
+            }
+
+            // 범용 메모 저장 (카테고리 없이)
+            function saveMemoGeneric() {
+                const textarea = document.getElementById('memo-textarea-generic');
+                const drugCode = textarea.getAttribute('data-drug-code');
+                const memo = textarea.value;
+
+                fetch('/api/update_memo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        memo: memo
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // 전역 메모 데이터 업데이트
+                        if (typeof drugMemos !== 'undefined') {
+                            if (memo) {
+                                drugMemos[drugCode] = memo;
+                            } else {
+                                delete drugMemos[drugCode];
+                            }
+                        }
+
+                        // 모든 탭에서 해당 약품의 메모 버튼 스타일 업데이트
+                        syncMemoButtonState(drugCode, memo);
+
+                        closeMemoModalGeneric();
+                    } else {
+                        alert('메모 저장에 실패했습니다.');
+                    }
+                })
+                .catch(error => {
+                    console.error('API 요청 실패:', error);
+                    alert('메모 저장에 실패했습니다.');
+                });
+            }
+
+            // 모든 탭에서 메모 버튼 상태 동기화
+            function syncMemoButtonState(drugCode, memo) {
+                const allMemoBtns = document.querySelectorAll(`button.memo-btn[data-drug-code="${drugCode}"]`);
+                allMemoBtns.forEach(btn => {
+                    if (memo) {
+                        btn.classList.add('has-memo');
+                        btn.title = memo.length > 50 ? memo.substring(0, 50) + '...' : memo;
+                    } else {
+                        btn.classList.remove('has-memo');
+                        btn.title = '메모 추가';
+                    }
+                });
+            }
+
+            // 메모 모달 열기 (긴급 탭용 - 기존)
             function openMemoModal(drugCode) {
                 const modal = document.getElementById('memo-modal');
                 const drugCodeElement = document.getElementById('memo-drug-code');
@@ -948,7 +1264,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 modal.style.display = 'none';
             }
 
-            // 메모 저장
+            // 메모 저장 (카테고리 없이)
             function saveMemo() {
                 const textarea = document.getElementById('memo-textarea');
                 const drugCode = textarea.getAttribute('data-drug-code');
@@ -962,7 +1278,6 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     },
                     body: JSON.stringify({
                         drug_code: drugCode,
-                        category: '재고소진',
                         memo: memo
                     })
                 })
@@ -978,18 +1293,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                             delete drugMemos[drugCode];
                         }
 
-                        // 메모 버튼 스타일 업데이트
-                        const memoBtn = document.querySelector(`.memo-btn[data-drug-code="${drugCode}"]`);
-                        if (memoBtn) {
-                            if (memo) {
-                                memoBtn.classList.add('has-memo');
-                                const preview = memo.length > 50 ? memo.substring(0, 50) + '...' : memo;
-                                memoBtn.setAttribute('title', preview);
-                            } else {
-                                memoBtn.classList.remove('has-memo');
-                                memoBtn.setAttribute('title', '메모 추가');
-                            }
-                        }
+                        // 모든 탭에서 메모 버튼 상태 동기화
+                        syncMemoButtonState(drugCode, memo);
 
                         closeMemoModal();
                     } else {
@@ -1003,15 +1308,48 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 });
             }
 
-            // 검색 기능
+            // 검색 기능 (검색어가 있을 때만 테이블 표시)
             document.getElementById('searchInput').addEventListener('keyup', function() {
-                const searchValue = this.value.toLowerCase();
+                const searchValue = this.value.toLowerCase().trim();
+                const tableContainer = document.getElementById('searchTableContainer');
+                const searchHint = document.getElementById('searchHint');
                 const rows = document.querySelectorAll('#dataTable tbody tr.clickable-row');
 
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(searchValue) ? '' : 'none';
-                });
+                if (searchValue === '') {
+                    // 검색어가 없으면 테이블 숨김
+                    tableContainer.style.display = 'none';
+                    searchHint.style.display = 'block';
+                } else {
+                    // 검색어가 있으면 테이블 표시
+                    tableContainer.style.display = 'block';
+                    searchHint.style.display = 'none';
+
+                    let visibleCount = 0;
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        if (text.includes(searchValue)) {
+                            row.style.display = '';
+                            visibleCount++;
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+
+                    // 검색 결과가 없으면 메시지 표시
+                    if (visibleCount === 0) {
+                        searchHint.textContent = '검색 결과가 없습니다.';
+                        searchHint.style.display = 'block';
+                        tableContainer.style.display = 'none';
+                    }
+                }
+            });
+
+            // 검색어 초기화 시 힌트 복원
+            document.getElementById('searchInput').addEventListener('input', function() {
+                const searchHint = document.getElementById('searchHint');
+                if (this.value.trim() === '') {
+                    searchHint.textContent = '검색어를 입력하면 일치하는 약품이 표시됩니다.';
+                }
             });
 
             // 차트 캐시 (한번 생성한 차트는 재사용)
@@ -1173,6 +1511,22 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 }
             }
         </script>
+
+        <!-- 범용 메모 모달 -->
+        <div id="memo-modal-generic" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <span class="close-btn" onclick="closeMemoModalGeneric()">&times;</span>
+                <h2 style="margin-bottom: 20px;">메모 작성</h2>
+                <p style="color: #718096; margin-bottom: 10px;">약품코드: <strong id="memo-drug-code-generic"></strong></p>
+                <textarea id="memo-textarea-generic"
+                          style="width: 100%; height: 200px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"
+                          placeholder="메모를 입력하세요..."></textarea>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button onclick="closeMemoModalGeneric()" style="padding: 10px 20px; border: 2px solid #cbd5e0; background: white; border-radius: 5px; cursor: pointer; font-size: 14px;">취소</button>
+                    <button onclick="saveMemoGeneric()" style="padding: 10px 20px; border: none; background: #4b5563; color: white; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">저장</button>
+                </div>
+            </div>
+        </div>
     </body>
     </html>
     """
@@ -1248,22 +1602,11 @@ def classify_drugs_by_special_cases(df, ma_months):
 def generate_urgent_drugs_section(urgent_drugs, ma_months):
     """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모) - 모달용"""
 
-    # 현재 긴급 목록에 있는 약품 코드들
-    current_urgent_codes = set(urgent_drugs['약품코드'].astype(str))
+    # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
+    checked_codes = checked_items_db.get_checked_items()
 
-    # DB에서 체크된 약품 코드 목록 가져오기
-    checked_codes = checked_items_db.get_checked_items(category='재고소진')
-
-    # 현재 긴급 목록에 없는 약품의 체크 상태 삭제 (메모는 유지)
-    for code in checked_codes:
-        if code not in current_urgent_codes:
-            checked_items_db.remove_checked_item(code, category='재고소진')
-
-    # 정리 후 체크된 약품 코드 목록 다시 가져오기
-    checked_codes = checked_items_db.get_checked_items(category='재고소진')
-
-    # 메모 목록 가져오기
-    memos = checked_items_db.get_all_memos(category='재고소진')
+    # 메모 목록 가져오기 (카테고리 없이)
+    memos = checked_items_db.get_all_memos()
 
     html = f"""
                     <div style="padding: 15px; background: #fff8f8; border-radius: 8px; margin-bottom: 15px;">
@@ -1279,9 +1622,11 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months):
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
-                                    <th>현재 재고</th>
+                                    <th>재고수량</th>
                                     <th>{ma_months}개월 이동평균</th>
+                                    <th>런웨이</th>
                                     <th>마지막 조제월</th>
+                                    <th>트렌드</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1308,6 +1653,10 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months):
                 else:
                     last_use_month = f"{months_ago}개월 전"
                 break
+
+        # 스파크라인 생성
+        ma = calculate_custom_ma(timeseries, ma_months)
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
 
         # 약품명 30자 제한
         drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
@@ -1349,7 +1698,9 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months):
                                     <td>{company_display}</td>
                                     <td style="color: #c53030; font-weight: bold;">0</td>
                                     <td style="color: #2d5016; font-weight: bold;">{latest_ma:.2f}</td>
+                                    <td style="color: #c53030; font-style: italic;">재고 없음</td>
                                     <td>{last_use_month}</td>
+                                    <td>{sparkline_html}</td>
                                 </tr>
         """
 
@@ -1388,38 +1739,55 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months):
 
     return html
 
-def generate_dead_stock_section(dead_stock_drugs, ma_months):
-    """악성 재고 섹션 HTML 생성 (테이블 형식) - 모달용"""
+def generate_low_stock_section(low_drugs_df, ma_months):
+    """재고 부족 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모) - 모달용"""
 
-    total_dead_stock = dead_stock_drugs['최종_재고수량'].sum()
+    if low_drugs_df.empty:
+        return ""
+
+    # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
+    checked_codes = checked_items_db.get_checked_items()
+    memos = checked_items_db.get_all_memos()
 
     html = f"""
-                    <div style="padding: 15px; background: #edf2f7; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #4a5568; font-weight: bold;">
-                            📊 총 {len(dead_stock_drugs)}개 약품이 {ma_months}개월 동안 사용되지 않았으나 재고가 {total_dead_stock:,.0f}개 남아있습니다.
-                        </p>
-                        <p style="margin: 5px 0 0 0; color: #718096; font-size: 14px;">
-                            💡 재고 정리 또는 반품을 고려해보세요.
+                    <div style="padding: 15px; background: #fffbeb; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #ca8a04; font-weight: bold;">
+                            ⚠️ 총 {len(low_drugs_df)}개 약품의 런웨이가 3개월 이하입니다. 재고 보충을 고려하세요.
                         </p>
                     </div>
                     <div class="table-container">
-                        <table style="font-size: 13px;">
+                        <table id="low-drugs-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
+                                    <th style="width: 50px;">확인</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
                                     <th>재고수량</th>
                                     <th>{ma_months}개월 이동평균</th>
-                                    <th>상태</th>
+                                    <th>런웨이</th>
+                                    <th>트렌드</th>
                                 </tr>
                             </thead>
                             <tbody>
     """
 
-    for _, row in dead_stock_drugs.iterrows():
-        # N개월 이동평균
-        latest_ma = row['N개월_이동평균']
+    for _, row in low_drugs_df.iterrows():
+        drug_code = str(row['약품코드'])
+        is_checked = drug_code in checked_codes
+
+        # 런웨이 표시
+        runway_months = row['런웨이_개월']
+        if runway_months >= 1:
+            runway_display = f"{runway_months:.2f}개월"
+        else:
+            runway_days = runway_months * 30.417
+            runway_display = f"{runway_days:.2f}일"
+
+        # 스파크라인 생성
+        timeseries = row['월별_조제수량_리스트']
+        ma = calculate_custom_ma(timeseries, ma_months)
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
 
         # 약품명 30자 제한
         drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
@@ -1431,14 +1799,35 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
+        # 체크 상태에 따라 클래스 적용
+        row_class = "checked-row" if is_checked else ""
+        checked_attr = "checked" if is_checked else ""
+
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
         html += f"""
-                                <tr style="background: rgba(247, 250, 252, 0.7);">
-                                    <td>{drug_name_display}</td>
-                                    <td>{row['약품코드']}</td>
+                                <tr class="low-row {row_class}" data-drug-code="{drug_code}">
+                                    <td style="text-align: center;">
+                                        <div class="checkbox-memo-container">
+                                            <input type="checkbox" class="low-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleLowCheckbox(this)">
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="openMemoModalGeneric('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{drug_code}</td>
                                     <td>{company_display}</td>
-                                    <td style="color: #2d5016; font-weight: bold;">{row['최종_재고수량']:,.0f}</td>
-                                    <td style="color: #c53030;">0</td>
-                                    <td style="color: #a0aec0; font-style: italic;">미사용</td>
+                                    <td>{row['최종_재고수량']:,.0f}</td>
+                                    <td>{row['N개월_이동평균']:.2f}</td>
+                                    <td style="color: #ca8a04; font-weight: bold;">{runway_display}</td>
+                                    <td>{sparkline_html}</td>
                                 </tr>
         """
 
@@ -1448,20 +1837,248 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months):
                     </div>
     """
 
+    # 메모 데이터를 JSON으로 변환
+    import json
+    memos_json = json.dumps(memos, ensure_ascii=False)
+
+    html += f"""
+            <script>
+                // 부족 탭 메모 데이터
+                var lowDrugMemos = {memos_json};
+            </script>
+    """
+
+    return html
+
+def generate_high_stock_section(high_drugs_df, ma_months):
+    """재고 충분 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모) - 모달용"""
+
+    if high_drugs_df.empty:
+        return ""
+
+    # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
+    checked_codes = checked_items_db.get_checked_items()
+    memos = checked_items_db.get_all_memos()
+
+    html = f"""
+                    <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #16a34a; font-weight: bold;">
+                            ✅ 총 {len(high_drugs_df)}개 약품의 런웨이가 3개월을 초과합니다. 재고가 충분합니다.
+                        </p>
+                    </div>
+                    <div class="table-container">
+                        <table id="high-drugs-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">확인</th>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>재고수량</th>
+                                    <th>{ma_months}개월 이동평균</th>
+                                    <th>런웨이</th>
+                                    <th>트렌드</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    for _, row in high_drugs_df.iterrows():
+        drug_code = str(row['약품코드'])
+        is_checked = drug_code in checked_codes
+
+        # 런웨이 표시
+        runway_months = row['런웨이_개월']
+        runway_display = f"{runway_months:.2f}개월"
+
+        # 스파크라인 생성
+        timeseries = row['월별_조제수량_리스트']
+        ma = calculate_custom_ma(timeseries, ma_months)
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
+
+        # 약품명 30자 제한
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        # 체크 상태에 따라 클래스 적용
+        row_class = "checked-row" if is_checked else ""
+        checked_attr = "checked" if is_checked else ""
+
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        html += f"""
+                                <tr class="high-row {row_class}" data-drug-code="{drug_code}">
+                                    <td style="text-align: center;">
+                                        <div class="checkbox-memo-container">
+                                            <input type="checkbox" class="high-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleHighCheckbox(this)">
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="openMemoModalGeneric('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{drug_code}</td>
+                                    <td>{company_display}</td>
+                                    <td>{row['최종_재고수량']:,.0f}</td>
+                                    <td>{row['N개월_이동평균']:.2f}</td>
+                                    <td style="color: #16a34a; font-weight: bold;">{runway_display}</td>
+                                    <td>{sparkline_html}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+    """
+
+    # 메모 데이터를 JSON으로 변환
+    import json
+    memos_json = json.dumps(memos, ensure_ascii=False)
+
+    html += f"""
+            <script>
+                // 충분 탭 메모 데이터
+                var highDrugMemos = {memos_json};
+            </script>
+    """
+
+    return html
+
+def generate_dead_stock_section(dead_stock_drugs, ma_months):
+    """악성 재고 섹션 HTML 생성 (테이블 형식 + 체크박스/메모/스파크라인) - 모달용"""
+
+    total_dead_stock = dead_stock_drugs['최종_재고수량'].sum()
+
+    # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
+    checked_codes = checked_items_db.get_checked_items()
+    memos = checked_items_db.get_all_memos()
+
+    html = f"""
+                    <div style="padding: 15px; background: #edf2f7; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #4a5568; font-weight: bold;">
+                            📊 총 {len(dead_stock_drugs)}개 약품이 {ma_months}개월 동안 사용되지 않았으나 재고가 {total_dead_stock:,.0f}개 남아있습니다.
+                        </p>
+                        <p style="margin: 5px 0 0 0; color: #718096; font-size: 14px;">
+                            💡 재고 정리 또는 반품을 고려해보세요.
+                        </p>
+                    </div>
+                    <div class="table-container">
+                        <table id="dead-drugs-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">확인</th>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>재고수량</th>
+                                    <th>{ma_months}개월 이동평균</th>
+                                    <th>런웨이</th>
+                                    <th>트렌드</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    for _, row in dead_stock_drugs.iterrows():
+        drug_code = str(row['약품코드'])
+        is_checked = drug_code in checked_codes
+
+        # N개월 이동평균
+        latest_ma = row['N개월_이동평균']
+
+        # 스파크라인 생성
+        timeseries = row['월별_조제수량_리스트']
+        ma = calculate_custom_ma(timeseries, ma_months)
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
+
+        # 약품명 30자 제한
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        # 체크 상태에 따라 클래스 적용
+        row_class = "checked-row" if is_checked else ""
+        checked_attr = "checked" if is_checked else ""
+
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        html += f"""
+                                <tr class="dead-row {row_class}" data-drug-code="{drug_code}" style="background: rgba(247, 250, 252, 0.7);">
+                                    <td style="text-align: center;">
+                                        <div class="checkbox-memo-container">
+                                            <input type="checkbox" class="dead-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleDeadCheckbox(this)">
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="openMemoModalGeneric('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{drug_code}</td>
+                                    <td>{company_display}</td>
+                                    <td style="color: #2d5016; font-weight: bold;">{row['최종_재고수량']:,.0f}</td>
+                                    <td style="color: #c53030;">0</td>
+                                    <td style="color: #a0aec0; font-style: italic;">재고만 있음</td>
+                                    <td>{sparkline_html}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+    """
+
+    # 메모 데이터를 JSON으로 변환
+    import json
+    memos_json = json.dumps(memos, ensure_ascii=False)
+
+    html += f"""
+            <script>
+                // 악성재고 탭 메모 데이터
+                var deadDrugMemos = {memos_json};
+            </script>
+    """
+
     return html
 
 def analyze_runway(df, months, ma_months):
     """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - N-MA 런웨이 기준
 
     Returns:
-        tuple: (chart_js_low, chart_js_high, low_count, high_count)
+        tuple: (chart_js_low, chart_js_high, low_count, high_count, low_drugs_df, high_drugs_df)
     """
     try:
         # N-MA 런웨이를 숫자로 변환 (개월 단위)
-        low_data = []  # 3개월 이하
-        high_data = []  # 3개월 초과
+        low_data = []  # 3개월 이하 (차트용)
+        high_data = []  # 3개월 초과 (차트용)
+        low_drugs_list = []  # 3개월 이하 (테이블용)
+        high_drugs_list = []  # 3개월 초과 (테이블용)
 
-        for _, row in df.iterrows():
+        for idx, row in df.iterrows():
             # N개월 이동평균 계산
             timeseries = row['월별_조제수량_리스트']
             ma = calculate_custom_ma(timeseries, ma_months)
@@ -1485,10 +2102,34 @@ def analyze_runway(df, months, ma_months):
                     latest_ma
                 )
 
+                # 테이블용 데이터 (전체 row 정보 + 계산된 값)
+                drug_data = {
+                    '약품코드': row['약품코드'],
+                    '약품명': row['약품명'],
+                    '제약회사': row['제약회사'],
+                    '최종_재고수량': row['최종_재고수량'],
+                    'N개월_이동평균': latest_ma,
+                    '런웨이_개월': ma_runway_months,
+                    '월별_조제수량_리스트': timeseries
+                }
+
                 if ma_runway_months <= 3:
                     low_data.append(data_tuple)
+                    low_drugs_list.append(drug_data)
                 else:
                     high_data.append(data_tuple)
+                    high_drugs_list.append(drug_data)
+
+        # DataFrame 생성
+        import pandas as pd
+        low_drugs_df = pd.DataFrame(low_drugs_list) if low_drugs_list else pd.DataFrame()
+        high_drugs_df = pd.DataFrame(high_drugs_list) if high_drugs_list else pd.DataFrame()
+
+        # 정렬: 부족은 런웨이 오름차순, 충분은 런웨이 내림차순
+        if not low_drugs_df.empty:
+            low_drugs_df = low_drugs_df.sort_values('런웨이_개월', ascending=True)
+        if not high_drugs_df.empty:
+            high_drugs_df = high_drugs_df.sort_values('런웨이_개월', ascending=False)
 
         chart_js_low = None
         chart_js_high = None
@@ -1700,11 +2341,12 @@ def analyze_runway(df, months, ma_months):
                 }}
             """
 
-        return chart_js_low, chart_js_high, low_count, high_count
+        return chart_js_low, chart_js_high, low_count, high_count, low_drugs_df, high_drugs_df
     except Exception as e:
         print(f"Error in analyze_runway: {e}")
-        pass
-    return None, None, 0, 0
+        import traceback
+        traceback.print_exc()
+    return None, None, 0, 0, pd.DataFrame(), pd.DataFrame()
 
 def create_and_save_report(df, months, mode='dispense', ma_months=3, open_browser=True):
     """보고서를 생성하고 파일로 저장하는 함수

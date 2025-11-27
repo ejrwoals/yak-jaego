@@ -685,21 +685,20 @@ def rebuild_db():
 
 @app.route('/api/toggle_checked_item', methods=['POST'])
 def toggle_checked_item():
-    """체크 상태 업데이트 API"""
+    """체크 상태 업데이트 API (카테고리 없이 약품코드만 사용)"""
     try:
         data = request.get_json()
         drug_code = data.get('drug_code')
-        category = data.get('category', '재고소진')
         is_checked = data.get('checked', False)
 
         if not drug_code:
             return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
 
-        # 체크 상태에 따라 DB 업데이트
+        # 체크 상태에 따라 DB 업데이트 (카테고리 없이)
         if is_checked:
-            checked_items_db.add_checked_item(drug_code, category)
+            checked_items_db.add_checked_item(drug_code)
         else:
-            checked_items_db.remove_checked_item(drug_code, category)
+            checked_items_db.remove_checked_item(drug_code)
 
         return jsonify({'status': 'success', 'message': '체크 상태가 업데이트되었습니다.'})
 
@@ -711,18 +710,17 @@ def toggle_checked_item():
 
 @app.route('/api/update_memo', methods=['POST'])
 def update_memo():
-    """메모 업데이트 API"""
+    """메모 업데이트 API (카테고리 없이 약품코드만 사용)"""
     try:
         data = request.get_json()
         drug_code = data.get('drug_code')
-        category = data.get('category', '재고소진')
         memo = data.get('memo', '')
 
         if not drug_code:
             return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
 
-        # 메모 업데이트
-        checked_items_db.update_memo(drug_code, category, memo)
+        # 메모 업데이트 (카테고리 없이)
+        checked_items_db.update_memo(drug_code, memo)
 
         return jsonify({'status': 'success', 'message': '메모가 저장되었습니다.'})
 
@@ -734,16 +732,15 @@ def update_memo():
 
 @app.route('/api/get_memo', methods=['GET'])
 def get_memo():
-    """메모 조회 API"""
+    """메모 조회 API (카테고리 없이 약품코드만 사용)"""
     try:
         drug_code = request.args.get('drug_code')
-        category = request.args.get('category', '재고소진')
 
         if not drug_code:
             return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
 
-        # 메모 조회
-        memo = checked_items_db.get_memo(drug_code, category)
+        # 메모 조회 (카테고리 없이)
+        memo = checked_items_db.get_memo(drug_code)
 
         return jsonify({'status': 'success', 'memo': memo})
 
