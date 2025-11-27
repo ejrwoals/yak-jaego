@@ -127,6 +127,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{report_title}</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
         <style>
             body {{
                 font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -377,6 +378,28 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 align-items: center;
                 gap: 8px;
             }}
+            .visibility-btn {{
+                background: none;
+                border: 2px solid #cbd5e0;
+                border-radius: 5px;
+                padding: 4px 8px;
+                cursor: pointer;
+                font-size: 16px;
+                transition: all 0.2s;
+                color: #4a5568;
+            }}
+            .visibility-btn:hover {{
+                border-color: #4facfe;
+                background: rgba(79, 172, 254, 0.1);
+            }}
+            .visibility-btn.hidden {{
+                color: #a0aec0;
+                border-color: #e2e8f0;
+                background: #f7fafc;
+            }}
+            .hidden-row {{
+                display: none !important;
+            }}
 
             /* 책갈피 사이드바 스타일 */
             .bookmark-sidebar {{
@@ -516,6 +539,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     urgent_count = len(urgent_drugs) if not urgent_drugs.empty else 0
     dead_count = len(dead_stock_drugs) if not dead_stock_drugs.empty else 0
 
+    # 숨김 처리된 약품 수 (체크된 항목)
+    checked_items = checked_items_db.get_checked_items()
+    hidden_count = len(checked_items)
+
     # 통합 인디케이터 생성
     html_content += f"""
         <!-- 통합 재고 현황 인디케이터 -->
@@ -576,6 +603,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 <div class="bookmark-icon">⚪</div>
                 <div class="bookmark-title">악성재고</div>
                 <div class="bookmark-count">{dead_count}</div>
+            </div>
+            <div class="bookmark-item bookmark-hidden" onclick="openCategoryModal('hidden-modal')" style="background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);">
+                <div class="bookmark-icon" style="color: #6b7280;"><i class="bi bi-eye-slash"></i></div>
+                <div class="bookmark-title" style="color: #6b7280;">숨김 약품</div>
+                <div class="bookmark-count" style="color: #6b7280;">{hidden_count}</div>
             </div>
         </div>
     """
@@ -754,6 +786,24 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             </div>
         """
 
+    # 숨김 약품 모달 (항상 생성)
+    hidden_section_html = generate_hidden_drugs_section(df, ma_months, months)
+    html_content += f"""
+        <!-- 숨김 약품 모달 -->
+        <div id="hidden-modal" class="category-modal">
+            <div class="category-modal-content">
+                <div class="category-modal-header">
+                    <h2 style="margin: 0; color: #64748b; display: flex; align-items: center; gap: 10px;">
+                        <i class="bi bi-eye-slash" style="font-size: 1.5em;"></i>
+                        <span>숨김 처리된 약품</span>
+                    </h2>
+                    <span class="category-modal-close" onclick="closeCategoryModal('hidden-modal')">&times;</span>
+                </div>
+                {hidden_section_html}
+            </div>
+        </div>
+    """
+
     # N개월 이동평균 계산 및 정렬 준비
     print(f"\n📊 약품 목록을 {ma_months}개월 이동평균 기준으로 정렬 중...")
 
@@ -888,6 +938,44 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 if (modal) {
                     modal.style.display = 'block';
                     document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
+                    // 숨김 상태 다시 적용
+                    applyHiddenState(modalId);
+                }
+            }
+
+            // 모달 열 때 숨김 상태 적용
+            function applyHiddenState(modalId) {
+                const modal = document.getElementById(modalId);
+                if (!modal) return;
+
+                if (modalId === 'hidden-modal') {
+                    // 숨김 탭: 숨김 처리된 것만 보이기
+                    let visibleCount = 0;
+                    modal.querySelectorAll('.visibility-btn').forEach(btn => {
+                        const row = btn.closest('tr');
+                        if (row) {
+                            if (btn.classList.contains('hidden')) {
+                                row.classList.remove('hidden-row');
+                                visibleCount++;
+                            } else {
+                                row.classList.add('hidden-row');
+                            }
+                        }
+                    });
+                    // 빈 메시지 업데이트
+                    updateHiddenEmptyMessage(visibleCount);
+                } else {
+                    // 다른 탭: 숨김 처리된 것 숨기기
+                    modal.querySelectorAll('.visibility-btn').forEach(btn => {
+                        const row = btn.closest('tr');
+                        if (row) {
+                            if (btn.classList.contains('hidden')) {
+                                row.classList.add('hidden-row');
+                            } else {
+                                row.classList.remove('hidden-row');
+                            }
+                        }
+                    });
                 }
             }
 
@@ -932,241 +1020,111 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 }
             }
 
-            // 긴급 약품 체크박스 핸들러
-            function handleUrgentCheckbox(checkbox) {
-                const drugCode = checkbox.getAttribute('data-drug-code');
-                const isChecked = checkbox.checked;
-                const row = checkbox.closest('tr');
+            // 숨김 토글 핸들러 (통합)
+            function toggleVisibility(btn, drugCode) {
+                const row = btn.closest('tr');
+                const isCurrentlyHidden = btn.classList.contains('hidden');
+                const newHiddenState = !isCurrentlyHidden;
 
-                // 체크 상태에 따라 스타일 적용
-                if (isChecked) {
-                    row.classList.add('checked-row');
-                } else {
-                    row.classList.remove('checked-row');
-                }
-
-                // 서버에 체크 상태 저장
+                // 서버에 숨김 상태 저장
                 fetch('/api/toggle_checked_item', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         drug_code: drugCode,
-                        checked: isChecked
+                        checked: newHiddenState
                     })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        console.log('체크 상태 업데이트 완료:', drugCode);
-                        // 테이블 정렬
-                        sortUrgentTable();
+                        // 모든 탭에서 같은 약품의 상태 동기화
+                        syncVisibilityState(drugCode, newHiddenState);
+                        // 숨김 탭 카운트 업데이트
+                        updateHiddenCount();
+                    }
+                })
+                .catch(error => console.error('API 요청 실패:', error));
+            }
+
+            // 모든 탭에서 같은 약품의 숨김 상태 동기화
+            function syncVisibilityState(drugCode, isHidden) {
+                // 모든 숨김 버튼에서 같은 약품코드를 가진 것들 찾기
+                const allButtons = document.querySelectorAll(`.visibility-btn[data-drug-code="${drugCode}"]`);
+                allButtons.forEach(btn => {
+                    const row = btn.closest('tr');
+                    if (isHidden) {
+                        btn.classList.add('hidden');
+                        btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+                        btn.title = '숨김 해제';
+                        // 숨김 탭이 아닌 곳에서는 행 숨기기
+                        if (row && !row.closest('#hidden-drugs-table')) {
+                            row.classList.add('hidden-row');
+                        }
+                        // 숨김 탭에서는 행 보이기
+                        if (row && row.closest('#hidden-drugs-table')) {
+                            row.classList.remove('hidden-row');
+                        }
                     } else {
-                        console.error('체크 상태 업데이트 실패:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('API 요청 실패:', error);
-                });
-            }
-
-            // 긴급 약품 테이블 정렬 (체크된 항목을 하단으로)
-            function sortUrgentTable() {
-                const table = document.getElementById('urgent-drugs-table');
-                if (!table) return;
-
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr.urgent-row'));
-
-                // 체크 여부에 따라 정렬
-                rows.sort((a, b) => {
-                    const aChecked = a.classList.contains('checked-row');
-                    const bChecked = b.classList.contains('checked-row');
-
-                    if (aChecked && !bChecked) return 1;  // a를 뒤로
-                    if (!aChecked && bChecked) return -1; // b를 뒤로
-                    return 0; // 동일 그룹 내에서는 순서 유지
-                });
-
-                // 테이블 재구성
-                rows.forEach(row => tbody.appendChild(row));
-            }
-
-            // 페이지 로드 시 테이블 정렬
-            window.addEventListener('DOMContentLoaded', function() {
-                sortUrgentTable();
-                sortLowTable();
-                sortHighTable();
-                sortDeadTable();
-            });
-
-            // 부족 약품 체크박스 핸들러
-            function handleLowCheckbox(checkbox) {
-                const drugCode = checkbox.getAttribute('data-drug-code');
-                const isChecked = checkbox.checked;
-                const row = checkbox.closest('tr');
-
-                if (isChecked) {
-                    row.classList.add('checked-row');
-                } else {
-                    row.classList.remove('checked-row');
-                }
-
-                fetch('/api/toggle_checked_item', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        drug_code: drugCode,
-                        checked: isChecked
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        sortLowTable();
-                        // 같은 약품이 다른 탭에도 있을 수 있으므로 모든 탭 동기화
-                        syncCheckboxState(drugCode, isChecked);
-                    }
-                })
-                .catch(error => console.error('API 요청 실패:', error));
-            }
-
-            // 부족 약품 테이블 정렬
-            function sortLowTable() {
-                const table = document.getElementById('low-drugs-table');
-                if (!table) return;
-
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr.low-row'));
-
-                rows.sort((a, b) => {
-                    const aChecked = a.classList.contains('checked-row');
-                    const bChecked = b.classList.contains('checked-row');
-                    if (aChecked && !bChecked) return 1;
-                    if (!aChecked && bChecked) return -1;
-                    return 0;
-                });
-
-                rows.forEach(row => tbody.appendChild(row));
-            }
-
-            // 충분 약품 체크박스 핸들러
-            function handleHighCheckbox(checkbox) {
-                const drugCode = checkbox.getAttribute('data-drug-code');
-                const isChecked = checkbox.checked;
-                const row = checkbox.closest('tr');
-
-                if (isChecked) {
-                    row.classList.add('checked-row');
-                } else {
-                    row.classList.remove('checked-row');
-                }
-
-                fetch('/api/toggle_checked_item', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        drug_code: drugCode,
-                        checked: isChecked
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        sortHighTable();
-                        syncCheckboxState(drugCode, isChecked);
-                    }
-                })
-                .catch(error => console.error('API 요청 실패:', error));
-            }
-
-            // 충분 약품 테이블 정렬
-            function sortHighTable() {
-                const table = document.getElementById('high-drugs-table');
-                if (!table) return;
-
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr.high-row'));
-
-                rows.sort((a, b) => {
-                    const aChecked = a.classList.contains('checked-row');
-                    const bChecked = b.classList.contains('checked-row');
-                    if (aChecked && !bChecked) return 1;
-                    if (!aChecked && bChecked) return -1;
-                    return 0;
-                });
-
-                rows.forEach(row => tbody.appendChild(row));
-            }
-
-            // 악성재고 약품 체크박스 핸들러
-            function handleDeadCheckbox(checkbox) {
-                const drugCode = checkbox.getAttribute('data-drug-code');
-                const isChecked = checkbox.checked;
-                const row = checkbox.closest('tr');
-
-                if (isChecked) {
-                    row.classList.add('checked-row');
-                } else {
-                    row.classList.remove('checked-row');
-                }
-
-                fetch('/api/toggle_checked_item', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        drug_code: drugCode,
-                        checked: isChecked
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        sortDeadTable();
-                        syncCheckboxState(drugCode, isChecked);
-                    }
-                })
-                .catch(error => console.error('API 요청 실패:', error));
-            }
-
-            // 모든 탭에서 같은 약품의 체크 상태 동기화
-            function syncCheckboxState(drugCode, isChecked) {
-                // 모든 체크박스에서 같은 약품코드를 가진 것들 찾기
-                const allCheckboxes = document.querySelectorAll(`input[type="checkbox"][data-drug-code="${drugCode}"]`);
-                allCheckboxes.forEach(cb => {
-                    if (cb.checked !== isChecked) {
-                        cb.checked = isChecked;
-                        const row = cb.closest('tr');
-                        if (row) {
-                            if (isChecked) {
-                                row.classList.add('checked-row');
-                            } else {
-                                row.classList.remove('checked-row');
-                            }
+                        btn.classList.remove('hidden');
+                        btn.innerHTML = '<i class="bi bi-eye"></i>';
+                        btn.title = '숨김 처리';
+                        // 숨김 탭이 아닌 곳에서는 행 보이기
+                        if (row && !row.closest('#hidden-drugs-table')) {
+                            row.classList.remove('hidden-row');
+                        }
+                        // 숨김 탭에서는 행 숨기기
+                        if (row && row.closest('#hidden-drugs-table')) {
+                            row.classList.add('hidden-row');
                         }
                     }
                 });
             }
 
-            // 악성재고 약품 테이블 정렬
-            function sortDeadTable() {
-                const table = document.getElementById('dead-drugs-table');
-                if (!table) return;
-
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr.dead-row'));
-
-                rows.sort((a, b) => {
-                    const aChecked = a.classList.contains('checked-row');
-                    const bChecked = b.classList.contains('checked-row');
-                    if (aChecked && !bChecked) return 1;
-                    if (!aChecked && bChecked) return -1;
-                    return 0;
+            // 숨김 탭 카운트 업데이트 (hidden 클래스가 있는 버튼 수 기준)
+            function updateHiddenCount() {
+                // 모든 탭에서 숨김 처리된 약품코드 수집 (중복 제거)
+                const hiddenDrugCodes = new Set();
+                document.querySelectorAll('.visibility-btn.hidden').forEach(btn => {
+                    const drugCode = btn.getAttribute('data-drug-code');
+                    if (drugCode) {
+                        hiddenDrugCodes.add(drugCode);
+                    }
                 });
-
-                rows.forEach(row => tbody.appendChild(row));
+                const countEl = document.querySelector('.bookmark-hidden .bookmark-count');
+                if (countEl) {
+                    countEl.textContent = hiddenDrugCodes.size;
+                }
+                // 빈 메시지 표시/숨김 업데이트
+                updateHiddenEmptyMessage(hiddenDrugCodes.size);
             }
+
+            // 숨김 탭 빈 메시지 표시/숨김
+            function updateHiddenEmptyMessage(count) {
+                const emptyMsg = document.getElementById('hidden-empty-message');
+                const table = document.getElementById('hidden-drugs-table');
+                if (emptyMsg && table) {
+                    if (count === 0) {
+                        emptyMsg.style.display = 'block';
+                        table.style.display = 'none';
+                    } else {
+                        emptyMsg.style.display = 'none';
+                        table.style.display = 'table';
+                    }
+                }
+            }
+
+            // 페이지 로드 시 숨김 처리된 항목 숨기기
+            window.addEventListener('DOMContentLoaded', function() {
+                // 숨김 처리된 항목들 숨기기 (숨김 탭 제외)
+                document.querySelectorAll('.visibility-btn.hidden').forEach(btn => {
+                    const row = btn.closest('tr');
+                    if (row && !row.closest('#hidden-drugs-table')) {
+                        row.classList.add('hidden-row');
+                    }
+                });
+                updateHiddenCount();
+            });
 
             // 인라인 차트 닫기
             function closeInlineChart(drugCode) {
@@ -1622,7 +1580,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                         <table id="urgent-drugs-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">확인</th>
+                                    <th style="width: 50px;">숨김</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -1672,10 +1630,6 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
-        # 체크 상태에 따라 클래스 적용
-        row_class = "checked-row" if is_checked else ""
-        checked_attr = "checked" if is_checked else ""
-
         # 메모 가져오기
         memo = memos.get(drug_code, '')
         memo_escaped = memo.replace("'", "\\'").replace('"', '&quot;').replace('\n', '\\n')
@@ -1698,13 +1652,20 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
         }
         chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
 
+        # 숨김 버튼 상태
+        hidden_class = "hidden" if is_checked else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+
         html += f"""
-                                <tr class="urgent-row tab-clickable-row {row_class}" data-drug-code="{drug_code}"
+                                <tr class="urgent-row tab-clickable-row" data-drug-code="{drug_code}"
                                     data-chart-data='{chart_data_json}'
                                     onclick="toggleInlineChart(this, '{drug_code}')">
                                     <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
-                                            <input type="checkbox" class="urgent-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleUrgentCheckbox(this)">
+                                            <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
                                                     onclick="event.stopPropagation(); openMemoModal('{drug_code}')"
@@ -1780,7 +1741,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months):
                         <table id="low-drugs-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">확인</th>
+                                    <th style="width: 50px;">숨김</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -1820,14 +1781,15 @@ def generate_low_stock_section(low_drugs_df, ma_months, months):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
-        # 체크 상태에 따라 클래스 적용
-        row_class = "checked-row" if is_checked else ""
-        checked_attr = "checked" if is_checked else ""
-
         # 메모 가져오기
         memo = memos.get(drug_code, '')
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        # 숨김 버튼 상태
+        hidden_class = "hidden" if is_checked else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
 
         # 인라인 차트용 데이터 생성
         latest_ma = row['N개월_이동평균']
@@ -1845,12 +1807,14 @@ def generate_low_stock_section(low_drugs_df, ma_months, months):
         chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
 
         html += f"""
-                                <tr class="low-row tab-clickable-row {row_class}" data-drug-code="{drug_code}"
+                                <tr class="low-row tab-clickable-row" data-drug-code="{drug_code}"
                                     data-chart-data='{chart_data_json}'
                                     onclick="toggleInlineChart(this, '{drug_code}')">
                                     <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
-                                            <input type="checkbox" class="low-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleLowCheckbox(this)">
+                                            <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
                                                     onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
@@ -1909,7 +1873,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months):
                         <table id="high-drugs-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">확인</th>
+                                    <th style="width: 50px;">숨김</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -1945,14 +1909,15 @@ def generate_high_stock_section(high_drugs_df, ma_months, months):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
-        # 체크 상태에 따라 클래스 적용
-        row_class = "checked-row" if is_checked else ""
-        checked_attr = "checked" if is_checked else ""
-
         # 메모 가져오기
         memo = memos.get(drug_code, '')
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        # 숨김 버튼 상태
+        hidden_class = "hidden" if is_checked else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
 
         # 인라인 차트용 데이터 생성
         latest_ma = row['N개월_이동평균']
@@ -1970,12 +1935,14 @@ def generate_high_stock_section(high_drugs_df, ma_months, months):
         chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
 
         html += f"""
-                                <tr class="high-row tab-clickable-row {row_class}" data-drug-code="{drug_code}"
+                                <tr class="high-row tab-clickable-row" data-drug-code="{drug_code}"
                                     data-chart-data='{chart_data_json}'
                                     onclick="toggleInlineChart(this, '{drug_code}')">
                                     <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
-                                            <input type="checkbox" class="high-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleHighCheckbox(this)">
+                                            <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
                                                     onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
@@ -2035,7 +2002,7 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
                         <table id="dead-drugs-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">확인</th>
+                                    <th style="width: 50px;">숨김</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -2070,14 +2037,15 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
-        # 체크 상태에 따라 클래스 적용
-        row_class = "checked-row" if is_checked else ""
-        checked_attr = "checked" if is_checked else ""
-
         # 메모 가져오기
         memo = memos.get(drug_code, '')
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        # 숨김 버튼 상태
+        hidden_class = "hidden" if is_checked else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
 
         # 인라인 차트용 데이터 생성
         chart_data = {
@@ -2094,12 +2062,14 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
         chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
 
         html += f"""
-                                <tr class="dead-row tab-clickable-row {row_class}" data-drug-code="{drug_code}" style="background: rgba(247, 250, 252, 0.7);"
+                                <tr class="dead-row tab-clickable-row" data-drug-code="{drug_code}" style="background: rgba(247, 250, 252, 0.7);"
                                     data-chart-data='{chart_data_json}'
                                     onclick="toggleInlineChart(this, '{drug_code}')">
                                     <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
-                                            <input type="checkbox" class="dead-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleDeadCheckbox(this)">
+                                            <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
                                                     onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
@@ -2135,6 +2105,139 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
     """
 
     return html
+
+
+def generate_hidden_drugs_section(df, ma_months, months):
+    """숨김 처리된 약품 섹션 HTML 생성 - 모달용
+
+    모든 약품을 포함하고, JavaScript로 숨김 상태에 따라 표시/숨김 처리
+    """
+
+    # 체크된 항목(숨김 처리된 항목) 가져오기
+    checked_items = checked_items_db.get_checked_items()
+    memos = checked_items_db.get_all_memos()
+
+    html = f"""
+                    <div id="hidden-empty-message" style="padding: 40px; text-align: center; color: #718096; display: none;">
+                        <p style="font-size: 18px;">숨김 처리된 약품이 없습니다.</p>
+                        <p style="font-size: 14px;">각 탭에서 <i class="bi bi-eye"></i> 버튼을 클릭하여 약품을 숨김 처리할 수 있습니다.</p>
+                    </div>
+                    <div style="padding: 20px; max-height: 70vh; overflow-y: auto;">
+                        <table id="hidden-drugs-table" class="data-table" style="width: 100%; margin-top: 0;">
+                            <thead>
+                                <tr style="background: linear-gradient(135deg, #64748b, #475569); color: white;">
+                                    <th style="width: 50px;">숨김</th>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>재고수량</th>
+                                    <th>{ma_months}개월 이동평균</th>
+                                    <th>런웨이</th>
+                                    <th style="width: 100px;">트렌드</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    # 모든 약품을 포함 (숨김 처리 안된 것은 hidden-row 클래스로 초기 숨김)
+    for _, row in df.iterrows():
+        drug_code = str(row['약품코드'])
+
+        # 숨김 상태 확인
+        is_hidden = drug_code in checked_items
+        row_hidden_class = "" if is_hidden else "hidden-row"
+        hidden_btn_class = "hidden" if is_hidden else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_hidden else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_hidden else "숨김 처리"
+
+        # 약품명 30자 제한
+        drug_name = row['약품명'] if row['약품명'] else "정보없음"
+        drug_name_display = drug_name[:30] + "..." if len(drug_name) > 30 else drug_name
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        # N개월 이동평균 계산
+        timeseries = row['월별_조제수량_리스트']
+        ma = calculate_custom_ma(timeseries, ma_months)
+        latest_ma = None
+        for val in reversed(ma):
+            if val is not None:
+                latest_ma = val
+                break
+        latest_ma = latest_ma if latest_ma else 0
+
+        # 스파크라인 생성
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
+
+        # 런웨이 계산
+        stock = row['최종_재고수량']
+        if latest_ma > 0:
+            runway_months = stock / latest_ma
+            if runway_months < 1:
+                runway_days = runway_months * 30
+                runway_display = f"{runway_days:.0f}일"
+            else:
+                runway_display = f"{runway_months:.1f}개월"
+        else:
+            runway_display = "N/A"
+
+        # 인라인 차트용 데이터 생성
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': int(stock),
+            'latest_ma': latest_ma,
+            'runway': runway_display
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
+        html += f"""
+                                <tr class="hidden-row-item tab-clickable-row {row_hidden_class}" data-drug-code="{drug_code}"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
+                                        <div class="checkbox-memo-container">
+                                            <button class="visibility-btn {hidden_btn_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{drug_code}</td>
+                                    <td>{company_display}</td>
+                                    <td>{stock:,.0f}</td>
+                                    <td>{latest_ma:.2f}</td>
+                                    <td>{runway_display}</td>
+                                    <td>{sparkline_html}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+    """
+
+    return html
+
 
 def analyze_runway(df, months, ma_months):
     """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - N-MA 런웨이 기준
