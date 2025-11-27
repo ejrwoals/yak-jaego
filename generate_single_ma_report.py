@@ -81,9 +81,9 @@ def create_sparkline_svg(timeseries_data, ma_data, ma_months):
     svg = f'<svg width="{width}" height="{height}" style="display:block;">{actual_line}{ma_line}</svg>'
     return svg
 
-def create_chart_data_json(months, timeseries_data, ma_data, avg, drug_name, drug_code, ma_months):
+def create_chart_data_json(months, timeseries_data, ma_data, avg, drug_name, drug_code, ma_months, stock=0, runway='N/A'):
     """
-    모달 차트용 데이터를 JSON으로 변환
+    인라인 차트용 데이터를 JSON으로 변환
     """
     # numpy/pandas 타입을 Python native 타입으로 변환
     def convert_to_native(val):
@@ -98,8 +98,11 @@ def create_chart_data_json(months, timeseries_data, ma_data, avg, drug_name, dru
         'avg': convert_to_native(avg),
         'drug_name': str(drug_name),
         'drug_code': str(drug_code),
-        'ma_months': ma_months
-    })
+        'ma_months': ma_months,
+        'stock': convert_to_native(stock),
+        'latest_ma': convert_to_native(avg),
+        'runway': runway
+    }, ensure_ascii=False)
 
 def generate_html_report(df, months, mode='dispense', ma_months=3):
     """
@@ -328,6 +331,24 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             }}
             .checked-row td {{
                 color: #718096 !important;
+            }}
+            /* 인라인 차트용 클릭 가능 행 스타일 */
+            .tab-clickable-row {{
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }}
+            .tab-clickable-row:hover {{
+                background-color: rgba(79, 172, 254, 0.1) !important;
+            }}
+            .tab-clickable-row.chart-expanded {{
+                background-color: rgba(79, 172, 254, 0.15) !important;
+                border-left: 3px solid #4facfe;
+            }}
+            .inline-chart-row {{
+                background: #f8fafc;
+            }}
+            .inline-chart-row:hover {{
+                background: #f8fafc !important;
             }}
             .memo-btn {{
                 background: transparent;
@@ -567,7 +588,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     # 긴급 약품 모달
     if has_urgent:
-        urgent_section_html = generate_urgent_drugs_section(urgent_drugs, ma_months)
+        urgent_section_html = generate_urgent_drugs_section(urgent_drugs, ma_months, months)
         html_content += f"""
             <!-- 긴급 약품 모달 -->
             <div id="urgent-modal" class="category-modal">
@@ -586,7 +607,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     # 재고 부족 약품 모달 (테이블 + 차트 토글)
     if has_low_runway:
-        low_section_html = generate_low_stock_section(low_drugs_df, ma_months)
+        low_section_html = generate_low_stock_section(low_drugs_df, ma_months, months)
         html_content += f"""
             <!-- 재고 부족 약품 모달 -->
             <div id="low-modal" class="category-modal">
@@ -651,7 +672,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     # 재고 충분 약품 모달 (테이블 + 차트 토글)
     if has_high_runway:
-        high_section_html = generate_high_stock_section(high_drugs_df, ma_months)
+        high_section_html = generate_high_stock_section(high_drugs_df, ma_months, months)
         html_content += f"""
             <!-- 재고 충분 약품 모달 -->
             <div id="high-modal" class="category-modal">
@@ -716,7 +737,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     # 악성 재고 모달
     if has_dead_stock:
-        dead_stock_section_html = generate_dead_stock_section(dead_stock_drugs, ma_months)
+        dead_stock_section_html = generate_dead_stock_section(dead_stock_drugs, ma_months, months)
         html_content += f"""
             <!-- 악성 재고 모달 -->
             <div id="dead-modal" class="category-modal">
@@ -815,18 +836,19 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
         # 런웨이 클래스 결정 (1개월 미만이면 경고)
         runway_class = get_runway_class(runway_display)
 
-        # 차트 데이터를 JSON으로 변환 (모달에서 사용)
+        # 인라인 차트용 데이터를 JSON으로 변환
+        drug_code = str(row['약품코드'])
         chart_data_json = create_chart_data_json(
             months=months,
             timeseries_data=timeseries,
             ma_data=ma,
             avg=latest_ma if latest_ma else 0,
             drug_name=row['약품명'],
-            drug_code=str(row['약품코드']),
-            ma_months=ma_months
-        )
-
-        modal_id = f"modal_{idx}"
+            drug_code=drug_code,
+            ma_months=ma_months,
+            stock=int(row['최종_재고수량']),
+            runway=runway_display
+        ).replace("'", "&#39;")
 
         # 약품명 30자 제한
         drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
@@ -839,40 +861,17 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             company_display = company_display[:12] + "..."
 
         html_content += f"""
-                        <tr class="{runway_class} clickable-row" onclick="openModalWithChart('{modal_id}', {idx})" data-chart-data='{chart_data_json}'>
+                        <tr class="{runway_class} clickable-row tab-clickable-row" data-drug-code="{drug_code}"
+                            data-chart-data='{chart_data_json}'
+                            onclick="toggleInlineChart(this, '{drug_code}')">
                             <td>{drug_name_display}</td>
                             <td>{company_display}</td>
-                            <td>{row['약품코드']}</td>
+                            <td>{drug_code}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
                             <td>{"N/A" if latest_ma is None else f"{latest_ma:.2f}"}</td>
                             <td class="runway-cell">{runway_display}</td>
                             <td>{sparkline_html}</td>
                         </tr>
-        """
-
-        # 빈 모달 컨테이너 (차트는 클릭시 동적 생성)
-        html_content += f"""
-                        <div id="{modal_id}" class="modal">
-                            <div class="modal-content">
-                                <span class="close-btn" onclick="closeModal('{modal_id}')">&times;</span>
-                                <h2 style="margin-bottom: 20px;">{row['약품명']} ({row['약품코드']})</h2>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
-                                    <div style="background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%); color: #2d3748; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.8;">재고수량</h4>
-                                        <div style="font-size: 1.8em; font-weight: bold;">{row['최종_재고수량']:,.0f}개</div>
-                                    </div>
-                                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.9;">{ma_months}개월 이동평균</h4>
-                                        <div style="font-size: 1.8em; font-weight: bold;">{"N/A" if latest_ma is None else f"{latest_ma:.1f}개"}</div>
-                                    </div>
-                                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                        <h4 style="margin: 0 0 10px 0; font-size: 0.9em; opacity: 0.9;">런웨이</h4>
-                                        <div style="font-size: 1.8em; font-weight: bold;">{runway_display}</div>
-                                    </div>
-                                </div>
-                                <div id="chart-container-{idx}" style="width:100%;height:500px;"></div>
-                            </div>
-                        </div>
         """
 
     # HTML 마무리
@@ -1169,6 +1168,162 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 rows.forEach(row => tbody.appendChild(row));
             }
 
+            // 인라인 차트 닫기
+            function closeInlineChart(drugCode) {
+                event.stopPropagation();
+                const chartRow = document.querySelector('.inline-chart-row');
+                if (chartRow) chartRow.remove();
+                const expandedRow = document.querySelector('tr[data-drug-code="' + drugCode + '"].chart-expanded');
+                if (expandedRow) expandedRow.classList.remove('chart-expanded');
+            }
+
+            // 인라인 차트 토글 (탭 내 테이블용)
+            var inlineChartCache = {};
+
+            function toggleInlineChart(row, drugCode) {
+                const existingChartRow = row.nextElementSibling;
+
+                // 이미 차트가 열려있으면 닫기
+                if (existingChartRow && existingChartRow.classList.contains('inline-chart-row')) {
+                    existingChartRow.remove();
+                    row.classList.remove('chart-expanded');
+                    return;
+                }
+
+                // 다른 열린 차트들 닫기
+                document.querySelectorAll('.inline-chart-row').forEach(el => el.remove());
+                document.querySelectorAll('.chart-expanded').forEach(el => el.classList.remove('chart-expanded'));
+
+                // 차트 데이터 가져오기
+                const chartDataStr = row.getAttribute('data-chart-data');
+                if (!chartDataStr) {
+                    console.error('차트 데이터가 없습니다:', drugCode);
+                    return;
+                }
+
+                const chartData = JSON.parse(chartDataStr);
+                const colSpan = row.cells.length;
+
+                // 차트 행 생성
+                const chartRow = document.createElement('tr');
+                chartRow.className = 'inline-chart-row';
+                chartRow.innerHTML = `
+                    <td colspan="${colSpan}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #4facfe;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0; color: #2d3748;">${chartData.drug_name} (${chartData.drug_code}) 상세 트렌드</h4>
+                            <button onclick="closeInlineChart('${drugCode}')"
+                                    style="background: none; border: none; font-size: 20px; cursor: pointer; color: #718096;">&times;</button>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+                            <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 12px; color: #666;">재고수량</div>
+                                <div style="font-size: 18px; font-weight: bold;">${chartData.stock.toLocaleString()}개</div>
+                            </div>
+                            <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 12px; opacity: 0.9;">${chartData.ma_months}개월 이동평균</div>
+                                <div style="font-size: 18px; font-weight: bold;">${chartData.latest_ma !== null ? chartData.latest_ma.toFixed(1) : 'N/A'}개</div>
+                            </div>
+                            <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 12px; opacity: 0.9;">런웨이</div>
+                                <div style="font-size: 18px; font-weight: bold;">${chartData.runway}</div>
+                            </div>
+                        </div>
+                        <div id="inline-chart-${drugCode}" style="width: 100%; height: 350px;"></div>
+                    </td>
+                `;
+
+                row.after(chartRow);
+                row.classList.add('chart-expanded');
+
+                // Plotly 차트 생성
+                renderInlineChart(drugCode, chartData);
+            }
+
+            function renderInlineChart(drugCode, chartData) {
+                const chartContainer = document.getElementById('inline-chart-' + drugCode);
+                if (!chartContainer) return;
+
+                const maClean = chartData.ma;
+
+                // 최대값 찾기
+                const maxValue = Math.max(...chartData.timeseries);
+                const maxIndex = chartData.timeseries.indexOf(maxValue);
+                const maxMonth = chartData.months[maxIndex];
+
+                const traces = [
+                    {
+                        x: chartData.months,
+                        y: chartData.timeseries,
+                        mode: 'lines+markers',
+                        name: '실제 조제수량',
+                        line: {color: 'black', width: 2, dash: 'dot'},
+                        marker: {size: 6, color: 'black'},
+                        hovertemplate: '실제 조제수량: %{y:,.0f}개<extra></extra>'
+                    },
+                    {
+                        x: chartData.months,
+                        y: maClean,
+                        mode: 'lines',
+                        name: chartData.ma_months + '개월 이동평균',
+                        line: {color: '#4facfe', width: 3},
+                        hovertemplate: chartData.ma_months + '개월 이동평균: %{y:,.2f}개<extra></extra>'
+                    }
+                ];
+
+                // 겨울철 배경 영역 생성
+                const winterShapes = [];
+                function isWinterMonth(month) {
+                    const monthNum = parseInt(month.split('-')[1]);
+                    return monthNum === 10 || monthNum === 11 || monthNum === 12 || monthNum === 1 || monthNum === 2;
+                }
+
+                let winterStart = null;
+                for (let i = 0; i < chartData.months.length; i++) {
+                    const isWinter = isWinterMonth(chartData.months[i]);
+                    if (isWinter && winterStart === null) {
+                        winterStart = i;
+                    } else if (!isWinter && winterStart !== null) {
+                        winterShapes.push({
+                            type: 'rect', xref: 'x', yref: 'paper',
+                            x0: chartData.months[winterStart], x1: chartData.months[i - 1],
+                            y0: 0, y1: 1,
+                            fillcolor: 'rgba(135, 206, 250, 0.2)', line: {width: 0}, layer: 'below'
+                        });
+                        winterStart = null;
+                    }
+                }
+                if (winterStart !== null) {
+                    winterShapes.push({
+                        type: 'rect', xref: 'x', yref: 'paper',
+                        x0: chartData.months[winterStart], x1: chartData.months[chartData.months.length - 1],
+                        y0: 0, y1: 1,
+                        fillcolor: 'rgba(135, 206, 250, 0.2)', line: {width: 0}, layer: 'below'
+                    });
+                }
+
+                const layout = {
+                    xaxis: { title: '월', type: 'category', showgrid: true, gridcolor: '#e2e8f0' },
+                    yaxis: { title: '조제수량', showgrid: true, gridcolor: '#e2e8f0' },
+                    height: 350,
+                    margin: { t: 30, b: 50, l: 60, r: 30 },
+                    hovermode: 'x unified',
+                    plot_bgcolor: 'white',
+                    paper_bgcolor: '#f8fafc',
+                    font: {size: 11},
+                    shapes: winterShapes,
+                    annotations: maxValue > 0 ? [{
+                        x: maxMonth, y: maxValue,
+                        text: '최대: ' + maxValue.toFixed(0),
+                        showarrow: true, arrowhead: 2, arrowsize: 1, arrowwidth: 2, arrowcolor: 'red',
+                        ax: 0, ay: -30,
+                        bgcolor: 'rgba(255,255,255,0.9)', bordercolor: 'red', borderwidth: 1, borderpad: 3,
+                        font: {color: 'red', size: 10, weight: 'bold'}
+                    }] : []
+                };
+
+                Plotly.newPlot(chartContainer, traces, layout, {displayModeBar: false, responsive: true});
+            }
+
             // 범용 메모 모달 열기 (카테고리 없이 약품코드만 사용)
             function openMemoModalGeneric(drugCode) {
                 const modal = document.getElementById('memo-modal-generic');
@@ -1352,159 +1507,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 }
             });
 
-            // 차트 캐시 (한번 생성한 차트는 재사용)
-            const chartCache = {};
-
-            // 모달 열기 + Plotly 차트 동적 생성
-            function openModalWithChart(modalId, rowIndex) {
-                const modal = document.getElementById(modalId);
-                const chartContainer = document.getElementById('chart-container-' + rowIndex);
-
-                // 모달 표시
-                modal.style.display = 'block';
-
-                // 이미 차트가 생성되었으면 재사용
-                if (chartCache[rowIndex]) {
-                    return;
-                }
-
-                // 차트 데이터 가져오기
-                const rows = document.querySelectorAll('#dataTable tbody tr.clickable-row');
-                const row = rows[rowIndex];
-                const chartData = JSON.parse(row.getAttribute('data-chart-data'));
-
-                // Plotly 차트 생성
-                const maClean = chartData.ma;
-
-                // 최대값 찾기
-                const maxValue = Math.max(...chartData.timeseries);
-                const maxIndex = chartData.timeseries.indexOf(maxValue);
-                const maxMonth = chartData.months[maxIndex];
-
-                const traces = [
-                    {
-                        x: chartData.months,
-                        y: chartData.timeseries,
-                        mode: 'lines+markers',
-                        name: '실제 조제수량',
-                        line: {color: 'black', width: 2, dash: 'dot'},
-                        marker: {size: 8, color: 'black'},
-                        hovertemplate: '실제 조제수량: %{y:,.0f}개<extra></extra>'
-                    },
-                    {
-                        x: chartData.months,
-                        y: maClean,
-                        mode: 'lines',
-                        name: `${chartData.ma_months}개월 이동평균`,
-                        line: {color: '#4facfe', width: 3},
-                        hovertemplate: `${chartData.ma_months}개월 이동평균: %{y:,.2f}개<extra></extra>`
-                    }
-                ];
-
-                // 겨울철 배경 영역 생성 (10, 11, 12, 1, 2월)
-                const winterShapes = [];
-
-                // 겨울철 월 확인 함수
-                function isWinterMonth(month) {
-                    const monthNum = parseInt(month.split('-')[1]);
-                    return monthNum === 10 || monthNum === 11 || monthNum === 12 || monthNum === 1 || monthNum === 2;
-                }
-
-                // 연속된 겨울철 구간 찾기
-                let winterStart = null;
-                for (let i = 0; i < chartData.months.length; i++) {
-                    const isWinter = isWinterMonth(chartData.months[i]);
-
-                    if (isWinter && winterStart === null) {
-                        // 겨울철 시작
-                        winterStart = i;
-                    } else if (!isWinter && winterStart !== null) {
-                        // 겨울철 끝
-                        winterShapes.push({
-                            type: 'rect',
-                            xref: 'x',
-                            yref: 'paper',
-                            x0: chartData.months[winterStart],
-                            x1: chartData.months[i - 1],
-                            y0: 0,
-                            y1: 1,
-                            fillcolor: 'rgba(135, 206, 250, 0.2)',
-                            line: {width: 0},
-                            layer: 'below'
-                        });
-                        winterStart = null;
-                    }
-                }
-
-                // 마지막이 겨울철인 경우
-                if (winterStart !== null) {
-                    winterShapes.push({
-                        type: 'rect',
-                        xref: 'x',
-                        yref: 'paper',
-                        x0: chartData.months[winterStart],
-                        x1: chartData.months[chartData.months.length - 1],
-                        y0: 0,
-                        y1: 1,
-                        fillcolor: 'rgba(135, 206, 250, 0.2)',
-                        line: {width: 0},
-                        layer: 'below'
-                    });
-                }
-
-                const layout = {
-                    title: chartData.drug_name + ' (' + chartData.drug_code + ') 월별 조제수량 추이',
-                    xaxis: {
-                        title: '월',
-                        type: 'category',
-                        showgrid: true,
-                        gridwidth: 1,
-                        gridcolor: 'lightgray'
-                    },
-                    yaxis: {
-                        title: '조제수량',
-                        showgrid: true,
-                        gridwidth: 1,
-                        gridcolor: 'lightgray'
-                    },
-                    height: 500,
-                    hovermode: 'x unified',
-                    plot_bgcolor: 'white',
-                    paper_bgcolor: 'white',
-                    font: {size: 12},
-                    shapes: winterShapes,
-                    annotations: [
-                        {
-                            x: maxMonth,
-                            y: maxValue,
-                            text: '최대: ' + maxValue.toFixed(0),
-                            showarrow: true,
-                            arrowhead: 2,
-                            arrowsize: 1,
-                            arrowwidth: 2,
-                            arrowcolor: 'red',
-                            ax: 0,
-                            ay: -40,
-                            bgcolor: 'rgba(255, 255, 255, 0.9)',
-                            bordercolor: 'red',
-                            borderwidth: 2,
-                            borderpad: 4,
-                            font: {color: 'red', size: 12, weight: 'bold'}
-                        }
-                    ]
-                };
-
-                Plotly.newPlot(chartContainer, traces, layout, {displayModeBar: true});
-
-                // 차트 캐시에 저장
-                chartCache[rowIndex] = true;
-            }
-
-            function closeModal(modalId) {
-                document.getElementById(modalId).style.display = 'none';
-            }
-
-            // 모달 외부 클릭시 닫기
+            // 모달 외부 클릭시 닫기 (메모 모달용)
             window.onclick = function(event) {
                 if (event.target.classList.contains('modal')) {
                     event.target.style.display = 'none';
@@ -1599,8 +1602,9 @@ def classify_drugs_by_special_cases(df, ma_months):
 
     return urgent_drugs, dead_stock_drugs
 
-def generate_urgent_drugs_section(urgent_drugs, ma_months):
-    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모) - 모달용"""
+def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
+    """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모 + 인라인 차트) - 모달용"""
+    import json
 
     # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
     checked_codes = checked_items_db.get_checked_items()
@@ -1680,14 +1684,30 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months):
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 인라인 차트용 데이터 생성
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': 0,
+            'latest_ma': latest_ma,
+            'runway': '재고 없음'
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
         html += f"""
-                                <tr class="urgent-row {row_class}" data-drug-code="{drug_code}">
-                                    <td style="text-align: center;">
+                                <tr class="urgent-row tab-clickable-row {row_class}" data-drug-code="{drug_code}"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
                                             <input type="checkbox" class="urgent-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleUrgentCheckbox(this)">
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
-                                                    onclick="openMemoModal('{drug_code}')"
+                                                    onclick="event.stopPropagation(); openMemoModal('{drug_code}')"
                                                     title="{memo_preview if memo else '메모 추가'}">
                                                 ✎
                                             </button>
@@ -1739,8 +1759,9 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months):
 
     return html
 
-def generate_low_stock_section(low_drugs_df, ma_months):
-    """재고 부족 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모) - 모달용"""
+def generate_low_stock_section(low_drugs_df, ma_months, months):
+    """재고 부족 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모 + 인라인 차트) - 모달용"""
+    import json
 
     if low_drugs_df.empty:
         return ""
@@ -1808,14 +1829,31 @@ def generate_low_stock_section(low_drugs_df, ma_months):
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 인라인 차트용 데이터 생성
+        latest_ma = row['N개월_이동평균']
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': int(row['최종_재고수량']),
+            'latest_ma': latest_ma,
+            'runway': runway_display
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
         html += f"""
-                                <tr class="low-row {row_class}" data-drug-code="{drug_code}">
-                                    <td style="text-align: center;">
+                                <tr class="low-row tab-clickable-row {row_class}" data-drug-code="{drug_code}"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
                                             <input type="checkbox" class="low-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleLowCheckbox(this)">
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
-                                                    onclick="openMemoModalGeneric('{drug_code}')"
+                                                    onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
                                                     title="{memo_preview if memo else '메모 추가'}">
                                                 ✎
                                             </button>
@@ -1850,8 +1888,9 @@ def generate_low_stock_section(low_drugs_df, ma_months):
 
     return html
 
-def generate_high_stock_section(high_drugs_df, ma_months):
-    """재고 충분 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모) - 모달용"""
+def generate_high_stock_section(high_drugs_df, ma_months, months):
+    """재고 충분 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모 + 인라인 차트) - 모달용"""
+    import json
 
     if high_drugs_df.empty:
         return ""
@@ -1915,14 +1954,31 @@ def generate_high_stock_section(high_drugs_df, ma_months):
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 인라인 차트용 데이터 생성
+        latest_ma = row['N개월_이동평균']
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': int(row['최종_재고수량']),
+            'latest_ma': latest_ma,
+            'runway': runway_display
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
         html += f"""
-                                <tr class="high-row {row_class}" data-drug-code="{drug_code}">
-                                    <td style="text-align: center;">
+                                <tr class="high-row tab-clickable-row {row_class}" data-drug-code="{drug_code}"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
                                             <input type="checkbox" class="high-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleHighCheckbox(this)">
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
-                                                    onclick="openMemoModalGeneric('{drug_code}')"
+                                                    onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
                                                     title="{memo_preview if memo else '메모 추가'}">
                                                 ✎
                                             </button>
@@ -1945,7 +2001,6 @@ def generate_high_stock_section(high_drugs_df, ma_months):
     """
 
     # 메모 데이터를 JSON으로 변환
-    import json
     memos_json = json.dumps(memos, ensure_ascii=False)
 
     html += f"""
@@ -1957,8 +2012,9 @@ def generate_high_stock_section(high_drugs_df, ma_months):
 
     return html
 
-def generate_dead_stock_section(dead_stock_drugs, ma_months):
-    """악성 재고 섹션 HTML 생성 (테이블 형식 + 체크박스/메모/스파크라인) - 모달용"""
+def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
+    """악성 재고 섹션 HTML 생성 (테이블 형식 + 체크박스/메모/스파크라인 + 인라인 차트) - 모달용"""
+    import json
 
     total_dead_stock = dead_stock_drugs['최종_재고수량'].sum()
 
@@ -2023,14 +2079,30 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months):
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 인라인 차트용 데이터 생성
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': int(row['최종_재고수량']),
+            'latest_ma': 0,
+            'runway': '재고만 있음'
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
         html += f"""
-                                <tr class="dead-row {row_class}" data-drug-code="{drug_code}" style="background: rgba(247, 250, 252, 0.7);">
-                                    <td style="text-align: center;">
+                                <tr class="dead-row tab-clickable-row {row_class}" data-drug-code="{drug_code}" style="background: rgba(247, 250, 252, 0.7);"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">
                                             <input type="checkbox" class="dead-checkbox" data-drug-code="{drug_code}" {checked_attr} onchange="handleDeadCheckbox(this)">
                                             <button class="memo-btn {memo_btn_class}"
                                                     data-drug-code="{drug_code}"
-                                                    onclick="openMemoModalGeneric('{drug_code}')"
+                                                    onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
                                                     title="{memo_preview if memo else '메모 추가'}">
                                                 ✎
                                             </button>
@@ -2053,7 +2125,6 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months):
     """
 
     # 메모 데이터를 JSON으로 변환
-    import json
     memos_json = json.dumps(memos, ensure_ascii=False)
 
     html += f"""
