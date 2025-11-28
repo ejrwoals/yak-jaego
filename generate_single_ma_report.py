@@ -398,7 +398,15 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 background: #f7fafc;
             }}
             .hidden-row {{
-                display: none !important;
+                background: #f8f9fa !important;
+                color: #9ca3af !important;
+                opacity: 0.7;
+            }}
+            .hidden-row td {{
+                color: #9ca3af !important;
+            }}
+            .hidden-row .visibility-btn {{
+                color: #9ca3af;
             }}
 
             /* 책갈피 사이드바 스타일 */
@@ -943,39 +951,33 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 }
             }
 
-            // 모달 열 때 숨김 상태 적용
+            // 모달 열 때 숨김 상태 적용 및 정렬
             function applyHiddenState(modalId) {
                 const modal = document.getElementById(modalId);
                 if (!modal) return;
 
+                // 숨김 상태에 따라 hidden-row 클래스 적용
+                modal.querySelectorAll('.visibility-btn').forEach(btn => {
+                    const row = btn.closest('tr');
+                    if (row) {
+                        if (btn.classList.contains('hidden')) {
+                            row.classList.add('hidden-row');
+                        } else {
+                            row.classList.remove('hidden-row');
+                        }
+                    }
+                });
+
+                // 테이블 정렬 (숨김 항목 하단으로)
+                const tbody = modal.querySelector('tbody');
+                if (tbody) {
+                    sortTableByHiddenState(tbody);
+                }
+
+                // 숨김 탭인 경우 빈 메시지 업데이트
                 if (modalId === 'hidden-modal') {
-                    // 숨김 탭: 숨김 처리된 것만 보이기
-                    let visibleCount = 0;
-                    modal.querySelectorAll('.visibility-btn').forEach(btn => {
-                        const row = btn.closest('tr');
-                        if (row) {
-                            if (btn.classList.contains('hidden')) {
-                                row.classList.remove('hidden-row');
-                                visibleCount++;
-                            } else {
-                                row.classList.add('hidden-row');
-                            }
-                        }
-                    });
-                    // 빈 메시지 업데이트
-                    updateHiddenEmptyMessage(visibleCount);
-                } else {
-                    // 다른 탭: 숨김 처리된 것 숨기기
-                    modal.querySelectorAll('.visibility-btn').forEach(btn => {
-                        const row = btn.closest('tr');
-                        if (row) {
-                            if (btn.classList.contains('hidden')) {
-                                row.classList.add('hidden-row');
-                            } else {
-                                row.classList.remove('hidden-row');
-                            }
-                        }
-                    });
+                    const hiddenCount = modal.querySelectorAll('.visibility-btn.hidden').length;
+                    updateHiddenEmptyMessage(hiddenCount);
                 }
             }
 
@@ -1051,34 +1053,59 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             function syncVisibilityState(drugCode, isHidden) {
                 // 모든 숨김 버튼에서 같은 약품코드를 가진 것들 찾기
                 const allButtons = document.querySelectorAll(`.visibility-btn[data-drug-code="${drugCode}"]`);
+
                 allButtons.forEach(btn => {
                     const row = btn.closest('tr');
+                    const isInHiddenTable = row && row.closest('#hidden-drugs-table');
+
                     if (isHidden) {
                         btn.classList.add('hidden');
                         btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
                         btn.title = '숨김 해제';
-                        // 숨김 탭이 아닌 곳에서는 행 숨기기
-                        if (row && !row.closest('#hidden-drugs-table')) {
-                            row.classList.add('hidden-row');
-                        }
-                        // 숨김 탭에서는 행 보이기
-                        if (row && row.closest('#hidden-drugs-table')) {
-                            row.classList.remove('hidden-row');
+                        if (row) {
+                            if (isInHiddenTable) {
+                                // 숨김 탭: 보이게
+                                row.style.display = '';
+                            } else {
+                                // 다른 탭: 회색 스타일 + 하단 정렬
+                                row.classList.add('hidden-row');
+                            }
                         }
                     } else {
                         btn.classList.remove('hidden');
                         btn.innerHTML = '<i class="bi bi-eye"></i>';
                         btn.title = '숨김 처리';
-                        // 숨김 탭이 아닌 곳에서는 행 보이기
-                        if (row && !row.closest('#hidden-drugs-table')) {
-                            row.classList.remove('hidden-row');
+                        if (row) {
+                            if (isInHiddenTable) {
+                                // 숨김 탭: 숨기기
+                                row.style.display = 'none';
+                            } else {
+                                // 다른 탭: 회색 스타일 제거
+                                row.classList.remove('hidden-row');
+                            }
                         }
-                        // 숨김 탭에서는 행 숨기기
-                        if (row && row.closest('#hidden-drugs-table')) {
-                            row.classList.add('hidden-row');
+                    }
+                    // 다른 탭의 테이블만 재정렬 (숨김 항목을 하단으로)
+                    if (row && !isInHiddenTable) {
+                        const tbody = row.closest('tbody');
+                        if (tbody) {
+                            sortTableByHiddenState(tbody);
                         }
                     }
                 });
+                // 빈 메시지 업데이트
+                updateHiddenEmptyMessage();
+            }
+
+            // 테이블 정렬: 숨김 처리된 행을 하단으로 이동
+            function sortTableByHiddenState(tbody) {
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.inline-chart-row)'));
+                rows.sort((a, b) => {
+                    const aHidden = a.classList.contains('hidden-row') ? 1 : 0;
+                    const bHidden = b.classList.contains('hidden-row') ? 1 : 0;
+                    return aHidden - bHidden;
+                });
+                rows.forEach(row => tbody.appendChild(row));
             }
 
             // 숨김 탭 카운트 업데이트 (hidden 클래스가 있는 버튼 수 기준)
@@ -1101,6 +1128,16 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
             // 숨김 탭 빈 메시지 표시/숨김
             function updateHiddenEmptyMessage(count) {
+                // count가 없으면 숨김 탭에서 보이는 행 수로 계산
+                if (count === undefined) {
+                    const hiddenTable = document.getElementById('hidden-drugs-table');
+                    if (hiddenTable) {
+                        const visibleRows = hiddenTable.querySelectorAll('tbody tr:not([style*="display: none"])');
+                        count = visibleRows.length;
+                    } else {
+                        count = 0;
+                    }
+                }
                 const emptyMsg = document.getElementById('hidden-empty-message');
                 const table = document.getElementById('hidden-drugs-table');
                 if (emptyMsg && table) {
@@ -1114,14 +1151,18 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 }
             }
 
-            // 페이지 로드 시 숨김 처리된 항목 숨기기
+            // 페이지 로드 시 숨김 처리된 항목 스타일 적용 및 정렬
             window.addEventListener('DOMContentLoaded', function() {
-                // 숨김 처리된 항목들 숨기기 (숨김 탭 제외)
+                // 숨김 처리된 항목들에 hidden-row 클래스 적용
                 document.querySelectorAll('.visibility-btn.hidden').forEach(btn => {
                     const row = btn.closest('tr');
-                    if (row && !row.closest('#hidden-drugs-table')) {
+                    if (row) {
                         row.classList.add('hidden-row');
                     }
+                });
+                // 모든 테이블 정렬 (숨김 항목 하단으로)
+                document.querySelectorAll('table tbody').forEach(tbody => {
+                    sortTableByHiddenState(tbody);
                 });
                 updateHiddenCount();
             });
@@ -2139,13 +2180,13 @@ def generate_hidden_drugs_section(df, ma_months, months):
                             <tbody>
     """
 
-    # 모든 약품을 포함 (숨김 처리 안된 것은 hidden-row 클래스로 초기 숨김)
+    # 모든 약품을 포함 (숨김 처리 안된 것은 display:none으로 숨김)
     for _, row in df.iterrows():
         drug_code = str(row['약품코드'])
 
         # 숨김 상태 확인
         is_hidden = drug_code in checked_items
-        row_hidden_class = "" if is_hidden else "hidden-row"
+        row_display_style = "" if is_hidden else "display: none;"
         hidden_btn_class = "hidden" if is_hidden else ""
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_hidden else '<i class="bi bi-eye"></i>'
         hidden_title = "숨김 해제" if is_hidden else "숨김 처리"
@@ -2204,8 +2245,8 @@ def generate_hidden_drugs_section(df, ma_months, months):
         chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
 
         html += f"""
-                                <tr class="hidden-row-item tab-clickable-row {row_hidden_class}" data-drug-code="{drug_code}"
-                                    data-chart-data='{chart_data_json}'
+                                <tr class="hidden-row-item tab-clickable-row" data-drug-code="{drug_code}"
+                                    data-chart-data='{chart_data_json}' style="{row_display_style}"
                                     onclick="toggleInlineChart(this, '{drug_code}')">
                                     <td style="text-align: center;" onclick="event.stopPropagation()">
                                         <div class="checkbox-memo-container">

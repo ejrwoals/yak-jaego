@@ -495,8 +495,8 @@ for month in months_reversed:
 
 5. **실시간 동기화 (숨김 처리)**
    - 🔄 **크로스 탭 동기화**: 한 탭에서 숨김 처리 시 모든 탭에 즉시 반영
-   - 📍 **관련 함수**: `toggleVisibility()`, `syncVisibilityState()`, `updateHiddenCount()`, `applyHiddenState()`
-   - 💾 **상태 유지**: 모달 닫았다 열어도 숨김 상태 유지 (`applyHiddenState()`)
+   - 🎯 **숨김 처리 UX**: 숨김 항목은 사라지지 않고 **하단 정렬 + 회색 비활성화 스타일**로 표시
+   - 📍 **관련 함수**: `toggleVisibility()`, `syncVisibilityState()`, `sortTableByHiddenState()`, `updateHiddenCount()`
    - 🎨 **Bootstrap Icons**: `bi-eye` (표시) / `bi-eye-slash` (숨김) 아이콘 사용
 
 ### v3.6 업데이트 (단순 재고 관리 보고서 추가)
