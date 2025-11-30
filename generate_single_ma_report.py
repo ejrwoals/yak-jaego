@@ -537,7 +537,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     """
 
     # 특수 케이스 약품 분류
-    urgent_drugs, dead_stock_drugs = classify_drugs_by_special_cases(df, ma_months)
+    urgent_drugs, dead_stock_drugs, negative_stock_drugs = classify_drugs_by_special_cases(df, ma_months)
 
     # 런웨이 분석 차트 생성 + 부족/충분 약품 DataFrame
     runtime_analysis_low, runtime_analysis_high, low_count, high_count, low_drugs_df, high_drugs_df = analyze_runway(df, months, ma_months)
@@ -546,10 +546,29 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     total_count = len(df)
     urgent_count = len(urgent_drugs) if not urgent_drugs.empty else 0
     dead_count = len(dead_stock_drugs) if not dead_stock_drugs.empty else 0
+    negative_count = len(negative_stock_drugs) if not negative_stock_drugs.empty else 0
 
     # 숨김 처리된 약품 수 (체크된 항목)
     checked_items = checked_items_db.get_checked_items()
     hidden_count = len(checked_items)
+
+    # 음수 재고 경고 배너 (음수 재고가 있을 때만 표시)
+    if negative_count > 0:
+        html_content += f"""
+        <!-- 음수 재고 경고 배너 -->
+        <div id="negative-stock-banner" style="margin: 20px 0; padding: 15px 20px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px;">⚠️</span>
+                <div>
+                    <span style="font-weight: bold; color: #dc2626; font-size: 15px;">음수 재고 경고:</span>
+                    <span style="color: #7f1d1d; font-size: 15px;">{negative_count}개 약품의 재고가 음수입니다</span>
+                </div>
+            </div>
+            <button onclick="openCategoryModal('negative-modal')" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">
+                확인하기
+            </button>
+        </div>
+        """
 
     # 통합 인디케이터 생성
     html_content += f"""
@@ -790,6 +809,26 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                         <span class="category-modal-close" onclick="closeCategoryModal('dead-modal')">&times;</span>
                     </div>
                     {dead_stock_section_html}
+                </div>
+            </div>
+        """
+
+    # 음수 재고 모달
+    has_negative_stock = not negative_stock_drugs.empty
+    if has_negative_stock:
+        negative_stock_section_html = generate_negative_stock_section(negative_stock_drugs, ma_months, months)
+        html_content += f"""
+            <!-- 음수 재고 모달 -->
+            <div id="negative-modal" class="category-modal">
+                <div class="category-modal-content">
+                    <div class="category-modal-header">
+                        <h2 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.5em;">⚠️</span>
+                            <span>음수 재고 약품</span>
+                        </h2>
+                        <span class="category-modal-close" onclick="closeCategoryModal('negative-modal')">&times;</span>
+                    </div>
+                    {negative_stock_section_html}
                 </div>
             </div>
         """
@@ -1698,6 +1737,7 @@ def classify_drugs_by_special_cases(df, ma_months):
     Returns:
         urgent_drugs: 사용되고 있는데 재고가 0인 약품 (긴급)
         dead_stock_drugs: 사용되지 않는데 재고만 있는 약품 (악성 재고)
+        negative_stock_drugs: 재고가 음수인 약품 (음수 재고)
     """
 
     # 각 약품의 N개월 이동평균 계산
@@ -1727,6 +1767,11 @@ def classify_drugs_by_special_cases(df, ma_months):
         (df_with_ma['최종_재고수량'] > 0)
     ].copy()
 
+    # Case 3: 음수 재고 - 재고가 음수인 약품 (이동평균 무관)
+    negative_stock_drugs = df_with_ma[
+        df_with_ma['최종_재고수량'] < 0
+    ].copy()
+
     # 긴급 약품: 마지막 조제월 기준으로 정렬 (최신 사용이 위로)
     if not urgent_drugs.empty:
         # 마지막 조제 인덱스 계산 (월별_조제수량_리스트에서 마지막 0이 아닌 값의 인덱스)
@@ -1745,7 +1790,11 @@ def classify_drugs_by_special_cases(df, ma_months):
     if not dead_stock_drugs.empty:
         dead_stock_drugs = dead_stock_drugs.sort_values('최종_재고수량', ascending=False)
 
-    return urgent_drugs, dead_stock_drugs
+    # 음수 재고: 재고수량 기준 오름차순 정렬 (가장 심각한 음수가 위로)
+    if not negative_stock_drugs.empty:
+        negative_stock_drugs = negative_stock_drugs.sort_values('최종_재고수량', ascending=True)
+
+    return urgent_drugs, dead_stock_drugs, negative_stock_drugs
 
 def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
     """긴급 약품 섹션 HTML 생성 (테이블 형식 + 체크박스 + 메모 + 인라인 차트) - 모달용"""
@@ -2288,6 +2337,138 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
             <script>
                 // 악성재고 탭 메모 데이터
                 var deadDrugMemos = {memos_json};
+            </script>
+    """
+
+    return html
+
+
+def generate_negative_stock_section(negative_stock_drugs, ma_months, months):
+    """음수 재고 섹션 HTML 생성 (테이블 형식 + 스파크라인 + 인라인 차트) - 모달용"""
+    import json
+
+    total_negative_stock = negative_stock_drugs['최종_재고수량'].sum()
+
+    # DB에서 체크된 약품 코드 목록 가져오기
+    checked_codes = checked_items_db.get_checked_items()
+    memos = checked_items_db.get_all_memos()
+
+    html = f"""
+                    <div style="padding: 15px; background: #fef2f2; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #dc2626; font-weight: bold;">
+                            ⚠️ 총 {len(negative_stock_drugs)}개 약품의 재고가 음수입니다. (총 {total_negative_stock:,.0f}개)
+                        </p>
+                        <p style="margin: 5px 0 0 0; color: #7f1d1d; font-size: 14px;">
+                            💡 음수 재고는 실제 재고보다 더 많이 출고된 상태를 의미합니다. 재고 실사 또는 데이터 확인이 필요합니다.
+                        </p>
+                    </div>
+                    <div class="table-container">
+                        <table id="negative-drugs-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">숨김</th>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>재고수량</th>
+                                    <th>{ma_months}개월 이동평균</th>
+                                    <th>비고</th>
+                                    <th>트렌드</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    for _, row in negative_stock_drugs.iterrows():
+        drug_code = str(row['약품코드'])
+        is_checked = drug_code in checked_codes
+
+        # N개월 이동평균
+        latest_ma = row['N개월_이동평균']
+
+        # 스파크라인 생성
+        timeseries = row['월별_조제수량_리스트']
+        ma = calculate_custom_ma(timeseries, ma_months)
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
+
+        # 약품명 30자 제한
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        # 숨김 버튼 상태
+        hidden_class = "hidden" if is_checked else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+
+        # 비고 (사용 중인지 여부)
+        usage_note = "사용 중" if latest_ma > 0 else "미사용"
+        usage_color = "#059669" if latest_ma > 0 else "#6b7280"
+
+        # 인라인 차트용 데이터 생성
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': int(row['최종_재고수량']),
+            'latest_ma': float(latest_ma) if latest_ma else 0,
+            'runway': '음수 재고'
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
+        html += f"""
+                                <tr class="negative-row tab-clickable-row" data-drug-code="{drug_code}" style="background: rgba(254, 242, 242, 0.7);"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
+                                        <div class="checkbox-memo-container">
+                                            <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{drug_code}</td>
+                                    <td>{company_display}</td>
+                                    <td style="color: #dc2626; font-weight: bold;">{row['최종_재고수량']:,.0f}</td>
+                                    <td>{latest_ma:.2f}</td>
+                                    <td style="color: {usage_color}; font-weight: 500;">{usage_note}</td>
+                                    <td>{sparkline_html}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+    """
+
+    # 메모 데이터를 JSON으로 변환
+    memos_json = json.dumps(memos, ensure_ascii=False)
+
+    html += f"""
+            <script>
+                // 음수재고 탭 메모 데이터
+                var negativeDrugMemos = {memos_json};
             </script>
     """
 
