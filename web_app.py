@@ -683,6 +683,18 @@ def rebuild_db():
         return jsonify({'error': f'DB 재생성 실패: {str(e)}'}), 500
 
 
+@app.route('/api/get_checked_items', methods=['GET'])
+def get_checked_items_api():
+    """숨김 처리된 약품 목록 조회 API"""
+    try:
+        checked_items = checked_items_db.get_checked_items()
+        return jsonify({'status': 'success', 'checked_items': list(checked_items)})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/toggle_checked_item', methods=['POST'])
 def toggle_checked_item():
     """체크 상태 업데이트 API (카테고리 없이 약품코드만 사용)"""

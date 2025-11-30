@@ -556,36 +556,36 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
         <!-- 통합 재고 현황 인디케이터 -->
         <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 2px solid #e5e7eb;">
             <h2 style="margin: 0 0 15px 0; color: #2d3748;">📊 재고 현황 분포</h2>
-            <div style="display: flex; height: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: relative;">
-                <div style="background: #dc2626; flex: {urgent_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)">
+            <div id="proportion-graph" style="display: flex; height: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: relative;" data-total="{total_count}">
+                <div id="proportion-bar-urgent" style="background: #dc2626; flex: {urgent_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)">
                     {urgent_count if urgent_count > 0 else ''}
                 </div>
-                <div style="background: #eab308; flex: {low_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-low" style="background: #eab308; flex: {low_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)">
                     {low_count if low_count > 0 else ''}
                 </div>
-                <div style="background: #22c55e; flex: {high_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-high" style="background: #22c55e; flex: {high_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
                     {high_count if high_count > 0 else ''}
                 </div>
-                <div style="background: #94a3b8; flex: {dead_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-dead" style="background: #94a3b8; flex: {dead_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
                     {dead_count if dead_count > 0 else ''}
                 </div>
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; color: #4a5568;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #dc2626; border-radius: 2px;"></span>
-                    <span>긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)</span>
+                    <span id="proportion-label-urgent">긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #eab308; border-radius: 2px;"></span>
-                    <span>부족: {low_count}개 ({low_count/total_count*100:.1f}%)</span>
+                    <span id="proportion-label-low">부족: {low_count}개 ({low_count/total_count*100:.1f}%)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span>
-                    <span>충분: {high_count}개 ({high_count/total_count*100:.1f}%)</span>
+                    <span id="proportion-label-high">충분: {high_count}개 ({high_count/total_count*100:.1f}%)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #94a3b8; border-radius: 2px;"></span>
-                    <span>악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)</span>
+                    <span id="proportion-label-dead">악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)</span>
                 </div>
             </div>
         </div>
@@ -1095,6 +1095,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 });
                 // 빈 메시지 업데이트
                 updateHiddenEmptyMessage();
+                // 탭 카운트 및 그래프 업데이트
+                updateProportionGraph();
             }
 
             // 테이블 정렬: 숨김 처리된 행을 하단으로 이동
@@ -1106,6 +1108,99 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     return aHidden - bHidden;
                 });
                 rows.forEach(row => tbody.appendChild(row));
+            }
+
+            // 각 탭별 카운트 업데이트 (숨김 처리 안된 항목만 카운트)
+            function updateTabCounts() {
+                const counts = {
+                    urgent: 0,
+                    low: 0,
+                    high: 0,
+                    dead: 0
+                };
+
+                // 긴급 탭 카운트
+                const urgentTable = document.querySelector('#urgent-modal tbody');
+                if (urgentTable) {
+                    counts.urgent = urgentTable.querySelectorAll('tr:not(.hidden-row):not(.inline-chart-row)').length;
+                }
+
+                // 부족 탭 카운트
+                const lowTable = document.querySelector('#low-modal tbody');
+                if (lowTable) {
+                    counts.low = lowTable.querySelectorAll('tr:not(.hidden-row):not(.inline-chart-row)').length;
+                }
+
+                // 충분 탭 카운트
+                const highTable = document.querySelector('#high-modal tbody');
+                if (highTable) {
+                    counts.high = highTable.querySelectorAll('tr:not(.hidden-row):not(.inline-chart-row)').length;
+                }
+
+                // 악성재고 탭 카운트
+                const deadTable = document.querySelector('#dead-modal tbody');
+                if (deadTable) {
+                    counts.dead = deadTable.querySelectorAll('tr:not(.hidden-row):not(.inline-chart-row)').length;
+                }
+
+                // 사이드바 카운트 업데이트
+                const urgentCountEl = document.querySelector('.bookmark-urgent .bookmark-count');
+                const lowCountEl = document.querySelector('.bookmark-low .bookmark-count');
+                const highCountEl = document.querySelector('.bookmark-high .bookmark-count');
+                const deadCountEl = document.querySelector('.bookmark-dead .bookmark-count');
+
+                if (urgentCountEl) urgentCountEl.textContent = counts.urgent;
+                if (lowCountEl) lowCountEl.textContent = counts.low;
+                if (highCountEl) highCountEl.textContent = counts.high;
+                if (deadCountEl) deadCountEl.textContent = counts.dead;
+
+                return counts;
+            }
+
+            // Proportion 그래프 업데이트
+            function updateProportionGraph() {
+                const counts = updateTabCounts();
+                const total = counts.urgent + counts.low + counts.high + counts.dead;
+
+                if (total === 0) return;
+
+                // 바 업데이트
+                const urgentBar = document.getElementById('proportion-bar-urgent');
+                const lowBar = document.getElementById('proportion-bar-low');
+                const highBar = document.getElementById('proportion-bar-high');
+                const deadBar = document.getElementById('proportion-bar-dead');
+
+                if (urgentBar) {
+                    urgentBar.style.flex = counts.urgent;
+                    urgentBar.textContent = counts.urgent > 0 ? counts.urgent : '';
+                    urgentBar.title = `긴급: ${counts.urgent}개 (${(counts.urgent/total*100).toFixed(1)}%)`;
+                }
+                if (lowBar) {
+                    lowBar.style.flex = counts.low;
+                    lowBar.textContent = counts.low > 0 ? counts.low : '';
+                    lowBar.title = `부족: ${counts.low}개 (${(counts.low/total*100).toFixed(1)}%)`;
+                }
+                if (highBar) {
+                    highBar.style.flex = counts.high;
+                    highBar.textContent = counts.high > 0 ? counts.high : '';
+                    highBar.title = `충분: ${counts.high}개 (${(counts.high/total*100).toFixed(1)}%)`;
+                }
+                if (deadBar) {
+                    deadBar.style.flex = counts.dead;
+                    deadBar.textContent = counts.dead > 0 ? counts.dead : '';
+                    deadBar.title = `악성재고: ${counts.dead}개 (${(counts.dead/total*100).toFixed(1)}%)`;
+                }
+
+                // 레이블 업데이트
+                const urgentLabel = document.getElementById('proportion-label-urgent');
+                const lowLabel = document.getElementById('proportion-label-low');
+                const highLabel = document.getElementById('proportion-label-high');
+                const deadLabel = document.getElementById('proportion-label-dead');
+
+                if (urgentLabel) urgentLabel.textContent = `긴급: ${counts.urgent}개 (${(counts.urgent/total*100).toFixed(1)}%)`;
+                if (lowLabel) lowLabel.textContent = `부족: ${counts.low}개 (${(counts.low/total*100).toFixed(1)}%)`;
+                if (highLabel) highLabel.textContent = `충분: ${counts.high}개 (${(counts.high/total*100).toFixed(1)}%)`;
+                if (deadLabel) deadLabel.textContent = `악성재고: ${counts.dead}개 (${(counts.dead/total*100).toFixed(1)}%)`;
             }
 
             // 숨김 탭 카운트 업데이트 (hidden 클래스가 있는 버튼 수 기준)
@@ -1151,20 +1246,71 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 }
             }
 
-            // 페이지 로드 시 숨김 처리된 항목 스타일 적용 및 정렬
+            // 페이지 로드 시 최신 숨김 목록을 API에서 가져와서 적용
             window.addEventListener('DOMContentLoaded', function() {
-                // 숨김 처리된 항목들에 hidden-row 클래스 적용
-                document.querySelectorAll('.visibility-btn.hidden').forEach(btn => {
-                    const row = btn.closest('tr');
-                    if (row) {
-                        row.classList.add('hidden-row');
-                    }
-                });
-                // 모든 테이블 정렬 (숨김 항목 하단으로)
-                document.querySelectorAll('table tbody').forEach(tbody => {
-                    sortTableByHiddenState(tbody);
-                });
-                updateHiddenCount();
+                // API에서 최신 숨김 목록 가져오기
+                fetch('/api/get_checked_items')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const checkedItems = new Set(data.checked_items);
+
+                            // 모든 visibility 버튼에 대해 최신 상태 적용
+                            document.querySelectorAll('.visibility-btn').forEach(btn => {
+                                const drugCode = btn.getAttribute('data-drug-code');
+                                const row = btn.closest('tr');
+                                const isInHiddenTable = row && row.closest('#hidden-drugs-table');
+
+                                if (checkedItems.has(drugCode)) {
+                                    // 숨김 처리된 상태
+                                    btn.classList.add('hidden');
+                                    btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+                                    btn.title = '숨김 해제';
+                                    if (row) {
+                                        if (isInHiddenTable) {
+                                            row.style.display = '';
+                                        } else {
+                                            row.classList.add('hidden-row');
+                                        }
+                                    }
+                                } else {
+                                    // 숨김 해제된 상태
+                                    btn.classList.remove('hidden');
+                                    btn.innerHTML = '<i class="bi bi-eye"></i>';
+                                    btn.title = '숨김 처리';
+                                    if (row) {
+                                        if (isInHiddenTable) {
+                                            row.style.display = 'none';
+                                        } else {
+                                            row.classList.remove('hidden-row');
+                                        }
+                                    }
+                                }
+                            });
+
+                            // 모든 테이블 정렬 (숨김 항목 하단으로)
+                            document.querySelectorAll('table tbody').forEach(tbody => {
+                                sortTableByHiddenState(tbody);
+                            });
+                            updateHiddenCount();
+                            updateProportionGraph();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('숨김 목록 로드 실패:', error);
+                        // 폴백: HTML에 있는 상태 그대로 사용
+                        document.querySelectorAll('.visibility-btn.hidden').forEach(btn => {
+                            const row = btn.closest('tr');
+                            if (row) {
+                                row.classList.add('hidden-row');
+                            }
+                        });
+                        document.querySelectorAll('table tbody').forEach(tbody => {
+                            sortTableByHiddenState(tbody);
+                        });
+                        updateHiddenCount();
+                        updateProportionGraph();
+                    });
             });
 
             // 인라인 차트 닫기

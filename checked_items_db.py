@@ -43,11 +43,22 @@ def init_checked_items_db():
     # 기존 테이블이 있으면 데이터 마이그레이션
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='checked_items'")
     if cursor.fetchone():
-        # 기존 데이터 마이그레이션 (카테고리 무시, 약품코드별로 하나만 유지)
-        cursor.execute('''
-            INSERT OR IGNORE INTO checked_items_v2 (약품코드, 체크여부, 체크일시, 메모)
-            SELECT 약품코드, 1, 체크일시, 메모 FROM checked_items
-        ''')
+        # 기존 스키마 확인 (체크여부 컬럼이 있는지)
+        cursor.execute("PRAGMA table_info(checked_items)")
+        columns = {col[1] for col in cursor.fetchall()}
+
+        if '체크여부' in columns:
+            # 새 스키마: 체크여부 값을 그대로 유지
+            cursor.execute('''
+                INSERT OR IGNORE INTO checked_items_v2 (약품코드, 체크여부, 체크일시, 메모)
+                SELECT 약품코드, 체크여부, 체크일시, 메모 FROM checked_items
+            ''')
+        else:
+            # 구 스키마 (카테고리 기반): 체크여부 = 1로 마이그레이션
+            cursor.execute('''
+                INSERT OR IGNORE INTO checked_items_v2 (약품코드, 체크여부, 체크일시, 메모)
+                SELECT 약품코드, 1, 체크일시, 메모 FROM checked_items
+            ''')
         # 기존 테이블 삭제
         cursor.execute('DROP TABLE checked_items')
 
