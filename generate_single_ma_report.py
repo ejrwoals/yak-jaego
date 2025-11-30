@@ -464,6 +464,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             .bookmark-high {{
                 background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
             }}
+            .bookmark-excess {{
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            }}
             .bookmark-dead {{
                 background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
             }}
@@ -539,8 +542,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     # 특수 케이스 약품 분류
     urgent_drugs, dead_stock_drugs, negative_stock_drugs = classify_drugs_by_special_cases(df, ma_months)
 
-    # 런웨이 분석 차트 생성 + 부족/충분 약품 DataFrame
-    runtime_analysis_low, runtime_analysis_high, low_count, high_count, low_drugs_df, high_drugs_df = analyze_runway(df, months, ma_months)
+    # 런웨이 분석 차트 생성 + 부족/충분/과다 약품 DataFrame
+    runtime_analysis_low, runtime_analysis_high, runtime_analysis_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df = analyze_runway(df, months, ma_months)
 
     # 전체 약품 수
     total_count = len(df)
@@ -585,11 +588,14 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 <div id="proportion-bar-high" style="background: #22c55e; flex: {high_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
                     {high_count if high_count > 0 else ''}
                 </div>
+                <div id="proportion-bar-excess" style="background: #3b82f6; flex: {excess_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)">
+                    {excess_count if excess_count > 0 else ''}
+                </div>
                 <div id="proportion-bar-dead" style="background: #94a3b8; flex: {dead_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
                     {dead_count if dead_count > 0 else ''}
                 </div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; color: #4a5568;">
+            <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; color: #4a5568; flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #dc2626; border-radius: 2px;"></span>
                     <span id="proportion-label-urgent">긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)</span>
@@ -601,6 +607,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span>
                     <span id="proportion-label-high">충분: {high_count}개 ({high_count/total_count*100:.1f}%)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #3b82f6; border-radius: 2px;"></span>
+                    <span id="proportion-label-excess">과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="display: inline-block; width: 12px; height: 12px; background: #94a3b8; border-radius: 2px;"></span>
@@ -626,6 +636,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 <div class="bookmark-title">충분</div>
                 <div class="bookmark-count">{high_count}</div>
             </div>
+            <div class="bookmark-item bookmark-excess" onclick="openCategoryModal('excess-modal')">
+                <div class="bookmark-icon">🔵</div>
+                <div class="bookmark-title">과다</div>
+                <div class="bookmark-count">{excess_count}</div>
+            </div>
             <div class="bookmark-item bookmark-dead" onclick="openCategoryModal('dead-modal')">
                 <div class="bookmark-icon">⚪</div>
                 <div class="bookmark-title">악성재고</div>
@@ -643,6 +658,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     has_urgent = not urgent_drugs.empty
     has_low_runway = runtime_analysis_low is not None
     has_high_runway = runtime_analysis_high is not None
+    has_excess_runway = runtime_analysis_excess is not None
     has_dead_stock = not dead_stock_drugs.empty
 
     # 긴급 약품 모달
@@ -789,6 +805,65 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                         chartView.style.display = 'none';
                         toggleBtn.textContent = '📊 막대 그래프 보기';
                         highViewMode = 'table';
+                    }}
+                }}
+            </script>
+        """
+
+    # 과다 재고 모달 (런웨이 12개월 초과)
+    if has_excess_runway:
+        excess_section_html = generate_excess_stock_section(excess_drugs_df, ma_months, months)
+        html_content += f"""
+            <!-- 과다 재고 약품 모달 -->
+            <div id="excess-modal" class="category-modal">
+                <div class="category-modal-content">
+                    <div class="category-modal-header">
+                        <h2 style="margin: 0; color: #2563eb; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.5em;">🔵</span>
+                            <span>과다 재고 약품 (런웨이 12개월 초과)</span>
+                        </h2>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <button id="toggle-view-excess" class="nav-btn" onclick="toggleExcessView()">📊 막대 그래프 보기</button>
+                            <span class="category-modal-close" onclick="closeCategoryModal('excess-modal')">&times;</span>
+                        </div>
+                    </div>
+                    <div id="table-view-excess">
+                        {excess_section_html}
+                    </div>
+                    <div id="chart-view-excess" style="display: none;">
+                        <div id="runway-chart-excess"></div>
+                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;">
+                            <button id="prev-excess" class="nav-btn" onclick="changePage('excess', -1)">◀ 이전</button>
+                            <span id="page-info-excess">페이지 1 / 1</span>
+                            <button id="next-excess" class="nav-btn" onclick="changePage('excess', 1)">다음 ▶</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script>
+                {runtime_analysis_excess if runtime_analysis_excess else ''}
+
+                // 과다 탭 뷰 토글
+                var excessViewMode = 'table';
+                function toggleExcessView() {{
+                    var tableView = document.getElementById('table-view-excess');
+                    var chartView = document.getElementById('chart-view-excess');
+                    var toggleBtn = document.getElementById('toggle-view-excess');
+
+                    if (excessViewMode === 'table') {{
+                        tableView.style.display = 'none';
+                        chartView.style.display = 'block';
+                        toggleBtn.textContent = '📋 테이블 보기';
+                        excessViewMode = 'chart';
+                        // 차트 초기화 (처음 표시될 때)
+                        if (typeof updateChartExcess === 'function') {{
+                            updateChartExcess();
+                        }}
+                    }} else {{
+                        tableView.style.display = 'block';
+                        chartView.style.display = 'none';
+                        toggleBtn.textContent = '📊 막대 그래프 보기';
+                        excessViewMode = 'table';
                     }}
                 }}
             </script>
@@ -1155,6 +1230,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     urgent: 0,
                     low: 0,
                     high: 0,
+                    excess: 0,
                     dead: 0
                 };
 
@@ -1176,6 +1252,12 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     counts.high = highTable.querySelectorAll('tr:not(.hidden-row):not(.inline-chart-row)').length;
                 }
 
+                // 과다 탭 카운트
+                const excessTable = document.querySelector('#excess-modal tbody');
+                if (excessTable) {
+                    counts.excess = excessTable.querySelectorAll('tr:not(.hidden-row):not(.inline-chart-row)').length;
+                }
+
                 // 악성재고 탭 카운트
                 const deadTable = document.querySelector('#dead-modal tbody');
                 if (deadTable) {
@@ -1186,11 +1268,13 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 const urgentCountEl = document.querySelector('.bookmark-urgent .bookmark-count');
                 const lowCountEl = document.querySelector('.bookmark-low .bookmark-count');
                 const highCountEl = document.querySelector('.bookmark-high .bookmark-count');
+                const excessCountEl = document.querySelector('.bookmark-excess .bookmark-count');
                 const deadCountEl = document.querySelector('.bookmark-dead .bookmark-count');
 
                 if (urgentCountEl) urgentCountEl.textContent = counts.urgent;
                 if (lowCountEl) lowCountEl.textContent = counts.low;
                 if (highCountEl) highCountEl.textContent = counts.high;
+                if (excessCountEl) excessCountEl.textContent = counts.excess;
                 if (deadCountEl) deadCountEl.textContent = counts.dead;
 
                 return counts;
@@ -1199,7 +1283,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             // Proportion 그래프 업데이트
             function updateProportionGraph() {
                 const counts = updateTabCounts();
-                const total = counts.urgent + counts.low + counts.high + counts.dead;
+                const total = counts.urgent + counts.low + counts.high + counts.excess + counts.dead;
 
                 if (total === 0) return;
 
@@ -1207,6 +1291,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 const urgentBar = document.getElementById('proportion-bar-urgent');
                 const lowBar = document.getElementById('proportion-bar-low');
                 const highBar = document.getElementById('proportion-bar-high');
+                const excessBar = document.getElementById('proportion-bar-excess');
                 const deadBar = document.getElementById('proportion-bar-dead');
 
                 if (urgentBar) {
@@ -1224,6 +1309,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     highBar.textContent = counts.high > 0 ? counts.high : '';
                     highBar.title = `충분: ${counts.high}개 (${(counts.high/total*100).toFixed(1)}%)`;
                 }
+                if (excessBar) {
+                    excessBar.style.flex = counts.excess;
+                    excessBar.textContent = counts.excess > 0 ? counts.excess : '';
+                    excessBar.title = `과다: ${counts.excess}개 (${(counts.excess/total*100).toFixed(1)}%)`;
+                }
                 if (deadBar) {
                     deadBar.style.flex = counts.dead;
                     deadBar.textContent = counts.dead > 0 ? counts.dead : '';
@@ -1234,11 +1324,13 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                 const urgentLabel = document.getElementById('proportion-label-urgent');
                 const lowLabel = document.getElementById('proportion-label-low');
                 const highLabel = document.getElementById('proportion-label-high');
+                const excessLabel = document.getElementById('proportion-label-excess');
                 const deadLabel = document.getElementById('proportion-label-dead');
 
                 if (urgentLabel) urgentLabel.textContent = `긴급: ${counts.urgent}개 (${(counts.urgent/total*100).toFixed(1)}%)`;
                 if (lowLabel) lowLabel.textContent = `부족: ${counts.low}개 (${(counts.low/total*100).toFixed(1)}%)`;
                 if (highLabel) highLabel.textContent = `충분: ${counts.high}개 (${(counts.high/total*100).toFixed(1)}%)`;
+                if (excessLabel) excessLabel.textContent = `과다: ${counts.excess}개 (${(counts.excess/total*100).toFixed(1)}%)`;
                 if (deadLabel) deadLabel.textContent = `악성재고: ${counts.dead}개 (${(counts.dead/total*100).toFixed(1)}%)`;
             }
 
@@ -2215,6 +2307,141 @@ def generate_high_stock_section(high_drugs_df, ma_months, months):
 
     return html
 
+
+def generate_excess_stock_section(excess_drugs_df, ma_months, months):
+    """과다 재고 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모 + 인라인 차트) - 모달용
+
+    런웨이가 12개월을 초과하는 약품들 (유효기간 만료 위험)
+    """
+    import json
+
+    if excess_drugs_df.empty:
+        return ""
+
+    # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
+    checked_codes = checked_items_db.get_checked_items()
+    memos = checked_items_db.get_all_memos()
+
+    html = f"""
+                    <div style="padding: 15px; background: #eff6ff; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #2563eb; font-weight: bold;">
+                            📦 총 {len(excess_drugs_df)}개 약품의 런웨이가 12개월을 초과합니다.
+                        </p>
+                        <p style="margin: 5px 0 0 0; color: #3b82f6; font-size: 14px;">
+                            💡 재고 소진에 1년 이상 걸리므로, 유효기간 만료 전에 사용하지 못할 수 있습니다. 재고 조정을 고려해보세요.
+                        </p>
+                    </div>
+                    <div class="table-container">
+                        <table id="excess-drugs-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">숨김</th>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>재고수량</th>
+                                    <th>{ma_months}개월 이동평균</th>
+                                    <th>런웨이</th>
+                                    <th>트렌드</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+    """
+
+    for _, row in excess_drugs_df.iterrows():
+        drug_code = str(row['약품코드'])
+        is_checked = drug_code in checked_codes
+
+        # 런웨이 표시
+        runway_months = row['런웨이_개월']
+        runway_display = f"{runway_months:.2f}개월"
+
+        # 스파크라인 생성
+        timeseries = row['월별_조제수량_리스트']
+        ma = calculate_custom_ma(timeseries, ma_months)
+        sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
+
+        # 약품명 30자 제한
+        drug_name_display = row['약품명'] if row['약품명'] is not None else "정보없음"
+        if len(drug_name_display) > 30:
+            drug_name_display = drug_name_display[:30] + "..."
+
+        # 제약회사 12자 제한
+        company_display = row['제약회사'] if row['제약회사'] is not None else "정보없음"
+        if len(company_display) > 12:
+            company_display = company_display[:12] + "..."
+
+        # 메모 가져오기
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
+
+        # 숨김 버튼 상태
+        hidden_class = "hidden" if is_checked else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+
+        # 인라인 차트용 데이터 생성
+        latest_ma = row['N개월_이동평균']
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': list(timeseries),
+            'ma': list(ma),
+            'months': months,
+            'ma_months': ma_months,
+            'stock': int(row['최종_재고수량']),
+            'latest_ma': latest_ma,
+            'runway': runway_display
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
+        html += f"""
+                                <tr class="excess-row tab-clickable-row" data-drug-code="{drug_code}"
+                                    data-chart-data='{chart_data_json}'
+                                    onclick="toggleInlineChart(this, '{drug_code}')">
+                                    <td style="text-align: center;" onclick="event.stopPropagation()">
+                                        <div class="checkbox-memo-container">
+                                            <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                                    title="{hidden_title}">{hidden_icon}</button>
+                                            <button class="memo-btn {memo_btn_class}"
+                                                    data-drug-code="{drug_code}"
+                                                    onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
+                                                    title="{memo_preview if memo else '메모 추가'}">
+                                                ✎
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td>{drug_code}</td>
+                                    <td>{company_display}</td>
+                                    <td>{row['최종_재고수량']:,.0f}</td>
+                                    <td>{row['N개월_이동평균']:.2f}</td>
+                                    <td style="color: #2563eb; font-weight: bold;">{runway_display}</td>
+                                    <td>{sparkline_html}</td>
+                                </tr>
+        """
+
+    html += """
+                            </tbody>
+                        </table>
+                    </div>
+    """
+
+    # 메모 데이터를 JSON으로 변환
+    memos_json = json.dumps(memos, ensure_ascii=False)
+
+    html += f"""
+            <script>
+                // 과다 탭 메모 데이터
+                var excessDrugMemos = {memos_json};
+            </script>
+    """
+
+    return html
+
+
 def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
     """악성 재고 섹션 HTML 생성 (테이블 형식 + 체크박스/메모/스파크라인 + 인라인 차트) - 모달용"""
     import json
@@ -2611,14 +2838,16 @@ def analyze_runway(df, months, ma_months):
     """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - N-MA 런웨이 기준
 
     Returns:
-        tuple: (chart_js_low, chart_js_high, low_count, high_count, low_drugs_df, high_drugs_df)
+        tuple: (chart_js_low, chart_js_high, chart_js_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df)
     """
     try:
         # N-MA 런웨이를 숫자로 변환 (개월 단위)
-        low_data = []  # 3개월 이하 (차트용)
-        high_data = []  # 3개월 초과 (차트용)
-        low_drugs_list = []  # 3개월 이하 (테이블용)
-        high_drugs_list = []  # 3개월 초과 (테이블용)
+        low_data = []  # 3개월 이하 (차트용) - 부족
+        high_data = []  # 3개월 초과 ~ 12개월 이하 (차트용) - 충분
+        excess_data = []  # 12개월 초과 (차트용) - 과다
+        low_drugs_list = []  # 3개월 이하 (테이블용) - 부족
+        high_drugs_list = []  # 3개월 초과 ~ 12개월 이하 (테이블용) - 충분
+        excess_drugs_list = []  # 12개월 초과 (테이블용) - 과다
 
         for idx, row in df.iterrows():
             # N개월 이동평균 계산
@@ -2656,27 +2885,38 @@ def analyze_runway(df, months, ma_months):
                 }
 
                 if ma_runway_months <= 3:
+                    # 부족: 런웨이 3개월 이하
                     low_data.append(data_tuple)
                     low_drugs_list.append(drug_data)
-                else:
+                elif ma_runway_months <= 12:
+                    # 충분: 런웨이 3개월 초과 ~ 12개월 이하
                     high_data.append(data_tuple)
                     high_drugs_list.append(drug_data)
+                else:
+                    # 과다: 런웨이 12개월 초과
+                    excess_data.append(data_tuple)
+                    excess_drugs_list.append(drug_data)
 
         # DataFrame 생성
         import pandas as pd
         low_drugs_df = pd.DataFrame(low_drugs_list) if low_drugs_list else pd.DataFrame()
         high_drugs_df = pd.DataFrame(high_drugs_list) if high_drugs_list else pd.DataFrame()
+        excess_drugs_df = pd.DataFrame(excess_drugs_list) if excess_drugs_list else pd.DataFrame()
 
-        # 정렬: 부족은 런웨이 오름차순, 충분은 런웨이 내림차순
+        # 정렬: 부족/충분은 런웨이 오름차순, 과다는 런웨이 내림차순
         if not low_drugs_df.empty:
             low_drugs_df = low_drugs_df.sort_values('런웨이_개월', ascending=True)
         if not high_drugs_df.empty:
-            high_drugs_df = high_drugs_df.sort_values('런웨이_개월', ascending=False)
+            high_drugs_df = high_drugs_df.sort_values('런웨이_개월', ascending=True)
+        if not excess_drugs_df.empty:
+            excess_drugs_df = excess_drugs_df.sort_values('런웨이_개월', ascending=False)
 
         chart_js_low = None
         chart_js_high = None
+        chart_js_excess = None
         low_count = len(low_data)
         high_count = len(high_data)
+        excess_count = len(excess_data)
 
         # 하위 차트 (3개월 이하, 오름차순 정렬)
         if low_data:
@@ -2875,20 +3115,116 @@ def analyze_runway(df, months, ma_months):
                         var totalPages = Math.ceil(lowData.length / itemsPerPage);
                         currentPageLow = Math.max(0, Math.min(currentPageLow + direction, totalPages - 1));
                         updateChartLow();
-                    }} else {{
+                    }} else if (type === 'high') {{
                         var totalPages = Math.ceil(highData.length / itemsPerPageHigh);
                         currentPageHigh = Math.max(0, Math.min(currentPageHigh + direction, totalPages - 1));
                         updateChartHigh();
+                    }} else {{
+                        var totalPages = Math.ceil(excessData.length / itemsPerPageExcess);
+                        currentPageExcess = Math.max(0, Math.min(currentPageExcess + direction, totalPages - 1));
+                        updateChartExcess();
                     }}
                 }}
             """
 
-        return chart_js_low, chart_js_high, low_count, high_count, low_drugs_df, high_drugs_df
+        # 과다 차트 (12개월 초과, 내림차순 정렬)
+        if excess_data:
+            excess_data_sorted = sorted(excess_data, reverse=True)
+            excess_data_json = json.dumps(excess_data_sorted)
+
+            chart_js_excess = f"""
+                var excessData = {excess_data_json};
+                var currentPageExcess = 0;
+                var itemsPerPageExcess = 30;
+
+                function updateChartExcess() {{
+                    var start = currentPageExcess * itemsPerPageExcess;
+                    var end = start + itemsPerPageExcess;
+                    var pageData = excessData.slice(start, end);
+
+                    if (pageData.length === 0) return;
+
+                    // 데이터 구조: [N-MA런웨이(개월), 약품명, N개월평균]
+                    var values = pageData.map(function(item) {{ return item[0]; }});
+                    var names = pageData.map(function(item) {{ return item[1]; }});
+                    var maAvg = pageData.map(function(item) {{ return item[2]; }});
+
+                    // 과다 그룹: 런웨이가 긴 것이 위에 오도록 역순
+                    values.reverse();
+                    names.reverse();
+                    maAvg.reverse();
+
+                    // 커스텀 호버 텍스트 생성
+                    var hoverTexts = [];
+                    for (var i = 0; i < values.length; i++) {{
+                        var maRunwayText = values[i] >= 1
+                            ? values[i].toFixed(2) + '개월'
+                            : (values[i] * 30.417).toFixed(2) + '일';
+
+                        hoverTexts.push(
+                            '런웨이: ' + maRunwayText + ' ({ma_months}개월 이동평균: ' + maAvg[i].toFixed(2) + ')'
+                        );
+                    }}
+
+                    var data = [{{
+                        x: values,
+                        y: names,
+                        type: 'bar',
+                        orientation: 'h',
+                        text: values,
+                        texttemplate: '%{{text:.2f}}개월',
+                        textposition: 'outside',
+                        hovertext: hoverTexts,
+                        hoverinfo: 'text',
+                        marker: {{
+                            color: 'rgb(59, 130, 246)'
+                        }},
+                        width: 0.7
+                    }}];
+
+                    var layout = {{
+                        xaxis: {{
+                            title: '개월',
+                            range: [0, Math.max(...values) * 1.1]
+                        }},
+                        yaxis: {{
+                            title: '',
+                            automargin: true,
+                            tickfont: {{size: 10}}
+                        }},
+                        height: Math.min(1200, pageData.length * 25 + 100),
+                        margin: {{
+                            l: 350,
+                            r: 100,
+                            t: 40,
+                            b: 60,
+                            pad: 10
+                        }},
+                        bargap: 0.3
+                    }};
+
+                    Plotly.newPlot('runway-chart-excess', data, layout, {{responsive: true}});
+
+                    // 페이지 정보 업데이트
+                    var totalPages = Math.ceil(excessData.length / itemsPerPageExcess);
+                    document.getElementById('page-info-excess').textContent =
+                        '페이지 ' + (currentPageExcess + 1) + ' / ' + totalPages +
+                        ' (총 ' + excessData.length + '개)';
+
+                    // 버튼 상태 업데이트
+                    document.getElementById('prev-excess').disabled = (currentPageExcess === 0);
+                    document.getElementById('next-excess').disabled = (currentPageExcess >= totalPages - 1);
+                }}
+
+                updateChartExcess();
+            """
+
+        return chart_js_low, chart_js_high, chart_js_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df
     except Exception as e:
         print(f"Error in analyze_runway: {e}")
         import traceback
         traceback.print_exc()
-    return None, None, 0, 0, pd.DataFrame(), pd.DataFrame()
+    return None, None, None, 0, 0, 0, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def create_and_save_report(df, months, mode='dispense', ma_months=3, open_browser=True):
     """보고서를 생성하고 파일로 저장하는 함수
