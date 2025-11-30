@@ -573,8 +573,7 @@ def list_reports(report_type):
         # 최신순 정렬
         reports.sort(key=lambda x: x['timestamp'], reverse=True)
 
-        # 최대 10개만 반환 (드롭다운용)
-        reports = reports[:10]
+        # 전체 반환 (제한 없음)
 
         return jsonify({'reports': reports})
 
@@ -760,6 +759,71 @@ def get_memo():
         import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/delete-report', methods=['POST'])
+def delete_report():
+    """보고서 파일 삭제 API"""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        report_type = data.get('report_type')
+
+        print(f"🗑️  삭제 요청 받음: filename={filename}, type={report_type}")
+
+        if not filename or not report_type:
+            return jsonify({'error': '파일명 또는 보고서 유형이 없습니다.'}), 400
+
+        # 보안: 파일명에 경로 탐색 문자가 없는지 확인
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({'error': '잘못된 파일명입니다.'}), 400
+
+        # 보고서 유형에 따라 디렉토리 결정
+        if report_type == 'timeseries':
+            report_dir = 'inventory_reports'
+            valid_prefixes = ['inventory_report_', 'simple_report_']
+        elif report_type == 'order':
+            report_dir = 'order_calc_reports'
+            valid_prefixes = ['order_calculator_report_']
+        else:
+            return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
+
+        # 파일명 유효성 검증
+        if not any(filename.startswith(prefix) for prefix in valid_prefixes):
+            return jsonify({'error': '허용되지 않는 파일입니다.'}), 400
+
+        if not filename.endswith('.html'):
+            return jsonify({'error': 'HTML 파일만 삭제할 수 있습니다.'}), 400
+
+        # 파일 경로 생성 (스크립트 위치 기준)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(base_dir, report_dir, filename)
+
+        print(f"🗑️  삭제 시도 경로: {file_path}")
+        print(f"🗑️  파일 존재 여부: {os.path.exists(file_path)}")
+
+        # 파일 존재 확인 및 삭제
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"✅ 보고서 삭제 완료: {filename}")
+
+            # CSV 파일도 함께 삭제 (주문 보고서의 경우)
+            if report_type == 'order':
+                csv_filename = filename.replace('.html', '.csv')
+                csv_path = os.path.join(base_dir, report_dir, csv_filename)
+                if os.path.exists(csv_path):
+                    os.remove(csv_path)
+                    print(f"✅ CSV 파일 삭제 완료: {csv_filename}")
+
+            return jsonify({'success': True, 'message': '보고서가 삭제되었습니다.'})
+        else:
+            print(f"❌ 파일을 찾을 수 없음: {file_path}")
+            return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/shutdown', methods=['POST'])

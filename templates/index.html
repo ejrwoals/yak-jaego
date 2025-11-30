@@ -349,17 +349,77 @@
             border-radius: 8px;
             padding: 12px 15px;
             margin-bottom: 10px;
-            cursor: pointer;
             transition: all 0.2s ease;
-            text-decoration: none;
-            display: block;
-            color: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
         }
 
         .report-item:hover {
             border-color: #cbd5e0;
-            transform: translateX(5px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .report-item-link {
+            flex: 1;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.2s ease;
+        }
+
+        .report-item-link:hover {
+            transform: translateX(5px);
+        }
+
+        .btn-delete-report {
+            background: none;
+            border: none;
+            color: #a0aec0;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .btn-delete-report:hover {
+            background-color: #fee2e2;
+            color: #ef4444;
+        }
+
+        .btn-delete-report svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-delete-all {
+            background: none;
+            color: #a0aec0;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 10px;
+        }
+
+        .btn-delete-all:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+        }
+
+        .btn-delete-all:disabled {
+            color: #cbd5e0;
+            cursor: not-allowed;
         }
 
         .report-item-time {
@@ -819,6 +879,9 @@
                             <div id="timeseries-reports" class="report-list">
                                 <div class="loading-state">로딩 중...</div>
                             </div>
+                            <button class="btn-delete-all" id="btn-delete-all-timeseries" onclick="deleteAllReports('timeseries')" style="display: none;">
+                                <span>전체 삭제</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -842,6 +905,9 @@
                             <div id="order-reports" class="report-list">
                                 <div class="loading-state">로딩 중...</div>
                             </div>
+                            <button class="btn-delete-all" id="btn-delete-all-order" onclick="deleteAllReports('order')" style="display: none;">
+                                <span>전체 삭제</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -956,16 +1022,29 @@
                     }
 
                     html += `
-                        <a href="/reports/${report.filename}" target="_blank" class="report-item">
-                            <div class="report-item-time">🕐 ${report.created_at}</div>
-                            <div class="report-item-type ${typeClass}">
-                                ${styleText}${typeText}
-                            </div>
-                        </a>
+                        <div class="report-item" data-filename="${report.filename}" data-type="${type}">
+                            <a href="/reports/${report.filename}" target="_blank" class="report-item-link">
+                                <div class="report-item-time">🕐 ${report.created_at}</div>
+                                <div class="report-item-type ${typeClass}">
+                                    ${styleText}${typeText}
+                                </div>
+                            </a>
+                            <button class="btn-delete-report" onclick="deleteReport('${report.filename}', '${type}')" title="보고서 삭제">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
                     `;
                 });
 
                 container.innerHTML = html;
+
+                // 보고서가 있으면 전체 삭제 버튼 표시
+                const deleteAllBtn = document.getElementById(`btn-delete-all-${type}`);
+                if (deleteAllBtn) {
+                    deleteAllBtn.style.display = 'flex';
+                }
             } catch (error) {
                 console.error('보고서 로드 실패:', error);
                 container.innerHTML = `
@@ -1057,6 +1136,115 @@
                 // 버튼 다시 활성화
                 button.disabled = false;
                 button.innerHTML = '<span>🔄</span><span>DB 재생성 (새 데이터 반영)</span>';
+            }
+        }
+
+        // 전체 보고서 삭제
+        async function deleteAllReports(reportType) {
+            const container = document.getElementById(`${reportType}-reports`);
+            const reportItems = container.querySelectorAll('.report-item');
+            const count = reportItems.length;
+
+            if (count === 0) {
+                alert('삭제할 보고서가 없습니다.');
+                return;
+            }
+
+            if (!confirm(`정말 ${count}개의 보고서를 모두 삭제하시겠습니까?\n\n삭제된 보고서는 복구할 수 없습니다.`)) {
+                return;
+            }
+
+            const deleteAllBtn = document.getElementById(`btn-delete-all-${reportType}`);
+            deleteAllBtn.disabled = true;
+            deleteAllBtn.innerHTML = '<span>⏳</span><span>삭제 중...</span>';
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const item of reportItems) {
+                const filename = item.dataset.filename;
+                try {
+                    const response = await fetch('/api/delete-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename, report_type: reportType })
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                        item.remove();
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+
+            // 결과 표시
+            if (failCount === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <div>생성된 보고서가 없습니다</div>
+                    </div>
+                `;
+                deleteAllBtn.style.display = 'none';
+            } else {
+                alert(`${successCount}개 삭제 완료, ${failCount}개 실패`);
+                deleteAllBtn.disabled = false;
+                deleteAllBtn.innerHTML = '<span>🗑️</span><span>전체 삭제</span>';
+            }
+        }
+
+        // 보고서 삭제
+        async function deleteReport(filename, reportType) {
+            if (!confirm('이 보고서를 삭제하시겠습니까?\n\n삭제된 보고서는 복구할 수 없습니다.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/delete-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename: filename,
+                        report_type: reportType
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // 해당 보고서 항목을 DOM에서 제거
+                    const reportItem = document.querySelector(`.report-item[data-filename="${filename}"]`);
+                    if (reportItem) {
+                        reportItem.style.transition = 'all 0.3s ease';
+                        reportItem.style.opacity = '0';
+                        reportItem.style.transform = 'translateX(-20px)';
+                        setTimeout(() => {
+                            reportItem.remove();
+
+                            // 목록이 비었으면 빈 상태 표시
+                            const container = document.getElementById(`${reportType}-reports`);
+                            if (container && container.querySelectorAll('.report-item').length === 0) {
+                                container.innerHTML = `
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">📭</div>
+                                        <div>생성된 보고서가 없습니다</div>
+                                    </div>
+                                `;
+                            }
+                        }, 300);
+                    }
+                } else {
+                    alert('삭제 실패: ' + (data.error || '알 수 없는 오류'));
+                }
+            } catch (error) {
+                console.error('보고서 삭제 실패:', error);
+                alert('보고서 삭제 중 오류가 발생했습니다.');
             }
         }
 
