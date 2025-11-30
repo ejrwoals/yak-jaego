@@ -134,7 +134,7 @@
         }
 
         .btn-rebuild-db {
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            background: #aaa;
             color: white;
             border: none;
             padding: 10px 20px;
@@ -148,16 +148,17 @@
             gap: 8px;
             justify-content: center;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(75, 85, 99, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .btn-rebuild-db:hover {
+            background: #999;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(75, 85, 99, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .btn-rebuild-db:disabled {
-            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            background: #999;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
@@ -226,15 +227,15 @@
         }
 
         .tab-button.active {
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            background: #555;
             color: white;
             border-color: transparent;
-            box-shadow: 0 4px 15px rgba(75, 85, 99, 0.4);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
         }
 
         .tab-button.active.order-tab {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+            background: #555;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
         }
 
         .tab-content {
@@ -290,7 +291,7 @@
         }
 
         .btn-new {
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            background: #555;
             color: white;
             border: none;
             padding: 15px 25px;
@@ -299,24 +300,26 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(75, 85, 99, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             text-decoration: none;
             display: block;
             text-align: center;
         }
 
         .btn-new:hover {
+            background: #444;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(75, 85, 99, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
 
         .btn-new.order {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+            background: #555;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .btn-new.order:hover {
-            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+            background: #444;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
 
         .report-list {
@@ -470,7 +473,7 @@
         }
 
         .workflow-card {
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            background: #555;
             border-radius: 15px;
             padding: 30px;
             text-align: center;
@@ -482,16 +485,17 @@
         }
 
         .workflow-card:hover {
+            background: #444;
             transform: translateY(-5px);
             box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
 
         .workflow-card.timeseries {
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            background: #555;
         }
 
         .workflow-card.order {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: #555;
         }
 
         .workflow-card .icon {
@@ -536,11 +540,11 @@
         }
 
         .workflow-card.timeseries .btn-primary {
-            color: #4b5563;
+            color: #555;
         }
 
         .workflow-card.order .btn-primary {
-            color: #f5576c;
+            color: #555;
         }
 
         .btn-primary:hover {
@@ -863,7 +867,7 @@
                         <div class="workflow-section section-new">
                             <h3>✨ 새로 생성하기</h3>
                             <div class="action-buttons">
-                                <a href="/workflow/simple" class="btn-new" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                                <a href="/workflow/simple" class="btn-new">
                                     <span style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                                         <span>📊 단순 재고 관리 보고서</span>
                                         <span style="background: rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 12px; font-size: 0.75em;">권장</span>

@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: #ebebeb;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -59,12 +59,13 @@
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
-            color: #f5576c;
+            color: #666;
             text-decoration: none;
             font-weight: 500;
         }
 
         .back-link:hover {
+            color: #333;
             text-decoration: underline;
         }
 
@@ -125,7 +126,7 @@
         }
 
         .calculate-btn {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: #555;
             color: white;
             border: none;
             padding: 15px 40px;
@@ -139,8 +140,9 @@
         }
 
         .calculate-btn:hover:not(:disabled) {
+            background: #444;
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(245, 87, 108, 0.4);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
         }
 
         .calculate-btn:disabled {
