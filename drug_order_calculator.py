@@ -195,25 +195,165 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_html_report(df):
-    """HTML 보고서 생성"""
-    print("\n📋 Step 4: HTML 보고서 생성")
-    print("-" * 30)
+def generate_table_rows(df, col_map=None):
+    """테이블 행 HTML 생성
 
-    # 출력 디렉토리 생성
-    output_dir = 'order_calc_reports'
-    os.makedirs(output_dir, exist_ok=True)
+    Args:
+        df: 데이터프레임
+        col_map: 컬럼명 매핑 딕셔너리 (선택사항)
+            기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
+                    'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
+    """
+    # 기본 컬럼명 (drug_order_calculator.py 스타일)
+    default_map = {
+        'runway': '런웨이',
+        'ma3_runway': '3-MA 런웨이',
+        'stock': '현재 재고수량',
+        'ma12': '1년 이동평균',
+        'ma3': '3개월 이동평균'
+    }
+    cm = col_map if col_map else default_map
 
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = os.path.join(output_dir, f'order_calculator_report_{timestamp}.html')
+    rows = ""
+    for _, row in df.iterrows():
+        runway = row[cm['runway']]
+        ma3_runway = row[cm['ma3_runway']]
 
-    # 런웨이 < 1인 약품 개수 확인
-    urgent_count = len(df[(df['런웨이'] < 1) | (df['3-MA 런웨이'] < 1)])
+        # 런웨이 < 1인 경우 행 전체를 빨간색으로
+        row_class = 'urgent-row' if (runway < 1 or ma3_runway < 1) else ''
+
+        runway_class = 'urgent-cell' if runway < 1 else 'normal-cell'
+        ma3_runway_class = 'urgent-cell' if ma3_runway < 1 else 'normal-cell'
+
+        runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
+        ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
+
+        rows += f"""
+            <tr class="{row_class}">
+                <td>{row['약품명']}</td>
+                <td>{row['약품코드']}</td>
+                <td>{row['제약회사']}</td>
+                <td>{row[cm['stock']]:.0f}</td>
+                <td>{row[cm['ma12']]:.1f}</td>
+                <td>{row[cm['ma3']]:.1f}</td>
+                <td class="{runway_class}">{runway_display}</td>
+                <td class="{ma3_runway_class}">{ma3_runway_display}</td>
+            </tr>
+"""
+    return rows
+
+
+def generate_zero_stock_table_rows(df, col_map):
+    """재고 0 이하 약품 테이블 행 HTML 생성 (약품유형 포함)"""
+    cm = col_map
+    rows = ""
+    for _, row in df.iterrows():
+        drug_type = row['약품유형']
+        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
+
+        rows += f"""
+            <tr>
+                <td>{row['약품명']}</td>
+                <td>{row['약품코드']}</td>
+                <td>{row['제약회사']}</td>
+                <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
+                <td style="color: #c62828; font-weight: bold;">{row[cm['stock']]:.0f}</td>
+                <td>{row[cm['ma12']]:.1f}</td>
+                <td>{row[cm['ma3']]:.1f}</td>
+            </tr>
+"""
+    return rows
+
+
+def generate_order_report_html(df, col_map=None):
+    """주문 보고서 HTML 생성 (재사용 가능한 함수)
+
+    Args:
+        df: 데이터프레임
+        col_map: 컬럼명 매핑 딕셔너리 (선택사항)
+            기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
+                    'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
+
+    Returns:
+        str: HTML 문자열
+    """
+    # 기본 컬럼명 (drug_order_calculator.py 스타일)
+    default_map = {
+        'runway': '런웨이',
+        'ma3_runway': '3-MA 런웨이',
+        'stock': '현재 재고수량',
+        'ma12': '1년 이동평균',
+        'ma3': '3개월 이동평균'
+    }
+    cm = col_map if col_map else default_map
+
+    # 재고 0 이하 약품 분리 (전문약/일반약 혼합), 재고 오름차순 정렬 (큰 마이너스가 위로)
+    zero_stock_df = df[df[cm['stock']] <= 0].copy()
+    zero_stock_df = zero_stock_df.sort_values(cm['stock'], ascending=True)
+    zero_stock_count = len(zero_stock_df)
+
+    # 재고 0 이하 약품은 탭 테이블에서 제외
+    normal_df = df[df[cm['stock']] > 0].copy()
+
+    # 약품 유형별 분리 (재고 > 0인 약품만)
+    dispense_df = normal_df[normal_df['약품유형'] == '전문약'].copy()
+    sale_df = normal_df[normal_df['약품유형'] == '일반약'].copy()
+    unclassified_df = normal_df[normal_df['약품유형'] == '미분류'].copy()
 
     # 약품 유형별 개수
-    dispense_count = len(df[df['약품유형'] == '전문약'])
-    sale_count = len(df[df['약품유형'] == '일반약'])
-    unclassified_count = len(df[df['약품유형'] == '미분류'])
+    dispense_count = len(dispense_df)
+    sale_count = len(sale_df)
+    unclassified_count = len(unclassified_df)
+
+    # 긴급 주문 필요 약품 개수 (유형별, 재고 > 0인 약품 중)
+    dispense_urgent = len(dispense_df[(dispense_df[cm['runway']] < 1) | (dispense_df[cm['ma3_runway']] < 1)])
+    sale_urgent = len(sale_df[(sale_df[cm['runway']] < 1) | (sale_df[cm['ma3_runway']] < 1)])
+    total_urgent = dispense_urgent + sale_urgent
+
+    # 테이블 행 생성
+    dispense_rows = generate_table_rows(dispense_df, cm)
+    sale_rows = generate_table_rows(sale_df, cm)
+    zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
+
+    # 재고 0 이하 경고 배너 HTML
+    zero_stock_banner = f"""
+    <div class="warning-banner" onclick="openZeroStockModal()">
+        <span class="warning-icon">⚠️</span>
+        <span class="warning-text">재고 부족/음수 경고: <strong>{zero_stock_count}개</strong> 약품의 재고가 0 이하입니다</span>
+        <button class="warning-btn">확인하기</button>
+    </div>
+    """ if zero_stock_count > 0 else ""
+
+    # 재고 0 이하 모달 HTML
+    zero_stock_modal = f"""
+    <div id="zeroStockModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ 재고 부족/음수 약품 ({zero_stock_count}개)</h3>
+                <span class="modal-close" onclick="closeZeroStockModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; margin-bottom: 15px;">재고가 0 이하인 약품입니다. 즉시 주문이 필요합니다.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>약품명</th>
+                            <th>약품코드</th>
+                            <th>제약회사</th>
+                            <th>약품유형</th>
+                            <th>현재 재고</th>
+                            <th>1년 이동평균</th>
+                            <th>3개월 이동평균</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {zero_stock_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    """ if zero_stock_count > 0 else ""
 
     html = f"""
 <!DOCTYPE html>
@@ -246,11 +386,159 @@ def generate_html_report(df):
             font-weight: bold;
             font-size: 24px;
         }}
+
+        /* 경고 배너 스타일 */
+        .warning-banner {{
+            background-color: #ffebee;
+            border: 2px solid #ef5350;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .warning-banner:hover {{
+            background-color: #ffcdd2;
+        }}
+        .warning-icon {{
+            font-size: 20px;
+            margin-right: 10px;
+        }}
+        .warning-text {{
+            flex: 1;
+            color: #c62828;
+        }}
+        .warning-btn {{
+            background-color: #ef5350;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }}
+        .warning-btn:hover {{
+            background-color: #e53935;
+        }}
+
+        /* 모달 스타일 */
+        .modal {{
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }}
+        .modal-content {{
+            background-color: #fff;
+            margin: 3% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 95%;
+            max-width: 1400px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }}
+        .modal-header {{
+            background-color: #6c757d;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .modal-header h3 {{
+            margin: 0;
+        }}
+        .modal-close {{
+            font-size: 28px;
+            cursor: pointer;
+            color: white;
+        }}
+        .modal-close:hover {{
+            color: #e9ecef;
+        }}
+        .modal-body {{
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }}
+
+        /* 탭 스타일 */
+        .tab-container {{
+            margin-bottom: 20px;
+        }}
+        .tab-buttons {{
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #dee2e6;
+        }}
+        .tab-btn {{
+            padding: 12px 24px;
+            border: none;
+            background-color: #e9ecef;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            color: #495057;
+            border-radius: 8px 8px 0 0;
+            margin-right: 4px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .tab-btn:hover {{
+            background-color: #dee2e6;
+        }}
+        .tab-btn.active {{
+            background-color: #fff;
+            color: #2c3e50;
+            border: 2px solid #dee2e6;
+            border-bottom: 2px solid #fff;
+            margin-bottom: -2px;
+            font-weight: 600;
+        }}
+        .tab-btn .count {{
+            background-color: #6c757d;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+        }}
+        .tab-btn.active .count {{
+            background-color: #2c3e50;
+        }}
+        .tab-btn .urgent-count {{
+            background-color: #dc3545;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+        }}
+        .tab-content {{
+            display: none;
+            background-color: #fff;
+            border: 2px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+        }}
+        .tab-content.active {{
+            display: block;
+        }}
+
         table {{
             width: 100%;
             border-collapse: collapse;
             background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }}
         th {{
             background-color: #34495e;
@@ -277,6 +565,12 @@ def generate_html_report(df):
         .normal-cell {{
             color: #2e7d32;
         }}
+        .empty-message {{
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-size: 16px;
+        }}
     </style>
 </head>
 <body>
@@ -285,67 +579,123 @@ def generate_html_report(df):
         <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
     </div>
 
+    {zero_stock_banner}
+
     <div class="summary">
         <h2>📊 요약</h2>
-        <p>총 약품 수: <strong>{len(df)}개</strong></p>
-        <p>  - 전문약: <strong>{dispense_count}개</strong> / 일반약: <strong>{sale_count}개</strong>{f' / 미분류: {unclassified_count}개' if unclassified_count > 0 else ''}</p>
-        <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{urgent_count}개</span></p>
+        <p>총 약품 수: <strong>{len(df)}개</strong> (전문약: {len(df[df['약품유형'] == '전문약'])}개 / 일반약: {len(df[df['약품유형'] == '일반약'])}개{f' / 미분류: {len(df[df["약품유형"] == "미분류"])}개' if len(df[df['약품유형'] == '미분류']) > 0 else ''})</p>
+        <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{total_urgent}개</span> (전문약: {dispense_urgent}개 / 일반약: {sale_urgent}개){f' + 재고 0 이하: <span class="urgent">{zero_stock_count}개</span>' if zero_stock_count > 0 else ''}</p>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>약품명</th>
-                <th>약품코드</th>
-                <th>제약회사</th>
-                <th>약품유형</th>
-                <th>현재 재고수량</th>
-                <th>1년 이동평균</th>
-                <th>3개월 이동평균</th>
-                <th>런웨이 (개월)</th>
-                <th>3-MA 런웨이 (개월)</th>
-            </tr>
-        </thead>
-        <tbody>
-"""
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('dispense')">
+                💊 전문약
+                <span class="count">{dispense_count}</span>
+                {f'<span class="urgent-count">긴급 {dispense_urgent}</span>' if dispense_urgent > 0 else ''}
+            </button>
+            <button class="tab-btn" onclick="switchTab('sale')">
+                💊 일반약
+                <span class="count">{sale_count}</span>
+                {f'<span class="urgent-count">긴급 {sale_urgent}</span>' if sale_urgent > 0 else ''}
+            </button>
+        </div>
 
-    for _, row in df.iterrows():
-        runway = row['런웨이']
-        ma3_runway = row['3-MA 런웨이']
+        <div id="dispense-tab" class="tab-content active">
+            {f'''<table>
+                <thead>
+                    <tr>
+                        <th>약품명</th>
+                        <th>약품코드</th>
+                        <th>제약회사</th>
+                        <th>현재 재고수량</th>
+                        <th>1년 이동평균</th>
+                        <th>3개월 이동평균</th>
+                        <th>런웨이 (개월)</th>
+                        <th>3-MA 런웨이 (개월)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {dispense_rows}
+                </tbody>
+            </table>''' if dispense_count > 0 else '<div class="empty-message">오늘 나간 전문약이 없습니다.</div>'}
+        </div>
 
-        # 런웨이 < 1인 경우 행 전체를 빨간색으로
-        row_class = 'urgent-row' if (runway < 1 or ma3_runway < 1) else ''
+        <div id="sale-tab" class="tab-content">
+            {f'''<table>
+                <thead>
+                    <tr>
+                        <th>약품명</th>
+                        <th>약품코드</th>
+                        <th>제약회사</th>
+                        <th>현재 재고수량</th>
+                        <th>1년 이동평균</th>
+                        <th>3개월 이동평균</th>
+                        <th>런웨이 (개월)</th>
+                        <th>3-MA 런웨이 (개월)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {sale_rows}
+                </tbody>
+            </table>''' if sale_count > 0 else '<div class="empty-message">오늘 나간 일반약이 없습니다.</div>'}
+        </div>
+    </div>
 
-        runway_class = 'urgent-cell' if runway < 1 else 'normal-cell'
-        ma3_runway_class = 'urgent-cell' if ma3_runway < 1 else 'normal-cell'
+    {zero_stock_modal}
 
-        runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
-        ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
+    <script>
+        function switchTab(tabName) {{
+            // 모든 탭 버튼 비활성화
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            // 모든 탭 컨텐츠 숨김
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-        # 약품유형에 따라 배지 스타일 적용
-        drug_type = row['약품유형']
-        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
+            // 선택된 탭 활성화
+            if (tabName === 'dispense') {{
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('dispense-tab').classList.add('active');
+            }} else {{
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('sale-tab').classList.add('active');
+            }}
+        }}
 
-        html += f"""
-            <tr class="{row_class}">
-                <td>{row['약품명']}</td>
-                <td>{row['약품코드']}</td>
-                <td>{row['제약회사']}</td>
-                <td><span style="background-color: {type_badge_color}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px;">{drug_type}</span></td>
-                <td>{row['현재 재고수량']:.0f}</td>
-                <td>{row['1년 이동평균']:.1f}</td>
-                <td>{row['3개월 이동평균']:.1f}</td>
-                <td class="{runway_class}">{runway_display}</td>
-                <td class="{ma3_runway_class}">{ma3_runway_display}</td>
-            </tr>
-"""
-
-    html += """
-        </tbody>
-    </table>
+        // 재고 0 이하 모달 열기/닫기
+        function openZeroStockModal() {{
+            document.getElementById('zeroStockModal').style.display = 'block';
+        }}
+        function closeZeroStockModal() {{
+            document.getElementById('zeroStockModal').style.display = 'none';
+        }}
+        // 모달 외부 클릭 시 닫기
+        window.onclick = function(event) {{
+            var modal = document.getElementById('zeroStockModal');
+            if (event.target == modal) {{
+                modal.style.display = 'none';
+            }}
+        }}
+    </script>
 </body>
 </html>
 """
+    return html
+
+
+def generate_html_report(df):
+    """HTML 보고서 생성 및 파일 저장 (CLI용 래퍼 함수)"""
+    print("\n📋 Step 4: HTML 보고서 생성")
+    print("-" * 30)
+
+    # 출력 디렉토리 생성
+    output_dir = 'order_calc_reports'
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = os.path.join(output_dir, f'order_calculator_report_{timestamp}.html')
+
+    # HTML 생성 (재사용 가능한 함수 호출)
+    html = generate_order_report_html(df)
 
     with open(filename, 'w', encoding='utf-8') as f:
         f.write(html)

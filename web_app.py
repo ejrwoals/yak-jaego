@@ -21,7 +21,7 @@ import pandas as pd
 # 로컬 모듈 import
 from generate_report import create_and_save_report
 from generate_single_ma_report import create_and_save_report as create_simple_report
-from drug_order_calculator import run as run_order_calculator
+from drug_order_calculator import run as run_order_calculator, generate_order_report_html
 import inventory_db
 import processed_inventory_db
 import inventory_updater
@@ -335,8 +335,15 @@ def calculate_order():
         html_path = os.path.join(report_dir, f'order_calculator_report_{timestamp}.html')
         csv_path = os.path.join(report_dir, f'order_calculator_report_{timestamp}.csv')
 
-        # HTML 생성
-        html_content = generate_order_report_html(df_merged)
+        # HTML 생성 (web_app.py 컬럼명 매핑)
+        col_map = {
+            'runway': '런웨이_1년평균',
+            'ma3_runway': '런웨이_3개월평균',
+            'stock': '현재_재고수량',
+            'ma12': '1년_이동평균',
+            'ma3': '3개월_이동평균'
+        }
+        html_content = generate_order_report_html(df_merged, col_map)
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
@@ -367,151 +374,6 @@ def calculate_order():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
-
-def generate_order_report_html(df):
-    """주문 계산 HTML 보고서 생성 (기존 drug_order_calculator.py 스타일)"""
-
-    # 런웨이 < 1인 약품 개수 확인
-    urgent_count = len(df[(df['런웨이_1년평균'] < 1) | (df['런웨이_3개월평균'] < 1)])
-
-    # 약품 유형별 개수
-    dispense_count = len(df[df['약품유형'] == '전문약'])
-    sale_count = len(df[df['약품유형'] == '일반약'])
-    unclassified_count = len(df[df['약품유형'] == '미분류'])
-
-    html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>약 주문 수량 산출 보고서</title>
-    <style>
-        body {{
-            font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }}
-        .header {{
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }}
-        .summary {{
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        .urgent {{
-            color: #e74c3c;
-            font-weight: bold;
-            font-size: 24px;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        th {{
-            background-color: #34495e;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: bold;
-        }}
-        td {{
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }}
-        tr:hover {{
-            background-color: #f9f9f9;
-        }}
-        .urgent-row {{
-            background-color: #ffebee !important;
-            font-weight: bold;
-        }}
-        .urgent-cell {{
-            color: #c62828;
-            font-weight: bold;
-        }}
-        .normal-cell {{
-            color: #2e7d32;
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>📦 약 주문 수량 산출 보고서</h1>
-        <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-    </div>
-
-    <div class="summary">
-        <h2>📊 요약</h2>
-        <p>총 약품 수: <strong>{len(df)}개</strong></p>
-        <p>  - 전문약: <strong>{dispense_count}개</strong> / 일반약: <strong>{sale_count}개</strong>{f' / 미분류: {unclassified_count}개' if unclassified_count > 0 else ''}</p>
-        <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{urgent_count}개</span></p>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>약품명</th>
-                <th>약품코드</th>
-                <th>제약회사</th>
-                <th>약품유형</th>
-                <th>현재 재고수량</th>
-                <th>1년 이동평균</th>
-                <th>3개월 이동평균</th>
-                <th>런웨이 (개월)</th>
-                <th>3-MA 런웨이 (개월)</th>
-            </tr>
-        </thead>
-        <tbody>
-"""
-
-    for _, row in df.iterrows():
-        runway = row['런웨이_1년평균']
-        ma3_runway = row['런웨이_3개월평균']
-
-        # 런웨이 < 1인 경우 행 전체를 빨간색으로
-        row_class = 'urgent-row' if (runway < 1 or ma3_runway < 1) else ''
-
-        runway_class = 'urgent-cell' if runway < 1 else 'normal-cell'
-        ma3_runway_class = 'urgent-cell' if ma3_runway < 1 else 'normal-cell'
-
-        runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
-        ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
-
-        # 약품유형에 따라 배지 스타일 적용
-        drug_type = row['약품유형']
-        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
-
-        html += f"""
-            <tr class="{row_class}">
-                <td>{row['약품명']}</td>
-                <td>{row['약품코드']}</td>
-                <td>{row['제약회사']}</td>
-                <td><span style="background-color: {type_badge_color}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px;">{drug_type}</span></td>
-                <td>{row['현재_재고수량']:.0f}</td>
-                <td>{row['1년_이동평균']:.1f}</td>
-                <td>{row['3개월_이동평균']:.1f}</td>
-                <td class="{runway_class}">{runway_display}</td>
-                <td class="{ma3_runway_class}">{ma3_runway_display}</td>
-            </tr>
-"""
-
-    html += """
-        </tbody>
-    </table>
-</body>
-</html>
-"""
-    return html
 
 
 @app.route('/api/list-reports/<report_type>')
