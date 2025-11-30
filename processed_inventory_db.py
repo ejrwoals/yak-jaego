@@ -313,6 +313,60 @@ def get_metadata():
         return None
 
 
+def update_drug_names(df, show_summary=True):
+    """
+    약품명과 제약회사만 업데이트 (시계열 통계는 유지)
+
+    recent_inventory 업데이트 시 processed_inventory의 약품명/제약회사도
+    동기화하기 위해 사용합니다.
+
+    Args:
+        df (pd.DataFrame): 업데이트할 데이터 (필수 컬럼: 약품코드, 약품명, 제약회사)
+        show_summary (bool): 결과 요약 출력 여부
+
+    Returns:
+        dict: 업데이트 결과 {'updated': int, 'not_found': int}
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        updated = 0
+        not_found = 0
+
+        for _, row in df.iterrows():
+            약품코드 = str(row['약품코드'])
+            약품명 = row['약품명']
+            제약회사 = row['제약회사']
+
+            # 해당 약품코드가 존재하는 경우에만 업데이트
+            cursor.execute(f'''
+                UPDATE {TABLE_NAME}
+                SET 약품명 = ?, 제약회사 = ?
+                WHERE 약품코드 = ?
+            ''', (약품명, 제약회사, 약품코드))
+
+            if cursor.rowcount > 0:
+                updated += 1
+            else:
+                not_found += 1
+
+        conn.commit()
+        conn.close()
+
+        if show_summary and updated > 0:
+            print(f"📊 processed_inventory 약품명 동기화:")
+            print(f"   - 업데이트: {updated}건")
+            if not_found > 0:
+                print(f"   - 미존재 (신규 약품): {not_found}건")
+
+        return {'updated': updated, 'not_found': not_found}
+
+    except Exception as e:
+        print(f"❌ 약품명 업데이트 실패: {e}")
+        return {'updated': 0, 'not_found': 0}
+
+
 def db_exists():
     """
     데이터베이스 파일 존재 여부 확인
