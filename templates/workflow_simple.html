@@ -302,6 +302,161 @@
         .exit-btn:active {
             transform: translateY(0);
         }
+
+        /* Runway Slider Styles */
+        .runway-slider-container {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .runway-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .runway-label {
+            font-size: 0.9em;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 15px;
+        }
+
+        .runway-label.shortage {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .runway-label.sufficient {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .runway-label.excess {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .runway-bar {
+            position: relative;
+            height: 40px;
+            background: #e2e8f0;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .runway-segment {
+            height: 100%;
+            transition: width 0.1s ease;
+        }
+
+        .runway-segment.shortage {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        .runway-segment.sufficient {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+        }
+
+        .runway-segment.excess {
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+        }
+
+        .runway-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 48px;
+            background: white;
+            border: 3px solid #555;
+            border-radius: 8px;
+            cursor: ew-resize;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: box-shadow 0.2s, transform 0.1s;
+        }
+
+        .runway-handle:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .runway-handle:active {
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+
+        .runway-handle::before {
+            content: '⋮';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #555;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .runway-scale {
+            position: relative;
+            height: 20px;
+            font-size: 0.85em;
+            color: #718096;
+            margin-bottom: 15px;
+        }
+
+        .runway-scale span {
+            position: absolute;
+            transform: translateX(-50%);
+        }
+
+        .runway-scale span:first-child {
+            left: 0;
+            transform: translateX(0);
+        }
+
+        .runway-scale span:last-child {
+            left: 100%;
+            transform: translateX(-100%);
+        }
+
+        .runway-values {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .runway-value-box {
+            text-align: center;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            min-width: 120px;
+        }
+
+        .runway-value-label {
+            display: block;
+            font-size: 0.8em;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .runway-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .runway-value-unit {
+            font-size: 0.9em;
+            color: #718096;
+            margin-left: 2px;
+        }
     </style>
 </head>
 <body>
@@ -359,6 +514,47 @@
                         <option value="12">12개월 (장기 트렌드)</option>
                     </select>
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    런웨이 구간 설정
+                    <span class="tooltip" title="런웨이(재고 소진 예상 기간) 기준으로&#10;약품을 부족/충분/과다로 분류합니다.&#10;핸들을 드래그하여 경계값을 조정하세요.">ⓘ</span>
+                </label>
+                <div class="runway-slider-container">
+                    <div class="runway-labels">
+                        <span class="runway-label shortage">🟡 부족</span>
+                        <span class="runway-label sufficient">🟢 충분</span>
+                        <span class="runway-label excess">🔵 과다</span>
+                    </div>
+                    <div class="runway-bar">
+                        <div class="runway-segment shortage" id="segment-shortage"></div>
+                        <div class="runway-segment sufficient" id="segment-sufficient"></div>
+                        <div class="runway-segment excess" id="segment-excess"></div>
+                        <div class="runway-handle" id="handle-low" title="부족/충분 경계"></div>
+                        <div class="runway-handle" id="handle-high" title="충분/과다 경계"></div>
+                    </div>
+                    <div class="runway-scale">
+                        <span>0</span>
+                        <span id="scale-low">2</span>
+                        <span id="scale-high">6</span>
+                        <span>24+</span>
+                    </div>
+                    <div class="runway-values">
+                        <div class="runway-value-box">
+                            <span class="runway-value-label">부족/충분 경계</span>
+                            <span class="runway-value" id="value-low">2</span>
+                            <span class="runway-value-unit">개월</span>
+                        </div>
+                        <div class="runway-value-box">
+                            <span class="runway-value-label">충분/과다 경계</span>
+                            <span class="runway-value" id="value-high">6</span>
+                            <span class="runway-value-unit">개월</span>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="threshold_low" id="threshold_low" value="2">
+                <input type="hidden" name="threshold_high" id="threshold_high" value="6">
             </div>
 
             <button type="submit" class="submit-btn" id="submitBtn">
@@ -434,6 +630,111 @@
                     });
             }
         }
+
+        // Runway Slider Logic
+        (function() {
+            const MAX_VALUE = 24;
+            let lowValue = 2;
+            let highValue = 6;
+
+            const bar = document.querySelector('.runway-bar');
+            const handleLow = document.getElementById('handle-low');
+            const handleHigh = document.getElementById('handle-high');
+            const segmentShortage = document.getElementById('segment-shortage');
+            const segmentSufficient = document.getElementById('segment-sufficient');
+            const segmentExcess = document.getElementById('segment-excess');
+            const scaleLow = document.getElementById('scale-low');
+            const scaleHigh = document.getElementById('scale-high');
+            const valueLow = document.getElementById('value-low');
+            const valueHigh = document.getElementById('value-high');
+            const inputLow = document.getElementById('threshold_low');
+            const inputHigh = document.getElementById('threshold_high');
+
+            function updateUI() {
+                const lowPercent = (lowValue / MAX_VALUE) * 100;
+                const highPercent = (highValue / MAX_VALUE) * 100;
+
+                // Update segments
+                segmentShortage.style.width = lowPercent + '%';
+                segmentSufficient.style.width = (highPercent - lowPercent) + '%';
+                segmentExcess.style.width = (100 - highPercent) + '%';
+
+                // Update handles
+                handleLow.style.left = lowPercent + '%';
+                handleHigh.style.left = highPercent + '%';
+
+                // Update scale labels (position and text)
+                scaleLow.textContent = lowValue;
+                scaleHigh.textContent = highValue;
+                scaleLow.style.left = lowPercent + '%';
+                scaleHigh.style.left = highPercent + '%';
+
+                // Update value displays
+                valueLow.textContent = lowValue;
+                valueHigh.textContent = highValue;
+
+                // Update hidden inputs
+                inputLow.value = lowValue;
+                inputHigh.value = highValue;
+            }
+
+            function getValueFromPosition(clientX) {
+                const rect = bar.getBoundingClientRect();
+                const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                return Math.round(percent * MAX_VALUE);
+            }
+
+            function makeDraggable(handle, isLow) {
+                let isDragging = false;
+
+                function startDrag(e) {
+                    isDragging = true;
+                    e.preventDefault();
+                    document.body.style.cursor = 'ew-resize';
+                    document.body.style.userSelect = 'none';
+                }
+
+                function doDrag(e) {
+                    if (!isDragging) return;
+
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    let newValue = getValueFromPosition(clientX);
+
+                    if (isLow) {
+                        // Low handle: min 1, max is highValue - 1
+                        newValue = Math.max(1, Math.min(newValue, highValue - 1));
+                        lowValue = newValue;
+                    } else {
+                        // High handle: min is lowValue + 1, max is MAX_VALUE - 1
+                        newValue = Math.max(lowValue + 1, Math.min(newValue, MAX_VALUE - 1));
+                        highValue = newValue;
+                    }
+
+                    updateUI();
+                }
+
+                function endDrag() {
+                    isDragging = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+
+                // Mouse events
+                handle.addEventListener('mousedown', startDrag);
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('mouseup', endDrag);
+
+                // Touch events
+                handle.addEventListener('touchstart', startDrag);
+                document.addEventListener('touchmove', doDrag);
+                document.addEventListener('touchend', endDrag);
+            }
+
+            // Initialize
+            makeDraggable(handleLow, true);
+            makeDraggable(handleHigh, false);
+            updateUI();
+        })();
     </script>
 </body>
 </html>

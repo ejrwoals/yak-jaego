@@ -104,12 +104,14 @@ def create_chart_data_json(months, timeseries_data, ma_data, avg, drug_name, dru
         'runway': runway
     }, ensure_ascii=False)
 
-def generate_html_report(df, months, mode='dispense', ma_months=3):
+def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low=3, threshold_high=12):
     """
     DataFrame을 HTML 보고서로 생성 (Single MA 버전)
     months: 월 리스트 (예: ['2025-01', '2025-02', ...])
     mode: 'dispense' (전문약) 또는 'sale' (일반약)
     ma_months: 이동평균 개월 수
+    threshold_low: 부족/충분 경계 (개월)
+    threshold_high: 충분/과다 경계 (개월)
     """
 
     # 모드에 따른 제목 설정
@@ -543,7 +545,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
     urgent_drugs, dead_stock_drugs, negative_stock_drugs = classify_drugs_by_special_cases(df, ma_months)
 
     # 런웨이 분석 차트 생성 + 부족/충분/과다 약품 DataFrame
-    runtime_analysis_low, runtime_analysis_high, runtime_analysis_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df = analyze_runway(df, months, ma_months)
+    runtime_analysis_low, runtime_analysis_high, runtime_analysis_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df = analyze_runway(df, months, ma_months, threshold_low, threshold_high)
 
     # 전체 약품 수
     total_count = len(df)
@@ -682,7 +684,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     # 재고 부족 약품 모달 (테이블 + 차트 토글)
     if has_low_runway:
-        low_section_html = generate_low_stock_section(low_drugs_df, ma_months, months)
+        low_section_html = generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low)
         html_content += f"""
             <!-- 재고 부족 약품 모달 -->
             <div id="low-modal" class="category-modal">
@@ -690,7 +692,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     <div class="category-modal-header">
                         <h2 style="margin: 0; color: #ca8a04; display: flex; align-items: center; gap: 10px;">
                             <span style="font-size: 1.5em;">🟡</span>
-                            <span>재고 부족 약품 (런웨이 3개월 이하)</span>
+                            <span>재고 부족 약품 (런웨이 {threshold_low}개월 이하)</span>
                         </h2>
                         <div style="display: flex; align-items: center; gap: 15px;">
                             <button id="toggle-view-low" class="nav-btn" onclick="toggleLowView()">📊 막대 그래프 보기</button>
@@ -747,7 +749,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
 
     # 재고 충분 약품 모달 (테이블 + 차트 토글)
     if has_high_runway:
-        high_section_html = generate_high_stock_section(high_drugs_df, ma_months, months)
+        high_section_html = generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low, threshold_high)
         html_content += f"""
             <!-- 재고 충분 약품 모달 -->
             <div id="high-modal" class="category-modal">
@@ -755,7 +757,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     <div class="category-modal-header">
                         <h2 style="margin: 0; color: #16a34a; display: flex; align-items: center; gap: 10px;">
                             <span style="font-size: 1.5em;">🟢</span>
-                            <span>재고 충분 약품 (런웨이 3개월 초과)</span>
+                            <span>재고 충분 약품 (런웨이 {threshold_low}~{threshold_high}개월)</span>
                         </h2>
                         <div style="display: flex; align-items: center; gap: 15px;">
                             <button id="toggle-view-high" class="nav-btn" onclick="toggleHighView()">📊 막대 그래프 보기</button>
@@ -810,9 +812,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
             </script>
         """
 
-    # 과다 재고 모달 (런웨이 12개월 초과)
+    # 과다 재고 모달 (런웨이 threshold_high 초과)
     if has_excess_runway:
-        excess_section_html = generate_excess_stock_section(excess_drugs_df, ma_months, months)
+        excess_section_html = generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_high)
         html_content += f"""
             <!-- 과다 재고 약품 모달 -->
             <div id="excess-modal" class="category-modal">
@@ -820,7 +822,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3):
                     <div class="category-modal-header">
                         <h2 style="margin: 0; color: #2563eb; display: flex; align-items: center; gap: 10px;">
                             <span style="font-size: 1.5em;">🔵</span>
-                            <span>과다 재고 약품 (런웨이 12개월 초과)</span>
+                            <span>과다 재고 약품 (런웨이 {threshold_high}개월 초과)</span>
                         </h2>
                         <div style="display: flex; align-items: center; gap: 15px;">
                             <button id="toggle-view-excess" class="nav-btn" onclick="toggleExcessView()">📊 막대 그래프 보기</button>
@@ -2048,7 +2050,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
 
     return html
 
-def generate_low_stock_section(low_drugs_df, ma_months, months):
+def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3):
     """재고 부족 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모 + 인라인 차트) - 모달용"""
     import json
 
@@ -2062,7 +2064,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months):
     html = f"""
                     <div style="padding: 15px; background: #fffbeb; border-radius: 8px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #ca8a04; font-weight: bold;">
-                            ⚠️ 총 {len(low_drugs_df)}개 약품의 런웨이가 3개월 이하입니다. 재고 보충을 고려하세요.
+                            ⚠️ 총 {len(low_drugs_df)}개 약품의 런웨이가 {threshold_low}개월 이하입니다. 재고 보충을 고려하세요.
                         </p>
                     </div>
                     <div class="table-container">
@@ -2180,7 +2182,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months):
 
     return html
 
-def generate_high_stock_section(high_drugs_df, ma_months, months):
+def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=3, threshold_high=12):
     """재고 충분 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모 + 인라인 차트) - 모달용"""
     import json
 
@@ -2194,7 +2196,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months):
     html = f"""
                     <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #16a34a; font-weight: bold;">
-                            ✅ 총 {len(high_drugs_df)}개 약품의 런웨이가 3개월을 초과합니다. 재고가 충분합니다.
+                            ✅ 총 {len(high_drugs_df)}개 약품의 런웨이가 {threshold_low}~{threshold_high}개월입니다. 재고가 충분합니다.
                         </p>
                     </div>
                     <div class="table-container">
@@ -2308,10 +2310,10 @@ def generate_high_stock_section(high_drugs_df, ma_months, months):
     return html
 
 
-def generate_excess_stock_section(excess_drugs_df, ma_months, months):
+def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_high=12):
     """과다 재고 약품 섹션 HTML 생성 (테이블 형식 + 체크박스/메모 + 인라인 차트) - 모달용
 
-    런웨이가 12개월을 초과하는 약품들 (유효기간 만료 위험)
+    런웨이가 threshold_high개월을 초과하는 약품들 (유효기간 만료 위험)
     """
     import json
 
@@ -2325,10 +2327,10 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months):
     html = f"""
                     <div style="padding: 15px; background: #eff6ff; border-radius: 8px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #2563eb; font-weight: bold;">
-                            📦 총 {len(excess_drugs_df)}개 약품의 런웨이가 12개월을 초과합니다.
+                            📦 총 {len(excess_drugs_df)}개 약품의 런웨이가 {threshold_high}개월을 초과합니다.
                         </p>
                         <p style="margin: 5px 0 0 0; color: #3b82f6; font-size: 14px;">
-                            💡 재고 소진에 1년 이상 걸리므로, 유효기간 만료 전에 사용하지 못할 수 있습니다. 재고 조정을 고려해보세요.
+                            💡 재고 소진에 {threshold_high}개월 이상 걸리므로, 유효기간 만료 전에 사용하지 못할 수 있습니다. 재고 조정을 고려해보세요.
                         </p>
                     </div>
                     <div class="table-container">
@@ -2834,20 +2836,24 @@ def generate_hidden_drugs_section(df, ma_months, months):
     return html
 
 
-def analyze_runway(df, months, ma_months):
+def analyze_runway(df, months, ma_months, threshold_low=3, threshold_high=12):
     """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - N-MA 런웨이 기준
+
+    Args:
+        threshold_low: 부족/충분 경계 (개월)
+        threshold_high: 충분/과다 경계 (개월)
 
     Returns:
         tuple: (chart_js_low, chart_js_high, chart_js_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df)
     """
     try:
         # N-MA 런웨이를 숫자로 변환 (개월 단위)
-        low_data = []  # 3개월 이하 (차트용) - 부족
-        high_data = []  # 3개월 초과 ~ 12개월 이하 (차트용) - 충분
-        excess_data = []  # 12개월 초과 (차트용) - 과다
-        low_drugs_list = []  # 3개월 이하 (테이블용) - 부족
-        high_drugs_list = []  # 3개월 초과 ~ 12개월 이하 (테이블용) - 충분
-        excess_drugs_list = []  # 12개월 초과 (테이블용) - 과다
+        low_data = []  # threshold_low 이하 (차트용) - 부족
+        high_data = []  # threshold_low 초과 ~ threshold_high 이하 (차트용) - 충분
+        excess_data = []  # threshold_high 초과 (차트용) - 과다
+        low_drugs_list = []  # threshold_low 이하 (테이블용) - 부족
+        high_drugs_list = []  # threshold_low 초과 ~ threshold_high 이하 (테이블용) - 충분
+        excess_drugs_list = []  # threshold_high 초과 (테이블용) - 과다
 
         for idx, row in df.iterrows():
             # N개월 이동평균 계산
@@ -2884,16 +2890,16 @@ def analyze_runway(df, months, ma_months):
                     '월별_조제수량_리스트': timeseries
                 }
 
-                if ma_runway_months <= 3:
-                    # 부족: 런웨이 3개월 이하
+                if ma_runway_months <= threshold_low:
+                    # 부족: 런웨이 threshold_low 이하
                     low_data.append(data_tuple)
                     low_drugs_list.append(drug_data)
-                elif ma_runway_months <= 12:
-                    # 충분: 런웨이 3개월 초과 ~ 12개월 이하
+                elif ma_runway_months <= threshold_high:
+                    # 충분: 런웨이 threshold_low 초과 ~ threshold_high 이하
                     high_data.append(data_tuple)
                     high_drugs_list.append(drug_data)
                 else:
-                    # 과다: 런웨이 12개월 초과
+                    # 과다: 런웨이 threshold_high 초과
                     excess_data.append(data_tuple)
                     excess_drugs_list.append(drug_data)
 
@@ -3226,7 +3232,7 @@ def analyze_runway(df, months, ma_months):
         traceback.print_exc()
     return None, None, None, 0, 0, 0, pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-def create_and_save_report(df, months, mode='dispense', ma_months=3, open_browser=True):
+def create_and_save_report(df, months, mode='dispense', ma_months=3, threshold_low=3, threshold_high=12, open_browser=True):
     """보고서를 생성하고 파일로 저장하는 함수
 
     Args:
@@ -3234,10 +3240,13 @@ def create_and_save_report(df, months, mode='dispense', ma_months=3, open_browse
         months: 월 리스트
         mode: 'dispense' (전문약) 또는 'sale' (일반약)
         ma_months: 이동평균 개월 수
+        threshold_low: 부족/충분 경계 (개월)
+        threshold_high: 충분/과다 경계 (개월)
         open_browser: 브라우저에서 자동으로 열기 여부
     """
     print("\n=== 단순 보고서 생성 준비 ===")
     print(f"   이동평균 기간: {ma_months}개월")
+    print(f"   런웨이 경계값: 부족≤{threshold_low} < 충분≤{threshold_high} < 과다")
 
     # 1. SQLite DB에서 최신 재고 데이터 가져오기
     if not inventory_db.db_exists():
@@ -3287,7 +3296,8 @@ def create_and_save_report(df, months, mode='dispense', ma_months=3, open_browse
 
     # HTML 보고서 생성
     print("\n📝 HTML 보고서 생성 중...")
-    html_content = generate_html_report(df_final, months, mode=mode, ma_months=ma_months)
+    html_content = generate_html_report(df_final, months, mode=mode, ma_months=ma_months,
+                                        threshold_low=threshold_low, threshold_high=threshold_high)
 
     # 파일명에 모드 및 MA 개월 수 반영
     mode_suffix = 'dispense' if mode == 'dispense' else 'sale'

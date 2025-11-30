@@ -170,12 +170,17 @@ def generate_simple_report_route():
     try:
         mode = request.form.get('mode', 'dispense')
         ma_months = int(request.form.get('ma_months', 3))
+        threshold_low = int(request.form.get('threshold_low', 3))
+        threshold_high = int(request.form.get('threshold_high', 12))
 
         if mode not in ['dispense', 'sale']:
             return jsonify({'status': 'error', 'message': '잘못된 보고서 유형입니다.'}), 400
 
         if not (1 <= ma_months <= 12):
             return jsonify({'status': 'error', 'message': '이동평균 개월 수는 1~12 사이여야 합니다.'}), 400
+
+        if not (1 <= threshold_low < threshold_high <= 24):
+            return jsonify({'status': 'error', 'message': '경계값 설정이 올바르지 않습니다.'}), 400
 
         # 약품 유형 결정
         drug_type = '전문약' if mode == 'dispense' else '일반약'
@@ -209,7 +214,9 @@ def generate_simple_report_route():
             months = [f"Month {i+1}" for i in range(num_months)]
 
         # HTML 보고서 생성 (브라우저 자동 열기 비활성화)
-        report_path = create_simple_report(df, months, mode=mode, ma_months=ma_months, open_browser=False)
+        report_path = create_simple_report(df, months, mode=mode, ma_months=ma_months,
+                                           threshold_low=threshold_low, threshold_high=threshold_high,
+                                           open_browser=False)
 
         # 파일명만 추출
         report_filename = os.path.basename(report_path)
