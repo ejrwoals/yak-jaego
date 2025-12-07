@@ -244,7 +244,7 @@ def generate_table_rows(df, col_map=None):
 
 
 def generate_zero_stock_table_rows(df, col_map):
-    """재고 0 이하 약품 테이블 행 HTML 생성 (약품유형 포함)"""
+    """음수 재고 약품 테이블 행 HTML 생성 (약품유형 포함)"""
     cm = col_map
     rows = ""
     for _, row in df.iterrows():
@@ -287,15 +287,15 @@ def generate_order_report_html(df, col_map=None):
     }
     cm = col_map if col_map else default_map
 
-    # 재고 0 이하 약품 분리 (전문약/일반약 혼합), 재고 오름차순 정렬 (큰 마이너스가 위로)
-    zero_stock_df = df[df[cm['stock']] <= 0].copy()
+    # 음수 재고 약품 분리 (전문약/일반약 혼합), 재고 오름차순 정렬 (큰 마이너스가 위로)
+    zero_stock_df = df[df[cm['stock']] < 0].copy()
     zero_stock_df = zero_stock_df.sort_values(cm['stock'], ascending=True)
     zero_stock_count = len(zero_stock_df)
 
-    # 재고 0 이하 약품은 탭 테이블에서 제외
-    normal_df = df[df[cm['stock']] > 0].copy()
+    # 음수 재고 약품만 탭 테이블에서 제외 (재고 0인 약품은 메인 테이블에 표시)
+    normal_df = df[df[cm['stock']] >= 0].copy()
 
-    # 약품 유형별 분리 (재고 > 0인 약품만)
+    # 약품 유형별 분리 (재고 >= 0인 약품만, 음수 재고는 모달에서 별도 표시)
     dispense_df = normal_df[normal_df['약품유형'] == '전문약'].copy()
     sale_df = normal_df[normal_df['약품유형'] == '일반약'].copy()
     unclassified_df = normal_df[normal_df['약품유형'] == '미분류'].copy()
@@ -315,25 +315,25 @@ def generate_order_report_html(df, col_map=None):
     sale_rows = generate_table_rows(sale_df, cm)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
 
-    # 재고 0 이하 경고 배너 HTML
+    # 음수 재고 경고 배너 HTML
     zero_stock_banner = f"""
     <div class="warning-banner" onclick="openZeroStockModal()">
         <span class="warning-icon">⚠️</span>
-        <span class="warning-text">재고 부족/음수 경고: <strong>{zero_stock_count}개</strong> 약품의 재고가 0 이하입니다</span>
+        <span class="warning-text">음수 재고 경고: <strong>{zero_stock_count}개</strong> 약품의 재고가 0 미만입니다</span>
         <button class="warning-btn">확인하기</button>
     </div>
     """ if zero_stock_count > 0 else ""
 
-    # 재고 0 이하 모달 HTML
+    # 음수 재고 모달 HTML
     zero_stock_modal = f"""
     <div id="zeroStockModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>⚠️ 재고 부족/음수 약품 ({zero_stock_count}개)</h3>
+                <h3>⚠️ 음수 재고 약품 ({zero_stock_count}개)</h3>
                 <span class="modal-close" onclick="closeZeroStockModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">재고가 0 이하인 약품입니다. 즉시 주문이 필요합니다.</p>
+                <p style="color: #666; margin-bottom: 15px;">재고가 0 미만인 약품입니다. 즉시 주문이 필요합니다.</p>
                 <table>
                     <thead>
                         <tr>
@@ -584,7 +584,7 @@ def generate_order_report_html(df, col_map=None):
     <div class="summary">
         <h2>📊 요약</h2>
         <p>총 약품 수: <strong>{len(df)}개</strong> (전문약: {len(df[df['약품유형'] == '전문약'])}개 / 일반약: {len(df[df['약품유형'] == '일반약'])}개{f' / 미분류: {len(df[df["약품유형"] == "미분류"])}개' if len(df[df['약품유형'] == '미분류']) > 0 else ''})</p>
-        <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{total_urgent}개</span> (전문약: {dispense_urgent}개 / 일반약: {sale_urgent}개){f' + 재고 0 이하: <span class="urgent">{zero_stock_count}개</span>' if zero_stock_count > 0 else ''}</p>
+        <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{total_urgent}개</span> (전문약: {dispense_urgent}개 / 일반약: {sale_urgent}개){f' + 음수 재고: <span class="urgent">{zero_stock_count}개</span>' if zero_stock_count > 0 else ''}</p>
     </div>
 
     <div class="tab-container">
