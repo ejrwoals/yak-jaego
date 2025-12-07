@@ -8,6 +8,7 @@
 """
 
 import os
+import html
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -265,7 +266,7 @@ def generate_table_rows(df, col_map=None, months=None):
             'runway': runway_display,
             'ma3_runway': ma3_runway_display
         }
-        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
 
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
