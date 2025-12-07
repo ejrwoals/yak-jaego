@@ -249,6 +249,31 @@ def generate_table_rows(df, col_map=None, months=None):
         runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
         ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
 
+        # 트렌드 아이콘 계산 (3개월 평균 vs 1년 평균, ±15% 임계값)
+        ma12_val = float(row[cm['ma12']]) if not pd.isna(row[cm['ma12']]) else 0
+        ma3_val = float(row[cm['ma3']]) if not pd.isna(row[cm['ma3']]) else 0
+
+        if ma12_val == 0 and ma3_val > 0:
+            trend_icon = '📈'  # 신규 사용 시작
+            trend_class = 'trend-up'
+        elif ma12_val > 0 and ma3_val == 0:
+            trend_icon = '📉'  # 사용 중단
+            trend_class = 'trend-down'
+        elif ma12_val == 0 and ma3_val == 0:
+            trend_icon = '➖'  # 둘 다 0
+            trend_class = 'trend-stable'
+        else:
+            ratio = ma3_val / ma12_val
+            if ratio > 1.15:
+                trend_icon = '📈'  # 상승 (15% 초과)
+                trend_class = 'trend-up'
+            elif ratio < 0.85:
+                trend_icon = '📉'  # 하락 (15% 미만)
+                trend_class = 'trend-down'
+            else:
+                trend_icon = '➖'  # 유지 (±15% 이내)
+                trend_class = 'trend-stable'
+
         # 인라인 차트용 데이터 생성
         drug_code = str(row['약품코드'])
         timeseries = parse_list_string(row.get('월별_조제수량_리스트', []))
@@ -271,15 +296,17 @@ def generate_table_rows(df, col_map=None, months=None):
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
                 data-chart-data='{chart_data_json}'
-                onclick="toggleInlineChart(this, '{drug_code}')">
-                <td>{row['약품명']}</td>
+                onclick="toggleInlineChart(this, '{drug_code}')"
+                title="클릭하여 상세 차트 및 주문량 계산기 보기">
+                <td title="{html.escape(str(row['약품명']))}">{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
-                <td>{row['제약회사']}</td>
+                <td title="{html.escape(str(row['제약회사']))}">{row['제약회사']}</td>
                 <td>{row[cm['stock']]:.0f}</td>
                 <td>{row[cm['ma12']]:.1f}</td>
                 <td>{row[cm['ma3']]:.1f}</td>
                 <td class="{runway_class}">{runway_display}</td>
                 <td class="{ma3_runway_class}">{ma3_runway_display}</td>
+                <td class="{trend_class}" style="text-align: center; font-size: 16px;">{trend_icon}</td>
             </tr>
 """
     return rows
@@ -421,17 +448,148 @@ def generate_order_report_html(df, col_map=None, months=None):
             border-radius: 8px;
             margin-bottom: 20px;
         }}
-        .summary {{
+        /* 요약 대시보드 스타일 */
+        .summary-dashboard {{
             background-color: #fff;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 12px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }}
-        .urgent {{
-            color: #e74c3c;
-            font-weight: bold;
+        .summary-dashboard h2 {{
+            margin: 0 0 20px 0;
+            color: #2d3748;
+            font-size: 18px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+        }}
+        .summary-cards {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }}
+        .summary-card {{
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }}
+        .summary-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }}
+        .summary-card .icon {{
             font-size: 24px;
+            margin-bottom: 8px;
+        }}
+        .summary-card .label {{
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 4px;
+        }}
+        .summary-card .value {{
+            font-size: 32px;
+            font-weight: bold;
+            color: #2d3748;
+        }}
+        .summary-card .unit {{
+            font-size: 14px;
+            color: #718096;
+            font-weight: normal;
+        }}
+        .summary-card.dispense {{
+            border-left: 4px solid #3182ce;
+        }}
+        .summary-card.sale {{
+            border-left: 4px solid #38a169;
+        }}
+        .summary-card.total {{
+            border-left: 4px solid #805ad5;
+        }}
+        .urgent-section {{
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }}
+        .urgent-section h3 {{
+            margin: 0 0 12px 0;
+            color: #4a5568;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .urgent-cards {{
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }}
+        .urgent-card {{
+            background: white;
+            border-radius: 8px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid #e2e8f0;
+        }}
+        .urgent-card .dot {{
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #718096;
+        }}
+        .urgent-card .type {{
+            font-size: 13px;
+            color: #718096;
+        }}
+        .urgent-card .count {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #2d3748;
+        }}
+        .urgent-card.total-urgent {{
+            background: #4a5568;
+            border-color: #4a5568;
+        }}
+        .urgent-card.total-urgent .type,
+        .urgent-card.total-urgent .count {{
+            color: white;
+        }}
+        .urgent-card.total-urgent .dot {{
+            background: white;
+        }}
+        .negative-stock-alert {{
+            background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);
+            border: 1px solid #ed8936;
+            border-radius: 8px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .negative-stock-alert:hover {{
+            background: linear-gradient(135deg, #feebc8 0%, #fbd38d 100%);
+        }}
+        .negative-stock-alert .icon {{
+            font-size: 20px;
+        }}
+        .negative-stock-alert .text {{
+            flex: 1;
+            font-size: 14px;
+            color: #c05621;
+        }}
+        .negative-stock-alert .count {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #c05621;
         }}
 
         /* 경고 배너 스타일 */
@@ -564,7 +722,7 @@ def generate_order_report_html(df, col_map=None, months=None):
             background-color: #2c3e50;
         }}
         .tab-btn .urgent-count {{
-            background-color: #dc3545;
+            background-color: #dd6b20;
             color: white;
             padding: 2px 8px;
             border-radius: 12px;
@@ -586,6 +744,7 @@ def generate_order_report_html(df, col_map=None, months=None):
             width: 100%;
             border-collapse: collapse;
             background-color: white;
+            table-layout: fixed;
         }}
         th {{
             background-color: #34495e;
@@ -594,19 +753,31 @@ def generate_order_report_html(df, col_map=None, months=None):
             text-align: left;
             font-weight: bold;
         }}
+        /* 컬럼 너비 지정 */
+        th:nth-child(1), td:nth-child(1) {{ width: 40%; }}  /* 약품명 */
+        th:nth-child(2), td:nth-child(2) {{ width: 7%; }}   /* 약품코드 */
+        th:nth-child(3), td:nth-child(3) {{ width: 9%; }}   /* 제약회사 */
+        th:nth-child(4), td:nth-child(4) {{ width: 5%; }}   /* 현재 재고 */
+        th:nth-child(5), td:nth-child(5) {{ width: 6%; }}   /* 1년 평균 */
+        th:nth-child(6), td:nth-child(6) {{ width: 7%; }}   /* 3개월 평균 */
+        th:nth-child(7), td:nth-child(7) {{ width: 7%; }}   /* 런웨이 */
+        th:nth-child(8), td:nth-child(8) {{ width: 7%; }}   /* 3-MA 런웨이 */
+        th:nth-child(9), td:nth-child(9) {{ width: 5%; }}   /* 트렌드 */
         td {{
             padding: 10px;
             border-bottom: 1px solid #ddd;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }}
         tr:hover {{
             background-color: #f9f9f9;
         }}
         .urgent-row {{
-            background-color: #ffebee !important;
-            font-weight: bold;
+            background-color: #fffbeb !important;
         }}
         .urgent-cell {{
-            color: #c62828;
+            color: #c05621;
             font-weight: bold;
         }}
         .normal-cell {{
@@ -626,6 +797,17 @@ def generate_order_report_html(df, col_map=None, months=None):
         }}
         .clickable-row:hover {{
             background-color: #edf2f7 !important;
+        }}
+
+        /* 트렌드 아이콘 스타일 */
+        .trend-up {{
+            color: #e53e3e;
+        }}
+        .trend-down {{
+            color: #3182ce;
+        }}
+        .trend-stable {{
+            color: #718096;
         }}
         .clickable-row.chart-expanded {{
             background-color: rgba(79, 172, 254, 0.15) !important;
@@ -776,11 +958,26 @@ def generate_order_report_html(df, col_map=None, months=None):
 
     {zero_stock_banner}
 
-    <div class="summary">
-        <h2>📊 요약</h2>
-        <p>총 약품 수: <strong>{len(df)}개</strong> (전문약: {len(df[df['약품유형'] == '전문약'])}개 / 일반약: {len(df[df['약품유형'] == '일반약'])}개{f' / 미분류: {len(df[df["약품유형"] == "미분류"])}개' if len(df[df['약품유형'] == '미분류']) > 0 else ''})</p>
-        <p>긴급 주문 필요 (런웨이 < 1개월): <span class="urgent">{total_urgent}개</span> (전문약: {dispense_urgent}개 / 일반약: {sale_urgent}개){f' + 음수 재고: <span class="urgent">{zero_stock_count}개</span>' if zero_stock_count > 0 else ''}</p>
-    </div>
+    {f'''<div class="urgent-section">
+        <h3>🚨 긴급 주문 필요 (런웨이 &lt; 1개월)</h3>
+        <div class="urgent-cards">
+            <div class="urgent-card">
+                <span class="dot" style="background: #3182ce;"></span>
+                <span class="type">전문약</span>
+                <span class="count">{dispense_urgent}개</span>
+            </div>
+            <div class="urgent-card">
+                <span class="dot" style="background: #38a169;"></span>
+                <span class="type">일반약</span>
+                <span class="count">{sale_urgent}개</span>
+            </div>
+            <div class="urgent-card total-urgent">
+                <span class="dot"></span>
+                <span class="type">합계</span>
+                <span class="count">{total_urgent}개</span>
+            </div>
+        </div>
+    </div>''' if total_urgent > 0 else ''}
 
     <div class="tab-container">
         <div class="tab-buttons">
@@ -808,6 +1005,7 @@ def generate_order_report_html(df, col_map=None, months=None):
                         <th>3개월 이동평균</th>
                         <th>런웨이 (개월)</th>
                         <th>3-MA 런웨이 (개월)</th>
+                        <th>트렌드</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -828,6 +1026,7 @@ def generate_order_report_html(df, col_map=None, months=None):
                         <th>3개월 이동평균</th>
                         <th>런웨이 (개월)</th>
                         <th>3-MA 런웨이 (개월)</th>
+                        <th>트렌드</th>
                     </tr>
                 </thead>
                 <tbody>
