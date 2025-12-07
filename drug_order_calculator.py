@@ -165,9 +165,10 @@ def merge_and_calculate(today_df, processed_df):
     processed_df['1년 이동평균'] = processed_df['1년_이동평균']  # DB에서 이미 계산된 값 사용
     processed_df['3개월 이동평균'] = parse_list_column(processed_df['3개월_이동평균_리스트'])
 
-    # 약품코드를 기준으로 병합 (약품유형 컬럼 포함)
+    # 약품코드를 기준으로 병합 (약품유형 컬럼 + 시계열 데이터 포함)
     result_df = today_df.merge(
-        processed_df[['약품코드', '1년 이동평균', '3개월 이동평균', '약품유형']],
+        processed_df[['약품코드', '1년 이동평균', '3개월 이동평균', '약품유형',
+                      '월별_조제수량_리스트', '3개월_이동평균_리스트']],
         on='약품코드',
         how='left'
     )
@@ -195,15 +196,20 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_table_rows(df, col_map=None):
-    """테이블 행 HTML 생성
+def generate_table_rows(df, col_map=None, months=None):
+    """테이블 행 HTML 생성 (인라인 차트 지원)
 
     Args:
         df: 데이터프레임
         col_map: 컬럼명 매핑 딕셔너리 (선택사항)
             기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
+        months: 월 리스트 (차트용)
     """
+    import json
+    import ast
+    import re
+
     # 기본 컬럼명 (drug_order_calculator.py 스타일)
     default_map = {
         'runway': '런웨이',
@@ -214,13 +220,27 @@ def generate_table_rows(df, col_map=None):
     }
     cm = col_map if col_map else default_map
 
+    def parse_list_string(x):
+        """문자열로 저장된 리스트를 실제 리스트로 변환"""
+        if isinstance(x, list):
+            return x
+        if pd.isna(x):
+            return []
+        try:
+            # numpy 타입 표기를 제거
+            cleaned = re.sub(r'np\.(int64|float64)\(([^)]+)\)', r'\2', str(x))
+            return ast.literal_eval(cleaned)
+        except:
+            return []
+
     rows = ""
     for _, row in df.iterrows():
         runway = row[cm['runway']]
         ma3_runway = row[cm['ma3_runway']]
 
         # 런웨이 < 1인 경우 행 전체를 빨간색으로
-        row_class = 'urgent-row' if (runway < 1 or ma3_runway < 1) else ''
+        is_urgent = runway < 1 or ma3_runway < 1
+        row_class = 'urgent-row clickable-row' if is_urgent else 'clickable-row'
 
         runway_class = 'urgent-cell' if runway < 1 else 'normal-cell'
         ma3_runway_class = 'urgent-cell' if ma3_runway < 1 else 'normal-cell'
@@ -228,8 +248,29 @@ def generate_table_rows(df, col_map=None):
         runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
         ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
 
+        # 인라인 차트용 데이터 생성
+        drug_code = str(row['약품코드'])
+        timeseries = parse_list_string(row.get('월별_조제수량_리스트', []))
+        ma3_list = parse_list_string(row.get('3개월_이동평균_리스트', []))
+
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': timeseries,
+            'ma3_list': ma3_list,
+            'months': months if months else [],
+            'stock': float(row[cm['stock']]),
+            'ma12': float(row[cm['ma12']]) if not pd.isna(row[cm['ma12']]) else 0,
+            'ma3': float(row[cm['ma3']]) if not pd.isna(row[cm['ma3']]) else 0,
+            'runway': runway_display,
+            'ma3_runway': ma3_runway_display
+        }
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False).replace("'", "&#39;")
+
         rows += f"""
-            <tr class="{row_class}">
+            <tr class="{row_class}" data-drug-code="{drug_code}"
+                data-chart-data='{chart_data_json}'
+                onclick="toggleInlineChart(this, '{drug_code}')">
                 <td>{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
                 <td>{row['제약회사']}</td>
@@ -265,7 +306,7 @@ def generate_zero_stock_table_rows(df, col_map):
     return rows
 
 
-def generate_order_report_html(df, col_map=None):
+def generate_order_report_html(df, col_map=None, months=None):
     """주문 보고서 HTML 생성 (재사용 가능한 함수)
 
     Args:
@@ -273,6 +314,7 @@ def generate_order_report_html(df, col_map=None):
         col_map: 컬럼명 매핑 딕셔너리 (선택사항)
             기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
+        months: 월 리스트 (차트용)
 
     Returns:
         str: HTML 문자열
@@ -286,6 +328,10 @@ def generate_order_report_html(df, col_map=None):
         'ma3': '3개월 이동평균'
     }
     cm = col_map if col_map else default_map
+
+    # months가 없으면 빈 리스트
+    if months is None:
+        months = []
 
     # 음수 재고 약품 분리 (전문약/일반약 혼합), 재고 오름차순 정렬 (큰 마이너스가 위로)
     zero_stock_df = df[df[cm['stock']] < 0].copy()
@@ -310,9 +356,9 @@ def generate_order_report_html(df, col_map=None):
     sale_urgent = len(sale_df[(sale_df[cm['runway']] < 1) | (sale_df[cm['ma3_runway']] < 1)])
     total_urgent = dispense_urgent + sale_urgent
 
-    # 테이블 행 생성
-    dispense_rows = generate_table_rows(dispense_df, cm)
-    sale_rows = generate_table_rows(sale_df, cm)
+    # 테이블 행 생성 (months 전달)
+    dispense_rows = generate_table_rows(dispense_df, cm, months)
+    sale_rows = generate_table_rows(sale_df, cm, months)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
 
     # 음수 재고 경고 배너 HTML
@@ -571,7 +617,155 @@ def generate_order_report_html(df, col_map=None):
             color: #6c757d;
             font-size: 16px;
         }}
+
+        /* 인라인 차트용 클릭 가능 행 스타일 */
+        .clickable-row {{
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }}
+        .clickable-row:hover {{
+            background-color: #edf2f7 !important;
+        }}
+        .clickable-row.chart-expanded {{
+            background-color: rgba(79, 172, 254, 0.15) !important;
+            border-left: 3px solid #4facfe;
+        }}
+        .inline-chart-row {{
+            background: #f8fafc;
+        }}
+        .inline-chart-row:hover {{
+            background: #f8fafc !important;
+        }}
+
+        /* 주문량 계산기 스타일 */
+        .order-calculator {{
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }}
+        .order-calculator h4 {{
+            margin: 0 0 12px 0;
+            color: #2d3748;
+            font-size: 14px;
+        }}
+        .runway-buttons {{
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }}
+        .runway-btn {{
+            padding: 8px 16px;
+            border: 2px solid #e2e8f0;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }}
+        .runway-btn:hover {{
+            border-color: #4facfe;
+            background: #f0f9ff;
+        }}
+        .runway-btn.active {{
+            border-color: #4facfe;
+            background: #4facfe;
+            color: white;
+        }}
+        .order-result {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }}
+        .order-result-item {{
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }}
+        .order-result-item .label {{
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 4px;
+        }}
+        .order-result-item .ma-value {{
+            font-size: 11px;
+            color: #a0aec0;
+            margin-bottom: 8px;
+        }}
+        .order-result-item .value {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #2d3748;
+        }}
+        .order-context-header {{
+            font-size: 14px;
+            color: #4a5568;
+            margin-bottom: 16px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: 6px;
+            border-left: 3px solid #4facfe;
+        }}
+        .order-context-header .emoji {{
+            margin-right: 6px;
+        }}
+        .order-context-header .months {{
+            font-weight: bold;
+            color: #2563eb;
+        }}
+        /* 프로그레스바 스타일 */
+        .runway-progress {{
+            margin: 10px 0;
+        }}
+        .runway-progress-label {{
+            font-size: 11px;
+            color: #718096;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }}
+        .progress-bar-container {{
+            width: 100%;
+            height: 12px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }}
+        .progress-bar {{
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }}
+        .progress-bar.current {{
+            background: linear-gradient(90deg, #f56565 0%, #fc8181 100%);
+        }}
+        .progress-bar.target {{
+            background: linear-gradient(90deg, #48bb78 0%, #68d391 100%);
+        }}
+        .order-value {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2d3748;
+        }}
+        .order-value .arrow {{
+            color: #4facfe;
+        }}
+        .current-stock-note {{
+            font-size: 12px;
+            color: #718096;
+            margin-top: 12px;
+        }}
     </style>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -675,6 +869,303 @@ def generate_order_report_html(df, col_map=None):
                 modal.style.display = 'none';
             }}
         }}
+
+        // ========== 인라인 차트 기능 ==========
+
+        // 현재 열린 차트의 drugCode 저장
+        var currentChartDrugCode = null;
+
+        // 인라인 차트 닫기
+        function closeInlineChart(drugCode) {{
+            event.stopPropagation();
+            const chartRow = document.querySelector('.inline-chart-row');
+            if (chartRow) chartRow.remove();
+            const expandedRow = document.querySelector('tr[data-drug-code="' + drugCode + '"].chart-expanded');
+            if (expandedRow) expandedRow.classList.remove('chart-expanded');
+            currentChartDrugCode = null;
+        }}
+
+        // 인라인 차트 토글
+        function toggleInlineChart(row, drugCode) {{
+            const existingChartRow = row.nextElementSibling;
+
+            // 이미 차트가 열려있으면 닫기
+            if (existingChartRow && existingChartRow.classList.contains('inline-chart-row')) {{
+                existingChartRow.remove();
+                row.classList.remove('chart-expanded');
+                currentChartDrugCode = null;
+                return;
+            }}
+
+            // 다른 열린 차트들 닫기
+            document.querySelectorAll('.inline-chart-row').forEach(el => el.remove());
+            document.querySelectorAll('.chart-expanded').forEach(el => el.classList.remove('chart-expanded'));
+
+            // 차트 데이터 가져오기
+            const chartDataStr = row.getAttribute('data-chart-data');
+            if (!chartDataStr) {{
+                console.error('차트 데이터가 없습니다:', drugCode);
+                return;
+            }}
+
+            const chartData = JSON.parse(chartDataStr);
+            currentChartDrugCode = drugCode;
+            const colSpan = row.cells.length;
+
+            // 차트 행 생성
+            const chartRow = document.createElement('tr');
+            chartRow.className = 'inline-chart-row';
+            chartRow.innerHTML = `
+                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #4facfe;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4 style="margin: 0; color: #2d3748;">${{chartData.drug_name}} (${{chartData.drug_code}})</h4>
+                        <button onclick="closeInlineChart('${{drugCode}}')"
+                                style="background: none; border: none; font-size: 20px; cursor: pointer; color: #718096;">&times;</button>
+                    </div>
+
+                    <!-- 주문량 계산기 -->
+                    <div class="order-calculator">
+                        <h4>📦 주문량 계산기</h4>
+                        <div class="runway-buttons">
+                            <button class="runway-btn" onclick="calculateOrder(1, '${{drugCode}}')">1개월</button>
+                            <button class="runway-btn" onclick="calculateOrder(2, '${{drugCode}}')">2개월</button>
+                            <button class="runway-btn active" onclick="calculateOrder(3, '${{drugCode}}')">3개월</button>
+                        </div>
+                        <div class="order-context-header" id="order-context-${{drugCode}}">
+                            <span class="emoji">💡</span><span class="months">3개월</span>치 재고를 확보하려면:
+                        </div>
+                        <div class="order-result">
+                            <div class="order-result-item">
+                                <div class="label">1년 평균 기준 <span style="color:#a0aec0;">(${{chartData.ma12.toFixed(1)}}개/월)</span></div>
+                                <div class="runway-progress">
+                                    <div class="runway-progress-label">
+                                        <span>현재</span>
+                                        <span id="runway-ma12-current-${{drugCode}}">0.00개월</span>
+                                    </div>
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar current" id="progress-ma12-current-${{drugCode}}" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                <div class="runway-progress">
+                                    <div class="runway-progress-label">
+                                        <span>목표</span>
+                                        <span id="runway-ma12-target-${{drugCode}}">3개월</span>
+                                    </div>
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar target" id="progress-ma12-target-${{drugCode}}" style="width: 100%;"></div>
+                                    </div>
+                                </div>
+                                <div class="order-value">
+                                    <span class="arrow">👉</span>
+                                    <span id="order-ma12-${{drugCode}}">-</span>
+                                    <span style="font-size:14px; font-weight:normal; color:#718096;">주문 필요</span>
+                                </div>
+                            </div>
+                            <div class="order-result-item">
+                                <div class="label">3개월 평균 기준 <span style="color:#a0aec0;">(${{chartData.ma3.toFixed(1)}}개/월)</span></div>
+                                <div class="runway-progress">
+                                    <div class="runway-progress-label">
+                                        <span>현재</span>
+                                        <span id="runway-ma3-current-${{drugCode}}">0.00개월</span>
+                                    </div>
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar current" id="progress-ma3-current-${{drugCode}}" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                <div class="runway-progress">
+                                    <div class="runway-progress-label">
+                                        <span>목표</span>
+                                        <span id="runway-ma3-target-${{drugCode}}">3개월</span>
+                                    </div>
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar target" id="progress-ma3-target-${{drugCode}}" style="width: 100%;"></div>
+                                    </div>
+                                </div>
+                                <div class="order-value">
+                                    <span class="arrow">👉</span>
+                                    <span id="order-ma3-${{drugCode}}">-</span>
+                                    <span style="font-size:14px; font-weight:normal; color:#718096;">주문 필요</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="current-stock-note">* 현재 재고: ${{chartData.stock.toLocaleString()}}개</div>
+                    </div>
+
+                    <!-- 트렌드 차트 -->
+                    <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 300px;"></div>
+                </td>
+            `;
+
+            row.after(chartRow);
+            row.classList.add('chart-expanded');
+
+            // 차트 렌더링
+            renderInlineChart(drugCode, chartData);
+
+            // 기본 3개월 주문량 계산
+            calculateOrder(3, drugCode);
+        }}
+
+        // 주문량 계산
+        function calculateOrder(targetMonths, drugCode) {{
+            // 버튼 상태 업데이트 - inline-chart-row 내의 버튼만 선택
+            const chartRow = document.querySelector('.inline-chart-row');
+            if (chartRow) {{
+                const buttons = chartRow.querySelectorAll('.runway-btn');
+                buttons.forEach(btn => {{
+                    btn.classList.remove('active');
+                    // targetMonths에 해당하는 버튼에 active 추가
+                    if (btn.textContent.trim() === targetMonths + '개월') {{
+                        btn.classList.add('active');
+                    }}
+                }});
+            }}
+
+            // 차트 데이터 가져오기
+            const row = document.querySelector(`tr[data-drug-code="${{drugCode}}"]`);
+            const chartData = JSON.parse(row.getAttribute('data-chart-data'));
+
+            const stock = chartData.stock;
+            const ma12 = chartData.ma12;
+            const ma3 = chartData.ma3;
+
+            // 현재 런웨이 계산
+            const currentRunwayMa12 = ma12 > 0 ? stock / ma12 : 0;
+            const currentRunwayMa3 = ma3 > 0 ? stock / ma3 : 0;
+
+            // 주문량 계산: (목표 런웨이 × 월 평균) - 현재 재고
+            const orderMa12 = Math.max(0, Math.ceil((targetMonths * ma12) - stock));
+            const orderMa3 = Math.max(0, Math.ceil((targetMonths * ma3) - stock));
+
+            // 컨텍스트 헤더 업데이트
+            const contextHeader = document.getElementById(`order-context-${{drugCode}}`);
+            if (contextHeader) {{
+                contextHeader.innerHTML = `<span class="emoji">💡</span><span class="months">${{targetMonths}}개월</span>치 재고를 확보하려면:`;
+            }}
+
+            // 프로그레스바 업데이트 (1년 평균 기준)
+            // 현재와 목표 중 큰 값을 기준(100%)으로 설정
+            const maxRunwayMa12 = Math.max(currentRunwayMa12, targetMonths);
+            const progressMa12Current = (currentRunwayMa12 / maxRunwayMa12) * 100;
+            const progressMa12Target = (targetMonths / maxRunwayMa12) * 100;
+            document.getElementById(`runway-ma12-current-${{drugCode}}`).textContent = currentRunwayMa12.toFixed(2) + '개월';
+            document.getElementById(`progress-ma12-current-${{drugCode}}`).style.width = progressMa12Current + '%';
+            document.getElementById(`runway-ma12-target-${{drugCode}}`).textContent = targetMonths + '개월';
+            document.getElementById(`progress-ma12-target-${{drugCode}}`).style.width = progressMa12Target + '%';
+
+            // 프로그레스바 업데이트 (3개월 평균 기준)
+            const maxRunwayMa3 = Math.max(currentRunwayMa3, targetMonths);
+            const progressMa3Current = (currentRunwayMa3 / maxRunwayMa3) * 100;
+            const progressMa3Target = (targetMonths / maxRunwayMa3) * 100;
+            document.getElementById(`runway-ma3-current-${{drugCode}}`).textContent = currentRunwayMa3.toFixed(2) + '개월';
+            document.getElementById(`progress-ma3-current-${{drugCode}}`).style.width = progressMa3Current + '%';
+            document.getElementById(`runway-ma3-target-${{drugCode}}`).textContent = targetMonths + '개월';
+            document.getElementById(`progress-ma3-target-${{drugCode}}`).style.width = progressMa3Target + '%';
+
+            // 결과 표시
+            document.getElementById(`order-ma12-${{drugCode}}`).textContent = orderMa12.toLocaleString() + '개';
+            document.getElementById(`order-ma3-${{drugCode}}`).textContent = orderMa3.toLocaleString() + '개';
+        }}
+
+        // 차트 렌더링
+        function renderInlineChart(drugCode, chartData) {{
+            const chartContainer = document.getElementById('inline-chart-' + drugCode);
+            if (!chartContainer) return;
+
+            // 데이터 준비
+            const months = chartData.months || [];
+            const timeseries = chartData.timeseries || [];
+            const ma3List = chartData.ma3_list || [];
+            const currentStock = chartData.stock;
+
+            if (months.length === 0 || timeseries.length === 0) {{
+                chartContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #718096;">차트 데이터가 없습니다.</div>';
+                return;
+            }}
+
+            // 현재 재고 수평선 데이터
+            const stockLine = months.map(() => currentStock);
+
+            const traces = [
+                {{
+                    x: months,
+                    y: timeseries,
+                    mode: 'lines+markers',
+                    name: '실제 조제수량',
+                    line: {{color: '#2d3748', width: 2, dash: 'dot'}},
+                    marker: {{size: 5, color: '#2d3748'}},
+                    hovertemplate: '조제수량: %{{y:,.0f}}개<extra></extra>'
+                }},
+                {{
+                    x: months,
+                    y: ma3List,
+                    mode: 'lines',
+                    name: '3개월 이동평균',
+                    line: {{color: '#4facfe', width: 3}},
+                    hovertemplate: '3개월 평균: %{{y:,.1f}}개<extra></extra>'
+                }},
+                {{
+                    x: months,
+                    y: stockLine,
+                    mode: 'lines',
+                    name: '현재 재고',
+                    line: {{color: '#e53e3e', width: 2, dash: 'dash'}},
+                    hovertemplate: '현재 재고: %{{y:,.0f}}개<extra></extra>'
+                }}
+            ];
+
+            // 겨울철 배경 영역 생성
+            const winterShapes = [];
+            function isWinterMonth(month) {{
+                const monthNum = parseInt(month.split('-')[1]);
+                return monthNum === 10 || monthNum === 11 || monthNum === 12 || monthNum === 1 || monthNum === 2;
+            }}
+
+            let winterStart = null;
+            for (let i = 0; i < months.length; i++) {{
+                const isWinter = isWinterMonth(months[i]);
+                if (isWinter && winterStart === null) {{
+                    winterStart = i;
+                }} else if (!isWinter && winterStart !== null) {{
+                    winterShapes.push({{
+                        type: 'rect', xref: 'x', yref: 'paper',
+                        x0: months[winterStart], x1: months[i - 1],
+                        y0: 0, y1: 1,
+                        fillcolor: 'rgba(135, 206, 250, 0.2)', line: {{width: 0}}, layer: 'below'
+                    }});
+                    winterStart = null;
+                }}
+            }}
+            if (winterStart !== null) {{
+                winterShapes.push({{
+                    type: 'rect', xref: 'x', yref: 'paper',
+                    x0: months[winterStart], x1: months[months.length - 1],
+                    y0: 0, y1: 1,
+                    fillcolor: 'rgba(135, 206, 250, 0.2)', line: {{width: 0}}, layer: 'below'
+                }});
+            }}
+
+            const layout = {{
+                xaxis: {{ title: '월', type: 'category', showgrid: true, gridcolor: '#e2e8f0' }},
+                yaxis: {{ title: '조제수량', showgrid: true, gridcolor: '#e2e8f0' }},
+                height: 300,
+                margin: {{ t: 20, b: 50, l: 60, r: 30 }},
+                hovermode: 'x unified',
+                plot_bgcolor: 'white',
+                paper_bgcolor: '#f8fafc',
+                font: {{size: 11}},
+                shapes: winterShapes,
+                legend: {{
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1
+                }}
+            }};
+
+            Plotly.newPlot(chartContainer, traces, layout, {{displayModeBar: false, responsive: true}});
+        }}
     </script>
 </body>
 </html>
@@ -682,7 +1173,7 @@ def generate_order_report_html(df, col_map=None):
     return html
 
 
-def generate_html_report(df):
+def generate_html_report(df, months=None):
     """HTML 보고서 생성 및 파일 저장 (CLI용 래퍼 함수)"""
     print("\n📋 Step 4: HTML 보고서 생성")
     print("-" * 30)
@@ -695,7 +1186,7 @@ def generate_html_report(df):
     filename = os.path.join(output_dir, f'order_calculator_report_{timestamp}.html')
 
     # HTML 생성 (재사용 가능한 함수 호출)
-    html = generate_order_report_html(df)
+    html = generate_order_report_html(df, months=months)
 
     with open(filename, 'w', encoding='utf-8') as f:
         f.write(html)
@@ -741,8 +1232,18 @@ def run():
         # 병합 및 계산
         result_df = merge_and_calculate(inventory_df, processed_df)
 
+        # months 생성 (차트용)
+        months = []
+        data_period = processed_inventory_db.get_metadata()
+        if data_period:
+            from dateutil.relativedelta import relativedelta
+            start_date = datetime.strptime(data_period['start_month'], '%Y-%m')
+            for i in range(data_period['total_months']):
+                month_date = start_date + relativedelta(months=i)
+                months.append(month_date.strftime('%Y-%m'))
+
         # 보고서 생성
-        html_file = generate_html_report(result_df)
+        html_file = generate_html_report(result_df, months=months)
         csv_file = save_csv_report(result_df)
 
         # 완료 메시지

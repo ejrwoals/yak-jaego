@@ -343,7 +343,18 @@ def calculate_order():
             'ma12': '1년_이동평균',
             'ma3': '3개월_이동평균'
         }
-        html_content = generate_order_report_html(df_merged, col_map)
+
+        # months 생성 (차트용)
+        months = []
+        data_period = processed_inventory_db.get_metadata()
+        if data_period:
+            from dateutil.relativedelta import relativedelta
+            start_date = datetime.strptime(data_period['start_month'], '%Y-%m')
+            for i in range(data_period['total_months']):
+                month_date = start_date + relativedelta(months=i)
+                months.append(month_date.strftime('%Y-%m'))
+
+        html_content = generate_order_report_html(df_merged, col_map, months=months)
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
