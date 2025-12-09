@@ -1,4 +1,4 @@
-import html
+from html import escape as html_escape
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -1013,7 +1013,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
         # 인라인 차트용 데이터를 JSON으로 변환
         drug_code = str(row['약품코드'])
-        chart_data_json = html.escape(create_chart_data_json(
+        chart_data_json = html_escape(create_chart_data_json(
             months=months,
             timeseries_data=timeseries,
             ma_data=ma,
@@ -1981,7 +1981,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
             'latest_ma': latest_ma,
             'runway': '재고 없음'
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2135,7 +2135,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
             'latest_ma': latest_ma,
             'runway': runway_display
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         html += f"""
                                 <tr class="low-row tab-clickable-row" data-drug-code="{drug_code}"
@@ -2263,7 +2263,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
             'latest_ma': latest_ma,
             'runway': runway_display
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         html += f"""
                                 <tr class="high-row tab-clickable-row" data-drug-code="{drug_code}"
@@ -2397,7 +2397,7 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
             'latest_ma': latest_ma,
             'runway': runway_display
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         html += f"""
                                 <tr class="excess-row tab-clickable-row" data-drug-code="{drug_code}"
@@ -2525,7 +2525,7 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
             'latest_ma': 0,
             'runway': '재고만 있음'
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         html += f"""
                                 <tr class="dead-row tab-clickable-row" data-drug-code="{drug_code}" style="background: rgba(247, 250, 252, 0.7);"
@@ -2657,7 +2657,7 @@ def generate_negative_stock_section(negative_stock_drugs, ma_months, months):
             'latest_ma': float(latest_ma) if latest_ma else 0,
             'runway': '음수 재고'
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         html += f"""
                                 <tr class="negative-row tab-clickable-row" data-drug-code="{drug_code}" style="background: rgba(254, 242, 242, 0.7);"
@@ -2799,7 +2799,7 @@ def generate_hidden_drugs_section(df, ma_months, months):
             'latest_ma': latest_ma,
             'runway': runway_display
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         html += f"""
                                 <tr class="hidden-row-item tab-clickable-row" data-drug-code="{drug_code}"
