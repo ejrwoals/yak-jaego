@@ -423,13 +423,13 @@ def generate_order_report_html(df, col_map=None, months=None):
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
-    # 음수 재고 경고 배너 HTML
-    zero_stock_banner = f"""
-    <div class="warning-banner" onclick="openZeroStockModal()">
-        <span class="warning-icon">⚠️</span>
-        <span class="warning-text">음수 재고 경고: <strong>{zero_stock_count}개</strong> 약품의 재고가 0 미만입니다</span>
-        <button class="warning-btn">확인하기</button>
-    </div>
+    # 음수 재고 경고 책갈피 HTML
+    zero_stock_bookmark = f"""
+        <div class="alert-bookmark warning" onclick="openZeroStockModal()">
+            <span class="alert-icon">⚠️</span>
+            <span class="alert-title">음수 재고</span>
+            <span class="alert-count">{zero_stock_count}개</span>
+        </div>
     """ if zero_stock_count > 0 else ""
 
     # 음수 재고 모달 HTML
@@ -463,13 +463,13 @@ def generate_order_report_html(df, col_map=None, months=None):
     </div>
     """ if zero_stock_count > 0 else ""
 
-    # 신규 약품 알림 배너 HTML
-    new_drugs_banner = f"""
-    <div class="info-banner" onclick="openNewDrugsModal()">
-        <span class="info-icon">🆕</span>
-        <span class="info-text">신규 약품: <strong>{new_drugs_count}개</strong> 약품이 시계열 데이터 없이 등록되었습니다</span>
-        <button class="info-btn">확인하기</button>
-    </div>
+    # 신규 약품 알림 책갈피 HTML
+    new_drugs_bookmark = f"""
+        <div class="alert-bookmark info" onclick="openNewDrugsModal()">
+            <span class="alert-icon">🆕</span>
+            <span class="alert-title">신규 약품</span>
+            <span class="alert-count">{new_drugs_count}개</span>
+        </div>
     """ if new_drugs_count > 0 else ""
 
     # 신규 약품 모달 HTML
@@ -663,78 +663,67 @@ def generate_order_report_html(df, col_map=None, months=None):
             color: #c05621;
         }}
 
-        /* 경고 배너 스타일 */
-        .warning-banner {{
-            background-color: #ffebee;
-            border: 2px solid #ef5350;
-            border-radius: 8px;
-            padding: 12px 20px;
-            margin-bottom: 20px;
+        /* 알림 사이드바 (책갈피 스타일) */
+        .alert-sidebar {{
+            position: fixed;
+            right: 0;
+            top: 120px;
+            z-index: 999;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 10px;
+        }}
+        .alert-bookmark {{
+            position: relative;
+            right: -120px;
+            padding: 12px 16px;
+            border-radius: 12px 0 0 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
-        }}
-        .warning-banner:hover {{
-            background-color: #ffcdd2;
-        }}
-        .warning-icon {{
-            font-size: 20px;
-            margin-right: 10px;
-        }}
-        .warning-text {{
-            flex: 1;
-            color: #c62828;
-        }}
-        .warning-btn {{
-            background-color: #ef5350;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-        }}
-        .warning-btn:hover {{
-            background-color: #e53935;
-        }}
-
-        /* 신규 약품 알림 배너 스타일 */
-        .info-banner {{
-            background-color: #e3f2fd;
-            border: 2px solid #42a5f5;
-            border-radius: 8px;
-            padding: 12px 20px;
-            margin-bottom: 20px;
+            transition: right 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+            min-width: 160px;
+            font-weight: 600;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            flex-direction: column;
+            gap: 4px;
+            user-select: none;
+            /* Glassmorphism */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-right: none;
         }}
-        .info-banner:hover {{
-            background-color: #bbdefb;
+        .alert-bookmark:hover {{
+            right: 0;
+            transform: scale(1.02);
         }}
-        .info-icon {{
-            font-size: 20px;
-            margin-right: 10px;
+        .alert-bookmark .alert-icon {{
+            font-size: 1.2em;
         }}
-        .info-text {{
-            flex: 1;
-            color: #1565c0;
+        .alert-bookmark .alert-title {{
+            font-size: 0.85em;
+            opacity: 0.85;
         }}
-        .info-btn {{
-            background-color: #42a5f5;
+        .alert-bookmark .alert-count {{
+            font-size: 1.5em;
+            font-weight: bold;
+        }}
+        .alert-bookmark.warning {{
+            background: linear-gradient(135deg, rgba(239, 83, 80, 0.75) 0%, rgba(198, 40, 40, 0.85) 100%);
+            box-shadow: -4px 4px 20px rgba(198, 40, 40, 0.3);
             color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }}
-        .info-btn:hover {{
-            background-color: #1e88e5;
+        .alert-bookmark.warning:hover {{
+            box-shadow: -6px 6px 24px rgba(198, 40, 40, 0.4);
+        }}
+        .alert-bookmark.info {{
+            background: linear-gradient(135deg, rgba(66, 165, 245, 0.75) 0%, rgba(21, 101, 192, 0.85) 100%);
+            box-shadow: -4px 4px 20px rgba(21, 101, 192, 0.3);
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }}
+        .alert-bookmark.info:hover {{
+            box-shadow: -6px 6px 24px rgba(21, 101, 192, 0.4);
         }}
 
         /* 모달 스타일 */
@@ -1064,29 +1053,10 @@ def generate_order_report_html(df, col_map=None, months=None):
         <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
     </div>
 
-    {zero_stock_banner}
-    {new_drugs_banner}
-
-    {f'''<div class="urgent-section">
-        <h3>🚨 긴급 주문 필요 (런웨이 &lt; 1개월)</h3>
-        <div class="urgent-cards">
-            <div class="urgent-card">
-                <span class="dot" style="background: #3182ce;"></span>
-                <span class="type">전문약</span>
-                <span class="count">{dispense_urgent}개</span>
-            </div>
-            <div class="urgent-card">
-                <span class="dot" style="background: #38a169;"></span>
-                <span class="type">일반약</span>
-                <span class="count">{sale_urgent}개</span>
-            </div>
-            <div class="urgent-card total-urgent">
-                <span class="dot"></span>
-                <span class="type">합계</span>
-                <span class="count">{total_urgent}개</span>
-            </div>
-        </div>
-    </div>''' if total_urgent > 0 else ''}
+    <div class="alert-sidebar">
+        {zero_stock_bookmark}
+        {new_drugs_bookmark}
+    </div>
 
     <div class="tab-container">
         <div class="tab-buttons">
