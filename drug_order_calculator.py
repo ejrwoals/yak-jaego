@@ -8,7 +8,7 @@
 """
 
 import os
-import html
+from html import escape as html_escape
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -174,6 +174,12 @@ def merge_and_calculate(today_df, processed_df):
         how='left'
     )
 
+    # 신규 약품 감지 (1년 이동평균이 NaN인 경우 = processed_inventory에 없는 약품)
+    result_df['신규약품'] = result_df['1년 이동평균'].isna()
+    new_drug_count = result_df['신규약품'].sum()
+    if new_drug_count > 0:
+        print(f"🆕 신규 약품 {new_drug_count}개 감지 (시계열 데이터 없음)")
+
     # 약품유형이 없는 경우 '미분류'로 표시
     result_df['약품유형'] = result_df['약품유형'].fillna('미분류')
 
@@ -291,16 +297,16 @@ def generate_table_rows(df, col_map=None, months=None):
             'runway': runway_display,
             'ma3_runway': ma3_runway_display
         }
-        chart_data_json = html.escape(json.dumps(chart_data, ensure_ascii=False))
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
                 data-chart-data='{chart_data_json}'
                 onclick="toggleInlineChart(this, '{drug_code}')"
                 title="클릭하여 상세 차트 및 주문량 계산기 보기">
-                <td title="{html.escape(str(row['약품명']))}">{row['약품명']}</td>
+                <td title="{html_escape(str(row['약품명']))}">{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
-                <td title="{html.escape(str(row['제약회사']))}">{row['제약회사']}</td>
+                <td title="{html_escape(str(row['제약회사']))}">{row['제약회사']}</td>
                 <td>{row[cm['stock']]:.0f}</td>
                 <td>{row[cm['ma12']]:.1f}</td>
                 <td>{row[cm['ma3']]:.1f}</td>
@@ -334,6 +340,23 @@ def generate_zero_stock_table_rows(df, col_map):
     return rows
 
 
+def generate_new_drugs_table_rows(df, col_map):
+    """신규 약품 테이블 행 HTML 생성"""
+    cm = col_map
+    rows = ""
+    for _, row in df.iterrows():
+        stock = row[cm['stock']] if cm['stock'] in row else 0
+        rows += f"""
+            <tr>
+                <td>{row['약품명']}</td>
+                <td>{row['약품코드']}</td>
+                <td>{row['제약회사']}</td>
+                <td style="text-align: right;">{stock:.0f}</td>
+            </tr>
+"""
+    return rows
+
+
 def generate_order_report_html(df, col_map=None, months=None):
     """주문 보고서 HTML 생성 (재사용 가능한 함수)
 
@@ -361,15 +384,25 @@ def generate_order_report_html(df, col_map=None, months=None):
     if months is None:
         months = []
 
-    # 음수 재고 약품 분리 (전문약/일반약 혼합), 재고 오름차순 정렬 (큰 마이너스가 위로)
+    # 신규 약품 분리 (시계열 데이터가 없는 약품) - 먼저 분리
+    new_drugs_df = df[df['신규약품'] == True].copy() if '신규약품' in df.columns else pd.DataFrame()
+
+    # 음수 재고 약품 분리 (신규 약품 제외 - 신규 약품은 이동평균이 없어서 별도 처리)
     zero_stock_df = df[df[cm['stock']] < 0].copy()
+    if '신규약품' in zero_stock_df.columns:
+        zero_stock_df = zero_stock_df[zero_stock_df['신규약품'] == False]
     zero_stock_df = zero_stock_df.sort_values(cm['stock'], ascending=True)
     zero_stock_count = len(zero_stock_df)
+    new_drugs_count = len(new_drugs_df)
+    if new_drugs_count > 0:
+        new_drugs_df = new_drugs_df.sort_values('약품명', ascending=True)
 
-    # 음수 재고 약품만 탭 테이블에서 제외 (재고 0인 약품은 메인 테이블에 표시)
+    # 음수 재고 및 신규 약품 제외한 정상 약품
     normal_df = df[df[cm['stock']] >= 0].copy()
+    if '신규약품' in normal_df.columns:
+        normal_df = normal_df[normal_df['신규약품'] == False]
 
-    # 약품 유형별 분리 (재고 >= 0인 약품만, 음수 재고는 모달에서 별도 표시)
+    # 약품 유형별 분리 (재고 >= 0이고 신규 약품이 아닌 약품만, 음수 재고/신규 약품은 모달에서 별도 표시)
     dispense_df = normal_df[normal_df['약품유형'] == '전문약'].copy()
     sale_df = normal_df[normal_df['약품유형'] == '일반약'].copy()
     unclassified_df = normal_df[normal_df['약품유형'] == '미분류'].copy()
@@ -388,6 +421,7 @@ def generate_order_report_html(df, col_map=None, months=None):
     dispense_rows = generate_table_rows(dispense_df, cm, months)
     sale_rows = generate_table_rows(sale_df, cm, months)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
+    new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
     # 음수 재고 경고 배너 HTML
     zero_stock_banner = f"""
@@ -428,6 +462,43 @@ def generate_order_report_html(df, col_map=None, months=None):
         </div>
     </div>
     """ if zero_stock_count > 0 else ""
+
+    # 신규 약품 알림 배너 HTML
+    new_drugs_banner = f"""
+    <div class="info-banner" onclick="openNewDrugsModal()">
+        <span class="info-icon">🆕</span>
+        <span class="info-text">신규 약품: <strong>{new_drugs_count}개</strong> 약품이 시계열 데이터 없이 등록되었습니다</span>
+        <button class="info-btn">확인하기</button>
+    </div>
+    """ if new_drugs_count > 0 else ""
+
+    # 신규 약품 모달 HTML
+    new_drugs_modal = f"""
+    <div id="newDrugsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #3498db;">
+                <h3>🆕 신규 약품 ({new_drugs_count}개)</h3>
+                <span class="modal-close" onclick="closeNewDrugsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; margin-bottom: 15px;">시계열 데이터가 없는 신규 약품입니다. 다음 달 데이터 수집 후 런웨이 계산이 가능합니다.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>약품명</th>
+                            <th>약품코드</th>
+                            <th>제약회사</th>
+                            <th>현재 재고</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {new_drugs_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    """ if new_drugs_count > 0 else ""
 
     html = f"""
 <!DOCTYPE html>
@@ -627,6 +698,43 @@ def generate_order_report_html(df, col_map=None, months=None):
         }}
         .warning-btn:hover {{
             background-color: #e53935;
+        }}
+
+        /* 신규 약품 알림 배너 스타일 */
+        .info-banner {{
+            background-color: #e3f2fd;
+            border: 2px solid #42a5f5;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .info-banner:hover {{
+            background-color: #bbdefb;
+        }}
+        .info-icon {{
+            font-size: 20px;
+            margin-right: 10px;
+        }}
+        .info-text {{
+            flex: 1;
+            color: #1565c0;
+        }}
+        .info-btn {{
+            background-color: #42a5f5;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }}
+        .info-btn:hover {{
+            background-color: #1e88e5;
         }}
 
         /* 모달 스타일 */
@@ -957,6 +1065,7 @@ def generate_order_report_html(df, col_map=None, months=None):
     </div>
 
     {zero_stock_banner}
+    {new_drugs_banner}
 
     {f'''<div class="urgent-section">
         <h3>🚨 긴급 주문 필요 (런웨이 &lt; 1개월)</h3>
@@ -1037,6 +1146,7 @@ def generate_order_report_html(df, col_map=None, months=None):
     </div>
 
     {zero_stock_modal}
+    {new_drugs_modal}
 
     <script>
         function switchTab(tabName) {{
@@ -1062,11 +1172,24 @@ def generate_order_report_html(df, col_map=None, months=None):
         function closeZeroStockModal() {{
             document.getElementById('zeroStockModal').style.display = 'none';
         }}
+
+        // 신규 약품 모달 열기/닫기
+        function openNewDrugsModal() {{
+            document.getElementById('newDrugsModal').style.display = 'block';
+        }}
+        function closeNewDrugsModal() {{
+            document.getElementById('newDrugsModal').style.display = 'none';
+        }}
+
         // 모달 외부 클릭 시 닫기
         window.onclick = function(event) {{
-            var modal = document.getElementById('zeroStockModal');
-            if (event.target == modal) {{
-                modal.style.display = 'none';
+            var zeroModal = document.getElementById('zeroStockModal');
+            var newDrugsModal = document.getElementById('newDrugsModal');
+            if (event.target == zeroModal) {{
+                zeroModal.style.display = 'none';
+            }}
+            if (event.target == newDrugsModal) {{
+                newDrugsModal.style.display = 'none';
             }}
         }}
 

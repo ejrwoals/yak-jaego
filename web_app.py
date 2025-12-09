@@ -285,38 +285,43 @@ def calculate_order():
 
         # 시계열 데이터 로드
         df_processed = processed_inventory_db.get_processed_data()
-        if df_processed.empty:
-            return jsonify({'error': '시계열 통계 데이터가 없습니다.'}), 404
 
         # today 파일에서 약품코드 추출
         today_codes = set(df_today['약품코드'].astype(str))
 
-        # processed 데이터를 today 파일 약품만 필터링
-        df_processed_filtered = df_processed[df_processed['약품코드'].isin(today_codes)].copy()
-
-        if df_processed_filtered.empty:
-            return jsonify({'error': 'today 파일 약품에 대한 시계열 데이터가 없습니다.'}), 404
-
-        # 현재 재고 로드
+        # 현재 재고 로드 (today 파일 약품만 필터링)
         df_recent = inventory_db.get_all_inventory_as_df()
+        df_recent_filtered = df_recent[df_recent['약품코드'].isin(today_codes)].copy()
 
-        # 데이터 병합
+        if df_recent_filtered.empty:
+            return jsonify({'error': 'today 파일 약품에 대한 재고 데이터가 없습니다.'}), 404
+
+        # 데이터 병합 (recent_inventory 기준 LEFT JOIN - 신규 약품 포함)
         df_merged = pd.merge(
-            df_processed_filtered,
-            df_recent[['약품코드', '현재_재고수량']],
+            df_recent_filtered[['약품코드', '약품명', '제약회사', '현재_재고수량']],
+            df_processed[['약품코드', '약품유형', '1년_이동평균', '3개월_이동평균_리스트', '월별_조제수량_리스트']],
             on='약품코드',
             how='left'
         )
 
-        # 런웨이 계산
+        # 신규 약품 감지 (1년_이동평균이 NaN인 경우 = processed_inventory에 없는 약품)
+        df_merged['신규약품'] = df_merged['1년_이동평균'].isna()
+
+        # 약품유형이 없는 경우 '미분류'로 처리
+        df_merged['약품유형'] = df_merged['약품유형'].fillna('미분류')
+        new_drug_count = df_merged['신규약품'].sum()
+        if new_drug_count > 0:
+            print(f"🆕 신규 약품 {new_drug_count}개 감지 (시계열 데이터 없음)")
+
+        # 런웨이 계산 (신규 약품은 999로 처리)
         df_merged['런웨이_1년평균'] = df_merged.apply(
             lambda row: row['현재_재고수량'] / row['1년_이동평균']
-            if row['1년_이동평균'] > 0 else 999, axis=1
+            if pd.notna(row['1년_이동평균']) and row['1년_이동평균'] > 0 else 999, axis=1
         )
 
-        # 3개월 이동평균 마지막 값 추출
+        # 3개월 이동평균 마지막 값 추출 (신규 약품은 0으로 처리)
         df_merged['3개월_이동평균'] = df_merged['3개월_이동평균_리스트'].apply(
-            lambda x: x[-1] if x and len(x) > 0 else 0
+            lambda x: x[-1] if isinstance(x, list) and len(x) > 0 else 0
         )
 
         df_merged['런웨이_3개월평균'] = df_merged.apply(
