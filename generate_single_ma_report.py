@@ -1102,6 +1102,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             function closeCategoryModal(modalId) {
                 const modal = document.getElementById(modalId);
                 if (modal) {
+                    // 모달 내의 모든 인라인 차트 제거
+                    modal.querySelectorAll('.inline-chart-row').forEach(el => el.remove());
                     modal.style.display = 'none';
                     document.body.style.overflow = 'auto'; // 배경 스크롤 복원
                 }
@@ -1113,6 +1115,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     const modals = document.querySelectorAll('.category-modal');
                     modals.forEach(modal => {
                         if (modal.style.display === 'block') {
+                            // 모달 내의 모든 인라인 차트 제거
+                            modal.querySelectorAll('.inline-chart-row').forEach(el => el.remove());
                             modal.style.display = 'none';
                         }
                     });
@@ -1123,6 +1127,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             // 모달 배경 클릭 시 닫기
             window.addEventListener('click', function(event) {
                 if (event.target.classList.contains('category-modal')) {
+                    // 모달 내의 모든 인라인 차트 제거
+                    event.target.querySelectorAll('.inline-chart-row').forEach(el => el.remove());
                     event.target.style.display = 'none';
                     document.body.style.overflow = 'auto';
                 }
