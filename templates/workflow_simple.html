@@ -463,13 +463,14 @@
     <div class="container">
         <a href="/" class="back-btn">← 메인으로 돌아가기</a>
 
-        <h1>📊 단순 재고 관리 보고서</h1>
-        <p class="subtitle">사용자 정의 이동평균 기반 간편 분석</p>
+        <h1>📊 재고 관리 보고서</h1>
+        <p class="subtitle">약품 소모량 기반 재고 분석</p>
 
         <div class="info-box">
             <strong>💡 이 보고서는?</strong>
-            하나의 이동평균만 사용하여 더 간단하고 직관적인 재고 분석을 제공합니다.
-            처음 사용하시는 분께 추천합니다!
+            평균 소모량을 기반으로 현재 재고가 몇개월 후쯤 소진되는지 정보 등의 재고 분석을 제공합니다.<br><br>
+            이동평균 개월수를 짧게 설정할수록 최근 단기적인 변화 트렌드를 더 잘 반영합니다. 
+            반면 개월수를 길게 설정할수록 단기 변동에 민감하지 않은 보다 안정적인 장기 트렌드를 기반으로 분석합니다.
         </div>
 
         <form id="reportForm" method="POST" action="/generate/simple_report">
@@ -536,25 +537,25 @@
                     </div>
                     <div class="runway-scale">
                         <span>0</span>
-                        <span id="scale-low">2</span>
-                        <span id="scale-high">6</span>
-                        <span>24+</span>
+                        <span id="scale-low">1</span>
+                        <span id="scale-high">3</span>
+                        <span>7+</span>
                     </div>
                     <div class="runway-values">
                         <div class="runway-value-box">
                             <span class="runway-value-label">부족/충분 경계</span>
-                            <span class="runway-value" id="value-low">2</span>
+                            <span class="runway-value" id="value-low">1</span>
                             <span class="runway-value-unit">개월</span>
                         </div>
                         <div class="runway-value-box">
                             <span class="runway-value-label">충분/과다 경계</span>
-                            <span class="runway-value" id="value-high">6</span>
+                            <span class="runway-value" id="value-high">3</span>
                             <span class="runway-value-unit">개월</span>
                         </div>
                     </div>
                 </div>
-                <input type="hidden" name="threshold_low" id="threshold_low" value="2">
-                <input type="hidden" name="threshold_high" id="threshold_high" value="6">
+                <input type="hidden" name="threshold_low" id="threshold_low" value="1">
+                <input type="hidden" name="threshold_high" id="threshold_high" value="3">
             </div>
 
             <button type="submit" class="submit-btn" id="submitBtn">
@@ -633,9 +634,9 @@
 
         // Runway Slider Logic
         (function() {
-            const MAX_VALUE = 24;
-            let lowValue = 2;
-            let highValue = 6;
+            const MAX_VALUE = 7;
+            let lowValue = 1;
+            let highValue = 3;
 
             const bar = document.querySelector('.runway-bar');
             const handleLow = document.getElementById('handle-low');
