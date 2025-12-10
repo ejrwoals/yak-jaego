@@ -955,8 +955,8 @@ def generate_order_report_html(df, col_map=None, months=None):
             color: white;
         }}
         .order-result {{
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 12px;
         }}
         .order-result-item {{
@@ -997,44 +997,73 @@ def generate_order_report_html(df, col_map=None, months=None):
             font-weight: bold;
             color: #2563eb;
         }}
-        /* 프로그레스바 스타일 */
-        .runway-progress {{
-            margin: 10px 0;
+        /* 단일 프로그레스바 스타일 (목표 마커 포함) */
+        .runway-progress-single {{
+            margin: 8px 0;
         }}
-        .runway-progress-label {{
+        .runway-progress-labels {{
             font-size: 11px;
             color: #718096;
             margin-bottom: 4px;
             display: flex;
             justify-content: space-between;
         }}
-        .progress-bar-container {{
+        .runway-progress-labels .current-label {{
+            color: #2d3748;
+            font-weight: 600;
+        }}
+        .runway-progress-labels .target-label {{
+            color: #718096;
+        }}
+        .progress-bar-wrapper {{
+            position: relative;
             width: 100%;
-            height: 12px;
+            height: 16px;
             background: #e2e8f0;
-            border-radius: 6px;
+            border-radius: 8px;
             overflow: hidden;
         }}
-        .progress-bar {{
+        .progress-bar-fill {{
             height: 100%;
-            border-radius: 6px;
-            transition: width 0.3s ease;
+            border-radius: 8px;
+            transition: width 0.3s ease, background 0.3s ease;
         }}
-        .progress-bar.current {{
+        .progress-bar-fill.shortage {{
             background: linear-gradient(90deg, #f56565 0%, #fc8181 100%);
         }}
-        .progress-bar.target {{
+        .progress-bar-fill.sufficient {{
             background: linear-gradient(90deg, #48bb78 0%, #68d391 100%);
+        }}
+        .target-marker {{
+            position: absolute;
+            top: -2px;
+            bottom: -2px;
+            width: 3px;
+            background: #2d3748;
+            border-radius: 2px;
+            z-index: 2;
+        }}
+        .target-marker::after {{
+            content: '▼';
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            color: #2d3748;
         }}
         .order-value {{
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
-            margin-top: 12px;
-            font-size: 18px;
+            margin-top: 8px;
+            font-size: 16px;
             font-weight: bold;
             color: #2d3748;
+        }}
+        .order-value.no-order {{
+            color: #38a169;
         }}
         .order-value .arrow {{
             color: #4facfe;
@@ -1216,76 +1245,69 @@ def generate_order_report_html(df, col_map=None, months=None):
                                 style="background: none; border: none; font-size: 20px; cursor: pointer; color: #718096;">&times;</button>
                     </div>
 
-                    <!-- 주문량 계산기 -->
-                    <div class="order-calculator">
-                        <h4>📦 주문량 계산기</h4>
-                        <div class="runway-buttons">
-                            <button class="runway-btn" onclick="calculateOrder(1, '${{drugCode}}')">1개월</button>
-                            <button class="runway-btn" onclick="calculateOrder(2, '${{drugCode}}')">2개월</button>
-                            <button class="runway-btn active" onclick="calculateOrder(3, '${{drugCode}}')">3개월</button>
+                    <!-- 차트(60%) + 주문량 계산기(40%) 가로 배치 -->
+                    <div style="display: flex; gap: 20px; align-items: stretch;">
+                        <!-- 트렌드 차트 (60%) -->
+                        <div style="flex: 6; min-width: 0;">
+                            <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 350px;"></div>
                         </div>
-                        <div class="order-context-header" id="order-context-${{drugCode}}">
-                            <span class="emoji">💡</span><span class="months">3개월</span>치 재고를 확보하려면:
-                        </div>
-                        <div class="order-result">
-                            <div class="order-result-item">
-                                <div class="label">1년 평균 기준 <span style="color:#a0aec0;">(${{chartData.ma12.toFixed(1)}}개/월)</span></div>
-                                <div class="runway-progress">
-                                    <div class="runway-progress-label">
-                                        <span>현재</span>
-                                        <span id="runway-ma12-current-${{drugCode}}">0.00개월</span>
-                                    </div>
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar current" id="progress-ma12-current-${{drugCode}}" style="width: 0%;"></div>
-                                    </div>
-                                </div>
-                                <div class="runway-progress">
-                                    <div class="runway-progress-label">
-                                        <span>목표</span>
-                                        <span id="runway-ma12-target-${{drugCode}}">3개월</span>
-                                    </div>
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar target" id="progress-ma12-target-${{drugCode}}" style="width: 100%;"></div>
-                                    </div>
-                                </div>
-                                <div class="order-value">
-                                    <span class="arrow">👉</span>
-                                    <span id="order-ma12-${{drugCode}}">-</span>
-                                    <span style="font-size:14px; font-weight:normal; color:#718096;">주문 필요</span>
-                                </div>
-                            </div>
-                            <div class="order-result-item">
-                                <div class="label">3개월 평균 기준 <span style="color:#a0aec0;">(${{chartData.ma3.toFixed(1)}}개/월)</span></div>
-                                <div class="runway-progress">
-                                    <div class="runway-progress-label">
-                                        <span>현재</span>
-                                        <span id="runway-ma3-current-${{drugCode}}">0.00개월</span>
-                                    </div>
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar current" id="progress-ma3-current-${{drugCode}}" style="width: 0%;"></div>
-                                    </div>
-                                </div>
-                                <div class="runway-progress">
-                                    <div class="runway-progress-label">
-                                        <span>목표</span>
-                                        <span id="runway-ma3-target-${{drugCode}}">3개월</span>
-                                    </div>
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar target" id="progress-ma3-target-${{drugCode}}" style="width: 100%;"></div>
-                                    </div>
-                                </div>
-                                <div class="order-value">
-                                    <span class="arrow">👉</span>
-                                    <span id="order-ma3-${{drugCode}}">-</span>
-                                    <span style="font-size:14px; font-weight:normal; color:#718096;">주문 필요</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="current-stock-note">* 현재 재고: ${{chartData.stock.toLocaleString()}}개</div>
-                    </div>
 
-                    <!-- 트렌드 차트 -->
-                    <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 300px;"></div>
+                        <!-- 주문량 계산기 (40%) -->
+                        <div class="order-calculator" style="flex: 4; margin-bottom: 0;">
+                            <h4>📦 주문량 계산기</h4>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                                <div class="runway-buttons" style="margin-bottom: 0;">
+                                    <button class="runway-btn" onclick="calculateOrder(1, '${{drugCode}}')">1개월</button>
+                                    <button class="runway-btn" onclick="calculateOrder(2, '${{drugCode}}')">2개월</button>
+                                    <button class="runway-btn active" onclick="calculateOrder(3, '${{drugCode}}')">3개월</button>
+                                </div>
+                                <div class="order-context-header" id="order-context-${{drugCode}}" style="margin: 0; flex: 1;">
+                                    <span class="emoji">💡</span><span class="months">3개월</span>치 재고를 확보하려면:
+                                </div>
+                            </div>
+                            <div class="order-result">
+                                <!-- 3개월 평균 기준 (위) -->
+                                <div class="order-result-item">
+                                    <div class="label">3개월 평균 기준 <span style="color:#a0aec0;">(${{chartData.ma3.toFixed(1)}}개/월)</span></div>
+                                    <div class="runway-progress-single">
+                                        <div class="runway-progress-labels">
+                                            <span class="current-label" id="runway-ma3-current-${{drugCode}}">현재 0.00개월</span>
+                                            <span class="target-label" id="runway-ma3-target-${{drugCode}}">목표 3개월</span>
+                                        </div>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-fill shortage" id="progress-ma3-fill-${{drugCode}}" style="width: 0%;"></div>
+                                            <div class="target-marker" id="marker-ma3-${{drugCode}}" style="left: 50%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="order-value" id="order-value-ma3-${{drugCode}}">
+                                        <span class="arrow">👉</span>
+                                        <span id="order-ma3-${{drugCode}}">-</span>
+                                        <span style="font-size:13px; font-weight:normal; color:#718096;">주문 필요</span>
+                                    </div>
+                                </div>
+                                <!-- 1년 평균 기준 (아래) -->
+                                <div class="order-result-item">
+                                    <div class="label">1년 평균 기준 <span style="color:#a0aec0;">(${{chartData.ma12.toFixed(1)}}개/월)</span></div>
+                                    <div class="runway-progress-single">
+                                        <div class="runway-progress-labels">
+                                            <span class="current-label" id="runway-ma12-current-${{drugCode}}">현재 0.00개월</span>
+                                            <span class="target-label" id="runway-ma12-target-${{drugCode}}">목표 3개월</span>
+                                        </div>
+                                        <div class="progress-bar-wrapper">
+                                            <div class="progress-bar-fill shortage" id="progress-ma12-fill-${{drugCode}}" style="width: 0%;"></div>
+                                            <div class="target-marker" id="marker-ma12-${{drugCode}}" style="left: 50%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="order-value" id="order-value-ma12-${{drugCode}}">
+                                        <span class="arrow">👉</span>
+                                        <span id="order-ma12-${{drugCode}}">-</span>
+                                        <span style="font-size:13px; font-weight:normal; color:#718096;">주문 필요</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="current-stock-note">* 현재 재고: ${{chartData.stock.toLocaleString()}}개</div>
+                        </div>
+                    </div>
                 </td>
             `;
 
@@ -1307,7 +1329,6 @@ def generate_order_report_html(df, col_map=None, months=None):
                 const buttons = chartRow.querySelectorAll('.runway-btn');
                 buttons.forEach(btn => {{
                     btn.classList.remove('active');
-                    // targetMonths에 해당하는 버튼에 active 추가
                     if (btn.textContent.trim() === targetMonths + '개월') {{
                         btn.classList.add('active');
                     }}
@@ -1336,28 +1357,62 @@ def generate_order_report_html(df, col_map=None, months=None):
                 contextHeader.innerHTML = `<span class="emoji">💡</span><span class="months">${{targetMonths}}개월</span>치 재고를 확보하려면:`;
             }}
 
-            // 프로그레스바 업데이트 (1년 평균 기준)
-            // 현재와 목표 중 큰 값을 기준(100%)으로 설정
-            const maxRunwayMa12 = Math.max(currentRunwayMa12, targetMonths);
-            const progressMa12Current = (currentRunwayMa12 / maxRunwayMa12) * 100;
-            const progressMa12Target = (targetMonths / maxRunwayMa12) * 100;
-            document.getElementById(`runway-ma12-current-${{drugCode}}`).textContent = currentRunwayMa12.toFixed(2) + '개월';
-            document.getElementById(`progress-ma12-current-${{drugCode}}`).style.width = progressMa12Current + '%';
-            document.getElementById(`runway-ma12-target-${{drugCode}}`).textContent = targetMonths + '개월';
-            document.getElementById(`progress-ma12-target-${{drugCode}}`).style.width = progressMa12Target + '%';
+            // 단일 프로그레스바 업데이트 함수
+            function updateSingleProgressBar(prefix, currentRunway, targetRunway, orderQty) {{
+                // 최대 표시 범위: 목표의 2배 (overflow 방지)
+                const maxDisplay = targetRunway * 2;
 
-            // 프로그레스바 업데이트 (3개월 평균 기준)
-            const maxRunwayMa3 = Math.max(currentRunwayMa3, targetMonths);
-            const progressMa3Current = (currentRunwayMa3 / maxRunwayMa3) * 100;
-            const progressMa3Target = (targetMonths / maxRunwayMa3) * 100;
-            document.getElementById(`runway-ma3-current-${{drugCode}}`).textContent = currentRunwayMa3.toFixed(2) + '개월';
-            document.getElementById(`progress-ma3-current-${{drugCode}}`).style.width = progressMa3Current + '%';
-            document.getElementById(`runway-ma3-target-${{drugCode}}`).textContent = targetMonths + '개월';
-            document.getElementById(`progress-ma3-target-${{drugCode}}`).style.width = progressMa3Target + '%';
+                // 현재 런웨이 퍼센트 (최대 100%로 제한)
+                const fillPercent = Math.min((currentRunway / maxDisplay) * 100, 100);
 
-            // 결과 표시
-            document.getElementById(`order-ma12-${{drugCode}}`).textContent = orderMa12.toLocaleString() + '개';
-            document.getElementById(`order-ma3-${{drugCode}}`).textContent = orderMa3.toLocaleString() + '개';
+                // 목표 마커 위치 (항상 50% = maxDisplay의 절반)
+                const markerPercent = 50;
+
+                // 부족/충분 상태 판단
+                const isSufficient = currentRunway >= targetRunway;
+
+                // 라벨 업데이트
+                document.getElementById(`runway-${{prefix}}-current-${{drugCode}}`).textContent =
+                    `현재 ${{currentRunway.toFixed(2)}}개월`;
+                document.getElementById(`runway-${{prefix}}-target-${{drugCode}}`).textContent =
+                    `목표 ${{targetRunway}}개월`;
+
+                // 프로그레스바 채우기
+                const fillEl = document.getElementById(`progress-${{prefix}}-fill-${{drugCode}}`);
+                fillEl.style.width = fillPercent + '%';
+                fillEl.classList.remove('shortage', 'sufficient');
+                fillEl.classList.add(isSufficient ? 'sufficient' : 'shortage');
+
+                // 목표 마커 위치
+                document.getElementById(`marker-${{prefix}}-${{drugCode}}`).style.left = markerPercent + '%';
+
+                // 주문량 결과 업데이트
+                const orderValueEl = document.getElementById(`order-value-${{prefix}}-${{drugCode}}`);
+                const orderTextEl = document.getElementById(`order-${{prefix}}-${{drugCode}}`);
+
+                if (orderQty > 0) {{
+                    orderValueEl.classList.remove('no-order');
+                    orderValueEl.innerHTML = `
+                        <span class="arrow">👉</span>
+                        <span>${{orderQty.toLocaleString()}}개</span>
+                        <span style="font-size:13px; font-weight:normal; color:#718096;">주문 필요</span>
+                    `;
+                }} else {{
+                    orderValueEl.classList.add('no-order');
+                    const surplus = Math.round((currentRunway - targetRunway) * 10) / 10;
+                    orderValueEl.innerHTML = `
+                        <span>✅</span>
+                        <span>주문 불필요</span>
+                        <span style="font-size:13px; font-weight:normal;">(+${{surplus.toFixed(1)}}개월 여유)</span>
+                    `;
+                }}
+            }}
+
+            // 3개월 평균 기준 업데이트
+            updateSingleProgressBar('ma3', currentRunwayMa3, targetMonths, orderMa3);
+
+            // 1년 평균 기준 업데이트
+            updateSingleProgressBar('ma12', currentRunwayMa12, targetMonths, orderMa12);
         }}
 
         // 차트 렌더링
