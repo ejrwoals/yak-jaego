@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재고 수정 - Jaego</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #718096;
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: #2d3748;
+        }
+
+        h1 {
+            color: #2d3748;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 1.8em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 1em;
+        }
+
+        /* 검색 섹션 */
+        .search-section {
+            margin-bottom: 30px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+        }
+
+        .search-hint {
+            color: #718096;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .search-result-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-result-item:hover {
+            background: #f7fafc;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .drug-name {
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .drug-info {
+            font-size: 0.9em;
+            color: #718096;
+            margin-top: 5px;
+        }
+
+        .current-stock {
+            color: #4299e1;
+            font-weight: 600;
+        }
+
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            color: #718096;
+        }
+
+        /* 선택된 약품 정보 표시 영역 */
+        .selected-drug-section {
+            display: none;
+            background: #f7fafc;
+            border: 2px solid #4299e1;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .selected-drug-section.active {
+            display: block;
+        }
+
+        .selected-drug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .selected-drug-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .btn-clear-selection {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #718096;
+            transition: color 0.2s;
+        }
+
+        .btn-clear-selection:hover {
+            color: #e53e3e;
+        }
+
+        .drug-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        @media (max-width: 500px) {
+            .drug-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .detail-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.85em;
+            color: #718096;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        /* 재고 수정 폼 */
+        .edit-form {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .stock-input-group {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stock-input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .stock-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1.2em;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stock-input:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+
+        .stock-input:read-only {
+            background: #edf2f7;
+            color: #718096;
+        }
+
+        .btn-save {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-save:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+
+        .btn-save:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 결과 메시지 */
+        .result-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .result-message.success {
+            display: block;
+            background: #c6f6d5;
+            color: #276749;
+            border: 1px solid #9ae6b4;
+        }
+
+        .result-message.error {
+            display: block;
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        /* 로딩 상태 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">&larr; 메인으로 돌아가기</a>
+
+        <h1>재고 수정</h1>
+        <p class="subtitle">약품을 검색하여 재고 수량을 직접 수정합니다</p>
+
+        <!-- 검색 섹션 -->
+        <div class="search-section">
+            <input type="text"
+                   class="search-input"
+                   id="searchInput"
+                   placeholder="약품명, 약품코드, 제약회사로 검색..."
+                   autocomplete="off">
+            <p class="search-hint" id="searchHint">2글자 이상 입력하면 검색됩니다</p>
+
+            <div class="search-results" id="searchResults">
+                <!-- 검색 결과가 여기에 동적으로 표시됨 -->
+            </div>
+        </div>
+
+        <!-- 선택된 약품 정보 -->
+        <div class="selected-drug-section" id="selectedDrugSection">
+            <div class="selected-drug-header">
+                <span class="selected-drug-name" id="selectedDrugName">-</span>
+                <button class="btn-clear-selection" onclick="clearSelection()" title="선택 해제">&times;</button>
+            </div>
+
+            <div class="drug-details">
+                <div class="detail-item">
+                    <div class="detail-label">약품코드</div>
+                    <div class="detail-value" id="detailDrugCode">-</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">제약회사</div>
+                    <div class="detail-value" id="detailCompany">-</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">약품유형</div>
+                    <div class="detail-value" id="detailDrugType">-</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">최종 업데이트</div>
+                    <div class="detail-value" id="detailLastUpdate">-</div>
+                </div>
+            </div>
+
+            <div class="edit-form">
+                <div class="stock-input-group">
+                    <label for="currentStock">현재 재고 (변경 전)</label>
+                    <input type="text" class="stock-input" id="currentStock" readonly>
+                </div>
+                <div class="stock-input-group">
+                    <label for="newStock">새 재고수량</label>
+                    <input type="number" class="stock-input" id="newStock" step="1" placeholder="0">
+                </div>
+                <button class="btn-save" id="btnSave" onclick="saveStock()">저장</button>
+            </div>
+
+            <div class="result-message" id="resultMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        // 현재 선택된 약품 코드
+        let selectedDrugCode = null;
+
+        // 페이지 로드 시 preselect 처리
+        document.addEventListener('DOMContentLoaded', function() {
+            const preselectCode = '{{ preselect_code or "" }}';
+            if (preselectCode) {
+                loadDrugByCode(preselectCode);
+            }
+        });
+
+        // 검색 입력 이벤트 (debounce 적용)
+        let searchTimeout = null;
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const keyword = this.value.trim();
+            clearTimeout(searchTimeout);
+
+            if (keyword.length < 2) {
+                document.getElementById('searchResults').style.display = 'none';
+                document.getElementById('searchHint').textContent = '2글자 이상 입력하면 검색됩니다';
+                document.getElementById('searchHint').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('searchHint').textContent = '검색 중...';
+            searchTimeout = setTimeout(() => searchDrugs(keyword), 300);
+        });
+
+        // 약품 검색
+        async function searchDrugs(keyword) {
+            try {
+                const response = await fetch(`/api/search-inventory?q=${encodeURIComponent(keyword)}`);
+                const data = await response.json();
+
+                const resultsDiv = document.getElementById('searchResults');
+                const hintDiv = document.getElementById('searchHint');
+
+                if (data.status === 'success' && data.count > 0) {
+                    resultsDiv.innerHTML = data.results.map(drug => `
+                        <div class="search-result-item" onclick="selectDrug('${drug.약품코드}')">
+                            <div class="drug-name">${escapeHtml(drug.약품명)}</div>
+                            <div class="drug-info">
+                                ${escapeHtml(drug.약품코드)} | ${escapeHtml(drug.제약회사 || '-')} | ${escapeHtml(drug.약품유형 || '미분류')}
+                                | <span class="current-stock">재고: ${formatNumber(drug.현재_재고수량)}개</span>
+                            </div>
+                        </div>
+                    `).join('');
+                    resultsDiv.style.display = 'block';
+                    hintDiv.style.display = 'none';
+                } else {
+                    resultsDiv.innerHTML = '<div class="no-results">검색 결과가 없습니다</div>';
+                    resultsDiv.style.display = 'block';
+                    hintDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('검색 실패:', error);
+                document.getElementById('searchHint').textContent = '검색 중 오류가 발생했습니다';
+            }
+        }
+
+        // 약품 선택
+        async function selectDrug(drugCode) {
+            await loadDrugByCode(drugCode);
+            document.getElementById('searchResults').style.display = 'none';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchHint').textContent = '2글자 이상 입력하면 검색됩니다';
+            document.getElementById('searchHint').style.display = 'block';
+        }
+
+        // 약품코드로 상세 정보 로드
+        async function loadDrugByCode(drugCode) {
+            try {
+                const response = await fetch(`/api/get-inventory/${encodeURIComponent(drugCode)}`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const drug = data.data;
+                    selectedDrugCode = drug.약품코드;
+
+                    document.getElementById('selectedDrugName').textContent = drug.약품명;
+                    document.getElementById('detailDrugCode').textContent = drug.약품코드;
+                    document.getElementById('detailCompany').textContent = drug.제약회사 || '-';
+                    document.getElementById('detailDrugType').textContent = drug.약품유형 || '미분류';
+                    document.getElementById('detailLastUpdate').textContent = drug.최종_업데이트일시 || '-';
+                    document.getElementById('currentStock').value = formatNumber(drug.현재_재고수량);
+                    document.getElementById('newStock').value = '';
+
+                    document.getElementById('selectedDrugSection').classList.add('active');
+                    document.getElementById('resultMessage').className = 'result-message';
+
+                    document.getElementById('newStock').focus();
+                } else {
+                    alert('약품 정보를 불러올 수 없습니다: ' + (data.message || '알 수 없는 오류'));
+                }
+            } catch (error) {
+                console.error('약품 정보 로드 실패:', error);
+                alert('약품 정보를 불러오는 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 선택 해제
+        function clearSelection() {
+            selectedDrugCode = null;
+            document.getElementById('selectedDrugSection').classList.remove('active');
+            document.getElementById('resultMessage').className = 'result-message';
+        }
+
+        // 재고 저장
+        async function saveStock() {
+            if (!selectedDrugCode) {
+                alert('약품을 먼저 선택해주세요.');
+                return;
+            }
+
+            const newStockInput = document.getElementById('newStock');
+            const newStock = newStockInput.value;
+
+            if (newStock === '') {
+                alert('새 재고수량을 입력해주세요.');
+                newStockInput.focus();
+                return;
+            }
+
+            const newStockNum = parseFloat(newStock);
+            if (isNaN(newStockNum)) {
+                alert('유효한 숫자를 입력해주세요.');
+                newStockInput.focus();
+                return;
+            }
+
+            const btnSave = document.getElementById('btnSave');
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<span class="loading"></span>저장 중...';
+
+            try {
+                const response = await fetch('/api/update-inventory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drug_code: selectedDrugCode,
+                        new_stock: newStockNum
+                    })
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('resultMessage');
+
+                if (data.status === 'success') {
+                    resultDiv.textContent = `재고가 ${formatNumber(data.previous_stock)}개에서 ${formatNumber(data.new_stock)}개로 변경되었습니다.`;
+                    resultDiv.className = 'result-message success';
+                    document.getElementById('currentStock').value = formatNumber(data.new_stock);
+                    document.getElementById('newStock').value = '';
+                } else {
+                    resultDiv.textContent = '오류: ' + data.message;
+                    resultDiv.className = 'result-message error';
+                }
+            } catch (error) {
+                console.error('저장 실패:', error);
+                document.getElementById('resultMessage').textContent = '저장 중 오류가 발생했습니다.';
+                document.getElementById('resultMessage').className = 'result-message error';
+            } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = '저장';
+            }
+        }
+
+        // Enter 키로 저장
+        document.getElementById('newStock').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                saveStock();
+            }
+        });
+
+        // 유틸리티 함수: HTML 이스케이프
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 유틸리티 함수: 숫자 포맷
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '0';
+            return Number(num).toLocaleString();
+        }
+    </script>
+</body>
+</html>

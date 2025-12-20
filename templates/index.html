@@ -66,6 +66,25 @@
             font-size: 1em;
         }
 
+        .header-utils {
+            margin-top: 15px;
+        }
+
+        .header-utils a {
+            color: #4299e1;
+            text-decoration: none;
+            font-size: 0.9em;
+            padding: 6px 12px;
+            border: 1px solid #4299e1;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .header-utils a:hover {
+            background: #4299e1;
+            color: white;
+        }
+
         .db-info {
             background-color: #e8f5e9;
             border-left: 4px solid #4caf50;
@@ -811,6 +830,9 @@
                 <span>Jaego</span>
             </h1>
             <p>약국 재고 관리 및 분석 시스템</p>
+            <div class="header-utils">
+                <a href="/inventory/edit">✏️ 재고 수정</a>
+            </div>
         </div>
 
         <div class="db-info">

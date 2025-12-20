@@ -49,6 +49,7 @@
 - **💾 데이터 무결성**: 약품코드 string 처리 및 float 형태 자동 정규화
 - **📅 최신 재고 자동 채택**: 각 약품별로 가장 최근 월의 재고 자동 선택
 - **➖ 음수 재고 지원**: 마이너스 재고 정확히 반영
+- **✏️ 재고 직접 수정**: 메인 페이지에서 개별 약품의 재고를 즉시 수정 가능 (v3.10)
 
 #### 워크플로우 1: 단순 재고 관리 보고서 (v3.7 개선)
 - **🎯 사용자 정의 이동평균**: 1~12개월 중 선택 가능 (기본 3개월)
@@ -274,6 +275,7 @@ yak-jaego/
 │   └── ...                        # 기타 월별 데이터
 ├── templates/                     # 웹 UI HTML 템플릿 폴더
 │   ├── index.html                 # 랜딩 페이지
+│   ├── inventory_edit.html        # 재고 수정 페이지 (v3.10)
 │   ├── workflow_simple.html       # 단순 재고 관리 워크플로우 페이지 (v3.6)
 │   ├── workflow_timeseries.html   # 상세 재고 관리 워크플로우 페이지
 │   ├── workflow_order.html        # 주문 계산 워크플로우 페이지
@@ -333,6 +335,11 @@ yak-jaego/
 
 #### 주요 기능:
 - `recent_inventory.sqlite3` 관리
+- **재고 업데이트 시점** (4가지 상황):
+  1. `init_db.py` 실행 시 (DB 초기화/재생성)
+  2. `inventory_updater.py` CLI 실행 시
+  3. 웹 UI에서 today 파일 업로드 시 (`/api/calculate-order`)
+  4. 웹 UI에서 개별 약품 재고 수정 시 (`/api/update-inventory`) ← v3.10 신규
 - 테이블 스키마:
   ```sql
   CREATE TABLE recent_inventory (
@@ -473,6 +480,30 @@ for month in months_reversed:
 - 다중 인코딩 지원 (UTF-8, CP949, EUC-KR)
 
 ## 🎯 핵심 개선 사항
+
+### v3.10 업데이트 (재고 직접 수정 기능)
+
+1. **개별 약품 재고 수정 페이지 추가**
+   - ✏️ **재고 수정 링크**: 메인 페이지 헤더에 "재고 수정" 링크 추가
+   - 🔍 **약품 검색**: 약품명, 약품코드, 제약회사로 검색 가능
+   - 📝 **즉시 수정**: 검색 결과에서 약품 선택 후 재고수량 직접 입력
+   - ✅ **실시간 반영**: 수정 즉시 `recent_inventory.sqlite3` DB에 반영
+
+2. **사용 시나리오**
+   - 📊 **보고서 검토 중 오류 발견**: 보고서에서 잘못된 재고 발견 시 즉시 수정
+   - 📦 **재고 실사 후 조정**: 실제 재고와 DB 불일치 시 개별 수정
+   - ➖ **음수 재고 허용**: 실제 운영 상황 반영 가능
+
+3. **API 엔드포인트**
+   - `GET /inventory/edit`: 재고 수정 페이지
+   - `GET /api/search-inventory?q=검색어`: 약품 검색
+   - `GET /api/get-inventory/<drug_code>`: 특정 약품 정보 조회
+   - `POST /api/update-inventory`: 재고 수정 (drug_code, new_stock)
+
+4. **기술 구현**
+   - `inventory_db.py`: `update_single_inventory()`, `search_inventory()` 함수 추가
+   - `web_app.py`: 4개 API 엔드포인트 추가
+   - `templates/inventory_edit.html`: 검색 및 수정 UI
 
 ### v3.9 업데이트 (사용자 정의 런웨이 경계값)
 

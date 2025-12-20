@@ -711,6 +711,102 @@ def delete_report():
         return jsonify({'error': str(e)}), 500
 
 
+# ============================================================
+# 재고 수정 관련 API
+# ============================================================
+
+@app.route('/inventory/edit')
+def inventory_edit_page():
+    """재고 수정 전용 페이지"""
+    # 쿼리 파라미터로 약품코드가 전달되면 pre-select 상태로 표시
+    preselect_code = request.args.get('drug_code', None)
+    return render_template('inventory_edit.html', preselect_code=preselect_code)
+
+
+@app.route('/api/search-inventory', methods=['GET'])
+def search_inventory_api():
+    """약품 검색 API"""
+    try:
+        keyword = request.args.get('q', '').strip()
+
+        if not keyword or len(keyword) < 2:
+            return jsonify({'status': 'error', 'message': '검색어는 2글자 이상 입력해주세요.'}), 400
+
+        results = inventory_db.search_inventory(keyword, limit=50)
+
+        return jsonify({
+            'status': 'success',
+            'count': len(results),
+            'results': results
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/get-inventory/<drug_code>', methods=['GET'])
+def get_inventory_api(drug_code):
+    """단일 약품 정보 조회 API"""
+    try:
+        result = inventory_db.get_inventory(drug_code)
+
+        if result:
+            return jsonify({
+                'status': 'success',
+                'data': result
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '해당 약품을 찾을 수 없습니다.'}), 404
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/update-inventory', methods=['POST'])
+def update_inventory_api():
+    """단일 약품 재고 수정 API"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        new_stock = data.get('new_stock')
+
+        # 유효성 검사
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
+
+        if new_stock is None:
+            return jsonify({'status': 'error', 'message': '재고수량이 없습니다.'}), 400
+
+        try:
+            new_stock = float(new_stock)
+            # 음수 재고 허용 (시스템 정책)
+        except ValueError:
+            return jsonify({'status': 'error', 'message': '유효하지 않은 재고수량입니다.'}), 400
+
+        # 재고 업데이트
+        result = inventory_db.update_single_inventory(drug_code, new_stock)
+
+        if result['success']:
+            print(f"✅ 재고 수정: {drug_code} ({result['previous_stock']} → {result['new_stock']})")
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'previous_stock': result['previous_stock'],
+                'new_stock': result['new_stock']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 404
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
     """Flask 앱 종료 API"""

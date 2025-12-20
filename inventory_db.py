@@ -260,6 +260,107 @@ def db_exists():
     return os.path.exists(DB_PATH)
 
 
+def update_single_inventory(약품코드, 재고수량):
+    """
+    단일 약품의 재고수량만 업데이트
+
+    Args:
+        약품코드 (str): 업데이트할 약품의 코드
+        재고수량 (float): 새로운 재고수량 (음수 허용)
+
+    Returns:
+        dict: {
+            'success': bool,
+            'message': str,
+            'previous_stock': float (성공 시),
+            'new_stock': float (성공 시)
+        }
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 기존 데이터 확인
+        cursor.execute(f'''
+            SELECT 현재_재고수량 FROM {TABLE_NAME}
+            WHERE 약품코드 = ?
+        ''', (str(약품코드),))
+
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return {'success': False, 'message': '해당 약품을 찾을 수 없습니다.'}
+
+        previous_stock = row[0]
+        update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 재고수량 업데이트
+        cursor.execute(f'''
+            UPDATE {TABLE_NAME}
+            SET 현재_재고수량 = ?, 최종_업데이트일시 = ?
+            WHERE 약품코드 = ?
+        ''', (float(재고수량), update_time, str(약품코드)))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            'success': True,
+            'message': '재고가 성공적으로 업데이트되었습니다.',
+            'previous_stock': previous_stock,
+            'new_stock': float(재고수량)
+        }
+
+    except Exception as e:
+        print(f"❌ 재고 업데이트 실패: {e}")
+        return {'success': False, 'message': str(e)}
+
+
+def search_inventory(keyword, limit=50):
+    """
+    약품 검색 (약품명, 약품코드, 제약회사로 검색)
+
+    Args:
+        keyword (str): 검색어
+        limit (int): 최대 결과 수
+
+    Returns:
+        list of dict: 검색 결과
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        search_pattern = f'%{keyword}%'
+
+        cursor.execute(f'''
+            SELECT 약품코드, 약품명, 제약회사, 약품유형, 현재_재고수량, 최종_업데이트일시
+            FROM {TABLE_NAME}
+            WHERE 약품코드 LIKE ? OR 약품명 LIKE ? OR 제약회사 LIKE ?
+            LIMIT ?
+        ''', (search_pattern, search_pattern, search_pattern, limit))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        result = []
+        for row in rows:
+            result.append({
+                '약품코드': row[0],
+                '약품명': row[1],
+                '제약회사': row[2],
+                '약품유형': row[3],
+                '현재_재고수량': row[4],
+                '최종_업데이트일시': row[5]
+            })
+
+        return result
+
+    except Exception as e:
+        print(f"❌ 약품 검색 실패: {e}")
+        return []
+
+
 if __name__ == '__main__':
     # 테스트 코드
     print("=== inventory_db.py 테스트 ===\n")
