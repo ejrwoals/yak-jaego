@@ -219,6 +219,111 @@
         .btn-shutdown:active {
             transform: translateY(0);
         }
+
+        /* 슬라이더 섹션 스타일 */
+        .slider-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .slider-section h3 {
+            color: #2c3e50;
+            font-size: 1em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slider-container {
+            position: relative;
+            width: 100%;
+            padding: 10px 0;
+        }
+
+        .slider-track {
+            position: relative;
+            width: 100%;
+            height: 12px;
+            background: linear-gradient(90deg, #f56565 0%, #fbd38d 50%, #68d391 100%);
+            border-radius: 6px;
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 28px;
+            height: 28px;
+            background: white;
+            border: 3px solid #4b5563;
+            border-radius: 50%;
+            cursor: grab;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: box-shadow 0.2s, transform 0.1s;
+            z-index: 10;
+        }
+
+        .slider-handle:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .slider-handle:active {
+            cursor: grabbing;
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .slider-handle::before {
+            content: '⋮';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            color: #4b5563;
+            font-weight: bold;
+        }
+
+        .slider-labels {
+            position: relative;
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #718096;
+            height: 20px;
+        }
+
+        .slider-labels span {
+            position: absolute;
+            transform: translateX(-50%);
+        }
+
+        .slider-value-display {
+            text-align: center;
+            margin-top: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .slider-value-display .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .slider-value-display .unit {
+            color: #718096;
+            font-size: 0.9em;
+        }
+
+        .slider-value-display .description {
+            color: #718096;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -236,9 +341,34 @@
             <ul>
                 <li>오늘 나간 약품의 재고 현황 파일을 업로드해주세요</li>
                 <li>지원 형식: <strong>.csv, .xls, .xlsx</strong></li>
-                <li>런웨이 1개월 미만 약품은 노란색으로 강조됩니다</li>
+                <li>런웨이 <span id="thresholdInfoText">1</span>개월 미만 약품은 노란색으로 강조됩니다</li>
                 <li>표의 각 행을 클릭하면 자세한 차트와 주문수량 계산기가 나옵니다</li>
             </ul>
+        </div>
+
+        <!-- 런웨이 임계값 슬라이더 -->
+        <div class="slider-section">
+            <h3>🎚️ 강조 표시 기준 런웨이</h3>
+            <div class="slider-container">
+                <div class="slider-track" id="sliderTrack">
+                    <div class="slider-handle" id="sliderHandle"></div>
+                </div>
+                <div class="slider-labels">
+                    <span style="left: 0%;">0.5</span>
+                    <span style="left: 9.09%;">1</span>
+                    <span style="left: 27.27%;">2</span>
+                    <span style="left: 45.45%;">3</span>
+                    <span style="left: 63.64%;">4</span>
+                    <span style="left: 81.82%;">5</span>
+                    <span style="left: 100%;">6</span>
+                </div>
+            </div>
+            <div class="slider-value-display">
+                <span class="value" id="thresholdValue">1</span>
+                <span class="unit">개월 미만</span>
+                <div class="description">이 기준 미만의 런웨이를 가진 약품이 강조 표시됩니다</div>
+            </div>
+            <input type="hidden" id="runwayThreshold" value="1">
         </div>
 
         <div class="upload-section">
@@ -262,7 +392,101 @@
     </button>
 
     <script>
-        // 파일 선택 핸들러
+        // ========== 슬라이더 로직 ==========
+        (function() {
+            const MIN_VALUE = 0.5;
+            const MAX_VALUE = 6;
+            const STEP = 0.5;
+            let currentValue = 1;  // 기본값
+
+            const track = document.getElementById('sliderTrack');
+            const handle = document.getElementById('sliderHandle');
+            const thresholdInput = document.getElementById('runwayThreshold');
+            const thresholdValue = document.getElementById('thresholdValue');
+            const thresholdInfoText = document.getElementById('thresholdInfoText');
+
+            // 값을 퍼센트로 변환
+            function valueToPercent(value) {
+                return ((value - MIN_VALUE) / (MAX_VALUE - MIN_VALUE)) * 100;
+            }
+
+            // 퍼센트를 값으로 변환
+            function percentToValue(percent) {
+                const rawValue = MIN_VALUE + (percent / 100) * (MAX_VALUE - MIN_VALUE);
+                // STEP 단위로 반올림
+                return Math.round(rawValue / STEP) * STEP;
+            }
+
+            // UI 업데이트
+            function updateUI() {
+                const percent = valueToPercent(currentValue);
+                handle.style.left = percent + '%';
+                thresholdInput.value = currentValue;
+                thresholdValue.textContent = currentValue;
+                thresholdInfoText.textContent = currentValue;
+            }
+
+            // 마우스 위치에서 값 계산
+            function getValueFromPosition(clientX) {
+                const rect = track.getBoundingClientRect();
+                let percent = ((clientX - rect.left) / rect.width) * 100;
+                percent = Math.max(0, Math.min(100, percent));
+                return percentToValue(percent);
+            }
+
+            // 드래그 이벤트
+            let isDragging = false;
+
+            handle.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                e.preventDefault();
+                document.body.style.cursor = 'grabbing';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                currentValue = getValueFromPosition(e.clientX);
+                updateUI();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+
+            // 터치 이벤트 지원
+            handle.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                e.preventDefault();
+            });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                currentValue = getValueFromPosition(touch.clientX);
+                updateUI();
+            });
+
+            document.addEventListener('touchend', () => {
+                isDragging = false;
+            });
+
+            // 트랙 클릭 시 해당 위치로 이동
+            track.addEventListener('click', (e) => {
+                if (e.target === handle) return;
+                currentValue = getValueFromPosition(e.clientX);
+                updateUI();
+            });
+
+            // 초기화
+            updateUI();
+        })();
+
+        // ========== 파일 선택 핸들러 ==========
         const fileInput = document.getElementById('todayFileInput');
         const fileName = document.getElementById('fileName');
         const calculateBtn = document.getElementById('calculateBtn');
@@ -290,15 +514,17 @@
 
             const btn = calculateBtn;
             const originalText = btn.innerHTML;
+            const runwayThreshold = document.getElementById('runwayThreshold').value;
 
             try {
                 // 버튼 비활성화 및 로딩 표시
                 btn.disabled = true;
                 btn.innerHTML = '<span class="loading"></span> 계산 중...';
 
-                // FormData 생성
+                // FormData 생성 (런웨이 임계값 포함)
                 const formData = new FormData();
                 formData.append('todayFile', file);
+                formData.append('runway_threshold', runwayThreshold);
 
                 showStatus('파일을 업로드하고 주문 수량을 계산하고 있습니다...', 'info');
 

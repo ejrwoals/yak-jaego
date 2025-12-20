@@ -242,6 +242,13 @@ def calculate_order():
     temp_filepath = None
 
     try:
+        # 런웨이 임계값 파라미터 추출 (기본값 1.0)
+        runway_threshold = float(request.form.get('runway_threshold', 1.0))
+
+        # 임계값 유효성 검사 (0.5 ~ 6개월)
+        if not (0.5 <= runway_threshold <= 6):
+            return jsonify({'error': '런웨이 임계값은 0.5~6 사이여야 합니다.'}), 400
+
         # 파일이 업로드 되었는지 확인
         if 'todayFile' not in request.files:
             return jsonify({'error': '파일이 업로드되지 않았습니다.'}), 400
@@ -359,7 +366,7 @@ def calculate_order():
                 month_date = start_date + relativedelta(months=i)
                 months.append(month_date.strftime('%Y-%m'))
 
-        html_content = generate_order_report_html(df_merged, col_map, months=months)
+        html_content = generate_order_report_html(df_merged, col_map, months=months, runway_threshold=runway_threshold)
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
@@ -378,7 +385,8 @@ def calculate_order():
             'html_filename': os.path.basename(html_path),
             'csv_filename': os.path.basename(csv_path),
             'drug_count': len(df_merged),
-            'urgent_count': len(df_merged[df_merged['런웨이_1년평균'] < 1])
+            'urgent_count': len(df_merged[(df_merged['런웨이_1년평균'] < runway_threshold) | (df_merged['런웨이_3개월평균'] < runway_threshold)]),
+            'runway_threshold': runway_threshold
         })
 
     except Exception as e:

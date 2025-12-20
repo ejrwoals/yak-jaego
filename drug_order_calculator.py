@@ -203,7 +203,7 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_table_rows(df, col_map=None, months=None):
+def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
     """테이블 행 HTML 생성 (인라인 차트 지원)
 
     Args:
@@ -212,6 +212,7 @@ def generate_table_rows(df, col_map=None, months=None):
             기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
         months: 월 리스트 (차트용)
+        runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
     """
     import json
     import ast
@@ -245,12 +246,12 @@ def generate_table_rows(df, col_map=None, months=None):
         runway = row[cm['runway']]
         ma3_runway = row[cm['ma3_runway']]
 
-        # 런웨이 < 1인 경우 행 전체를 빨간색으로
-        is_urgent = runway < 1 or ma3_runway < 1
+        # 런웨이가 임계값 미만인 경우 행 전체를 빨간색으로
+        is_urgent = runway < runway_threshold or ma3_runway < runway_threshold
         row_class = 'urgent-row clickable-row' if is_urgent else 'clickable-row'
 
-        runway_class = 'urgent-cell' if runway < 1 else 'normal-cell'
-        ma3_runway_class = 'urgent-cell' if ma3_runway < 1 else 'normal-cell'
+        runway_class = 'urgent-cell' if runway < runway_threshold else 'normal-cell'
+        ma3_runway_class = 'urgent-cell' if ma3_runway < runway_threshold else 'normal-cell'
 
         runway_display = f'{runway:.2f}' if runway < 999 else '재고만 있음'
         ma3_runway_display = f'{ma3_runway:.2f}' if ma3_runway < 999 else '재고만 있음'
@@ -357,7 +358,7 @@ def generate_new_drugs_table_rows(df, col_map):
     return rows
 
 
-def generate_order_report_html(df, col_map=None, months=None):
+def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1.0):
     """주문 보고서 HTML 생성 (재사용 가능한 함수)
 
     Args:
@@ -366,6 +367,7 @@ def generate_order_report_html(df, col_map=None, months=None):
             기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
         months: 월 리스트 (차트용)
+        runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
 
     Returns:
         str: HTML 문자열
@@ -413,13 +415,13 @@ def generate_order_report_html(df, col_map=None, months=None):
     unclassified_count = len(unclassified_df)
 
     # 긴급 주문 필요 약품 개수 (유형별, 재고 > 0인 약품 중)
-    dispense_urgent = len(dispense_df[(dispense_df[cm['runway']] < 1) | (dispense_df[cm['ma3_runway']] < 1)])
-    sale_urgent = len(sale_df[(sale_df[cm['runway']] < 1) | (sale_df[cm['ma3_runway']] < 1)])
+    dispense_urgent = len(dispense_df[(dispense_df[cm['runway']] < runway_threshold) | (dispense_df[cm['ma3_runway']] < runway_threshold)])
+    sale_urgent = len(sale_df[(sale_df[cm['runway']] < runway_threshold) | (sale_df[cm['ma3_runway']] < runway_threshold)])
     total_urgent = dispense_urgent + sale_urgent
 
-    # 테이블 행 생성 (months 전달)
-    dispense_rows = generate_table_rows(dispense_df, cm, months)
-    sale_rows = generate_table_rows(sale_df, cm, months)
+    # 테이블 행 생성 (months, runway_threshold 전달)
+    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold)
+    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
@@ -1079,7 +1081,7 @@ def generate_order_report_html(df, col_map=None, months=None):
 <body>
     <div class="header">
         <h1>📦 약 주문 수량 산출 보고서</h1>
-        <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 강조 기준: 런웨이 {runway_threshold}개월 미만</p>
     </div>
 
     <div class="alert-sidebar">
