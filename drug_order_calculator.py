@@ -588,12 +588,15 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 'memo': ct.get('메모', '')
             })
 
+    # 오늘 파일에 있는 약품 중 개별 임계값 설정된 약품 수로 업데이트
+    custom_threshold_count = len(custom_threshold_drugs)
+
     custom_threshold_rows = ""
     for drug in custom_threshold_drugs:
         stock_th = f"{drug['stock_threshold']}개 이하" if drug['stock_threshold'] is not None else "-"
         runway_th = f"{drug['runway_threshold']}개월 미만" if drug['runway_threshold'] is not None else "-"
         custom_threshold_rows += f"""
-            <tr>
+            <tr data-threshold-drug-code="{drug['code']}">
                 <td>{drug['name']}</td>
                 <td>{drug['code']}</td>
                 <td style="text-align: right;">{drug['stock']:.0f}</td>
@@ -617,7 +620,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <div id="customThresholdModal" class="modal">
         <div class="modal-content">
             <div class="modal-header" style="background-color: #805ad5;">
-                <h3>⚙️ 개별 임계값 설정 약품 ({custom_threshold_count}개)</h3>
+                <h3>⚙️ 개별 임계값 설정 약품 (<span id="customThresholdModalCount">{custom_threshold_count}</span>개)</h3>
                 <span class="modal-close" onclick="closeCustomThresholdModal()">&times;</span>
             </div>
             <div class="modal-body">
@@ -633,7 +636,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                             <th>메모</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="customThresholdTbody">
                         {custom_threshold_rows}
                     </tbody>
                 </table>
@@ -1229,109 +1232,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             color: #718096;
             margin-top: 12px;
         }}
-        /* 인라인 임계값 설정 폼 */
-        .threshold-settings {{
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px dashed #e2e8f0;
-        }}
-        .threshold-settings-header {{
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            color: #805ad5;
-            font-size: 14px;
-            font-weight: 600;
-        }}
-        .threshold-settings-header:hover {{
-            color: #6b46c1;
-        }}
-        .threshold-settings-form {{
-            display: none;
-            margin-top: 12px;
-            padding: 12px;
-            background: #f8f4ff;
-            border-radius: 6px;
-        }}
-        .threshold-settings-form.visible {{
-            display: block;
-        }}
-        .threshold-input-group {{
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }}
-        .threshold-input {{
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }}
-        .threshold-input label {{
-            font-size: 12px;
-            color: #4a5568;
-            font-weight: 500;
-        }}
-        .threshold-input input {{
-            width: 100px;
-            padding: 6px 10px;
-            border: 1px solid #cbd5e0;
-            border-radius: 4px;
-            font-size: 14px;
-        }}
-        .threshold-input input:focus {{
-            outline: none;
-            border-color: #805ad5;
-            box-shadow: 0 0 0 2px rgba(128, 90, 213, 0.2);
-        }}
-        .threshold-memo-input {{
-            flex: 1;
-            min-width: 150px;
-        }}
-        .threshold-memo-input input {{
-            width: 100%;
-        }}
-        .threshold-buttons {{
-            display: flex;
-            gap: 8px;
-        }}
-        .threshold-btn {{
-            padding: 6px 14px;
-            border: none;
-            border-radius: 4px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }}
-        .threshold-btn.save {{
-            background: #805ad5;
-            color: white;
-        }}
-        .threshold-btn.save:hover {{
-            background: #6b46c1;
-        }}
-        .threshold-btn.delete {{
-            background: #e53e3e;
-            color: white;
-        }}
-        .threshold-btn.delete:hover {{
-            background: #c53030;
-        }}
-        .threshold-status {{
-            margin-top: 8px;
-            font-size: 12px;
-            padding: 6px 10px;
-            border-radius: 4px;
-        }}
-        .threshold-status.success {{
-            background: #c6f6d5;
-            color: #276749;
-        }}
-        .threshold-status.error {{
-            background: #fed7d7;
-            color: #c53030;
-        }}
     </style>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
@@ -1582,41 +1482,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                         </div>
                     </div>
 
-                    <!-- 개별 임계값 설정 -->
-                    <div class="threshold-settings">
-                        <div class="threshold-settings-header" onclick="toggleThresholdForm('${{drugCode}}')">
-                            <span>⚙️</span>
-                            <span>개별 임계값 설정</span>
-                            <span id="threshold-toggle-${{drugCode}}">▼</span>
-                        </div>
-                        <div id="threshold-form-${{drugCode}}" class="threshold-settings-form">
-                            <div class="threshold-input-group">
-                                <div class="threshold-input">
-                                    <label>재고 임계값 (N개 이하)</label>
-                                    <input type="number" id="stock-threshold-${{drugCode}}"
-                                           value="${{chartData.custom_threshold?.stock_threshold || ''}}"
-                                           placeholder="미설정">
-                                </div>
-                                <div class="threshold-input">
-                                    <label>런웨이 임계값 (M개월 미만)</label>
-                                    <input type="number" step="0.5" id="runway-threshold-input-${{drugCode}}"
-                                           value="${{chartData.custom_threshold?.runway_threshold || ''}}"
-                                           placeholder="미설정">
-                                </div>
-                                <div class="threshold-input threshold-memo-input">
-                                    <label>메모</label>
-                                    <input type="text" id="threshold-memo-${{drugCode}}"
-                                           value="${{chartData.custom_threshold?.memo || ''}}"
-                                           placeholder="설정 이유 (선택사항)">
-                                </div>
-                                <div class="threshold-buttons">
-                                    <button class="threshold-btn save" onclick="saveThreshold('${{drugCode}}')">저장</button>
-                                    <button class="threshold-btn delete" onclick="deleteThreshold('${{drugCode}}')">삭제</button>
-                                </div>
-                            </div>
-                            <div id="threshold-status-${{drugCode}}" class="threshold-status" style="display: none;"></div>
-                        </div>
-                    </div>
                 </td>
             `;
 
@@ -1724,135 +1589,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             updateSingleProgressBar('ma12', currentRunwayMa12, targetMonths, orderMa12);
         }}
 
-        // ========== 개별 임계값 설정 기능 ==========
-
-        // 임계값 설정 폼 토글
-        function toggleThresholdForm(drugCode) {{
-            const form = document.getElementById('threshold-form-' + drugCode);
-            const toggle = document.getElementById('threshold-toggle-' + drugCode);
-            if (form.classList.contains('visible')) {{
-                form.classList.remove('visible');
-                toggle.textContent = '▼';
-            }} else {{
-                form.classList.add('visible');
-                toggle.textContent = '▲';
-            }}
-        }}
-
-        // 임계값 저장
-        function saveThreshold(drugCode) {{
-            const stockInput = document.getElementById('stock-threshold-' + drugCode);
-            const runwayInput = document.getElementById('runway-threshold-input-' + drugCode);
-            const memoInput = document.getElementById('threshold-memo-' + drugCode);
-            const statusDiv = document.getElementById('threshold-status-' + drugCode);
-
-            const stockThreshold = stockInput.value ? parseInt(stockInput.value) : null;
-            const runwayThreshold = runwayInput.value ? parseFloat(runwayInput.value) : null;
-            const memo = memoInput.value || null;
-
-            if (stockThreshold === null && runwayThreshold === null) {{
-                statusDiv.textContent = '재고 또는 런웨이 임계값 중 하나는 설정해야 합니다.';
-                statusDiv.className = 'threshold-status error';
-                statusDiv.style.display = 'block';
-                return;
-            }}
-
-            fetch('/api/drug-threshold/' + drugCode, {{
-                method: 'POST',
-                headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{
-                    stock_threshold: stockThreshold,
-                    runway_threshold: runwayThreshold,
-                    memo: memo
-                }})
-            }})
-            .then(response => response.json())
-            .then(data => {{
-                // 약품명 가져오기
-                const row = document.querySelector('tr[data-drug-code="' + drugCode + '"]');
-                let drugName = drugCode;
-                if (row) {{
-                    const chartDataStr = row.getAttribute('data-chart-data');
-                    if (chartDataStr) {{
-                        try {{
-                            drugName = JSON.parse(chartDataStr).drug_name || drugCode;
-                        }} catch(e) {{}}
-                    }}
-                }}
-
-                if (data.status === 'success') {{
-                    statusDiv.textContent = '✓ ' + drugName + ' 임계값이 저장되었습니다.';
-                    statusDiv.className = 'threshold-status success';
-                    // 약품명에 아이콘 추가 (없으면)
-                    if (row) {{
-                        const nameCell = row.cells[0];
-                        if (!nameCell.innerHTML.includes('custom-threshold-icon')) {{
-                            nameCell.innerHTML = '<span class="custom-threshold-icon" title="개별 임계값 설정됨">⚙️</span> ' + nameCell.innerHTML;
-                        }}
-                    }}
-                }} else {{
-                    statusDiv.textContent = '✗ ' + (data.message || '저장 실패');
-                    statusDiv.className = 'threshold-status error';
-                }}
-                statusDiv.style.display = 'block';
-            }})
-            .catch(error => {{
-                statusDiv.textContent = '✗ 저장 실패: ' + error.message;
-                statusDiv.className = 'threshold-status error';
-                statusDiv.style.display = 'block';
-            }});
-        }}
-
-        // 임계값 삭제
-        function deleteThreshold(drugCode) {{
-            const statusDiv = document.getElementById('threshold-status-' + drugCode);
-
-            // 약품명 가져오기
-            const row = document.querySelector('tr[data-drug-code="' + drugCode + '"]');
-            let drugName = drugCode;
-            if (row) {{
-                const chartDataStr = row.getAttribute('data-chart-data');
-                if (chartDataStr) {{
-                    try {{
-                        drugName = JSON.parse(chartDataStr).drug_name || drugCode;
-                    }} catch(e) {{}}
-                }}
-            }}
-
-            if (!confirm(drugName + '의 개별 임계값 설정을 삭제하시겠습니까?')) {{
-                return;
-            }}
-
-            fetch('/api/drug-threshold/' + drugCode, {{
-                method: 'DELETE'
-            }})
-            .then(response => response.json())
-            .then(data => {{
-                if (data.status === 'success') {{
-                    statusDiv.textContent = '✓ ' + drugName + ' 임계값이 삭제되었습니다.';
-                    statusDiv.className = 'threshold-status success';
-                    // 입력 필드 초기화
-                    document.getElementById('stock-threshold-' + drugCode).value = '';
-                    document.getElementById('runway-threshold-input-' + drugCode).value = '';
-                    document.getElementById('threshold-memo-' + drugCode).value = '';
-                    // 약품명에서 아이콘 제거
-                    if (row) {{
-                        const nameCell = row.cells[0];
-                        nameCell.innerHTML = nameCell.innerHTML.replace(/<span class="custom-threshold-icon"[^>]*>⚙️<\/span>\s*/g, '');
-                    }}
-                }} else {{
-                    statusDiv.textContent = '✗ ' + (data.message || '삭제 실패');
-                    statusDiv.className = 'threshold-status error';
-                }}
-                statusDiv.style.display = 'block';
-            }})
-            .catch(error => {{
-                statusDiv.textContent = '✗ 삭제 실패: ' + error.message;
-                statusDiv.className = 'threshold-status error';
-                statusDiv.style.display = 'block';
-            }});
-        }}
-
         // 차트 렌더링
         function renderInlineChart(drugCode, chartData) {{
             const chartContainer = document.getElementById('inline-chart-' + drugCode);
@@ -1952,6 +1688,78 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
             Plotly.newPlot(chartContainer, traces, layout, {{displayModeBar: false, responsive: true}});
         }}
+
+        // ========== 페이지 로드 시 최신 임계값 동기화 ==========
+        window.addEventListener('DOMContentLoaded', function() {{
+            fetch('/api/drug-thresholds')
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.status === 'success') {{
+                        // 약품코드 → 임계값 맵 생성
+                        const thresholdMap = {{}};
+                        data.data.forEach(item => {{
+                            thresholdMap[item.약품코드] = {{
+                                stock_threshold: item.절대재고_임계값,
+                                runway_threshold: item.런웨이_임계값,
+                                memo: item.메모 || ''
+                            }};
+                        }});
+
+                        // 모든 테이블 행 순회
+                        document.querySelectorAll('tr[data-drug-code]').forEach(row => {{
+                            const drugCode = row.getAttribute('data-drug-code');
+                            const nameCell = row.cells[0];
+                            if (!nameCell) return;
+                            const hasIcon = nameCell.innerHTML.includes('custom-threshold-icon');
+
+                            if (thresholdMap[drugCode]) {{
+                                // 임계값 있음 → 아이콘 추가 (없으면)
+                                if (!hasIcon) {{
+                                    nameCell.innerHTML = '<span class="custom-threshold-icon" title="개별 임계값 설정됨">⚙️</span> ' + nameCell.innerHTML;
+                                }}
+
+                                // data-chart-data 업데이트 (인라인 차트 열 때 최신 값 사용)
+                                try {{
+                                    const chartData = JSON.parse(row.getAttribute('data-chart-data'));
+                                    chartData.custom_threshold = thresholdMap[drugCode];
+                                    row.setAttribute('data-chart-data', JSON.stringify(chartData));
+                                }} catch(e) {{}}
+                            }} else {{
+                                // 임계값 없음 → 아이콘 제거 (있으면)
+                                if (hasIcon) {{
+                                    nameCell.innerHTML = nameCell.innerHTML.replace(
+                                        /<span class="custom-threshold-icon"[^>]*>⚙️<\/span>\s*/g,
+                                        ''
+                                    );
+                                }}
+
+                                // data-chart-data에서 custom_threshold 제거
+                                try {{
+                                    const chartData = JSON.parse(row.getAttribute('data-chart-data'));
+                                    chartData.custom_threshold = null;
+                                    row.setAttribute('data-chart-data', JSON.stringify(chartData));
+                                }} catch(e) {{}}
+                            }}
+                        }});
+
+                        // 책갈피 카운트 업데이트
+                        const countEl = document.querySelector('.alert-bookmark.custom .alert-count');
+                        if (countEl) {{
+                            countEl.textContent = data.count + '개';
+                        }}
+
+                        // 책갈피 표시/숨김
+                        const bookmark = document.querySelector('.alert-bookmark.custom');
+                        if (bookmark) {{
+                            bookmark.style.display = data.count > 0 ? 'flex' : 'none';
+                        }}
+                    }}
+                }})
+                .catch(error => {{
+                    console.error('임계값 동기화 실패:', error);
+                    // 실패 시 기존 HTML 상태 그대로 사용 (폴백)
+                }});
+        }});
     </script>
 </body>
 </html>
