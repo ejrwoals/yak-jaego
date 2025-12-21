@@ -14,6 +14,7 @@
 - `recent_inventory.sqlite3`: 각 약품의 최신 재고 수량 저장
 - `processed_inventory.sqlite3`: 시계열 통계 데이터 (1년 이동평균, 3개월 이동평균, 런웨이 등)
 - `checked_items.sqlite3`: 긴급 약품 확인 상태 저장 (v3.5 신규)
+- `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장 (v3.12 신규)
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
 - **음수 재고 지원**: 마이너스 재고도 정확히 반영
 - **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소
@@ -50,6 +51,7 @@
 - **📅 최신 재고 자동 채택**: 각 약품별로 가장 최근 월의 재고 자동 선택
 - **➖ 음수 재고 지원**: 마이너스 재고 정확히 반영
 - **✏️ 재고 직접 수정**: 메인 페이지에서 개별 약품의 재고를 즉시 수정 가능 (v3.10)
+- **⚙️ 개별 임계값 설정**: 특정 약품에 별도 재고/런웨이 임계값 설정으로 맞춤 강조 표시 (v3.12)
 
 #### 워크플로우 1: 단순 재고 관리 보고서 (v3.7 개선)
 - **🎯 사용자 정의 이동평균**: 1~12개월 중 선택 가능 (기본 3개월)
@@ -78,7 +80,8 @@
 - **📋 today.csv 기반 필터링**: 오늘 나간 약품만 표시
 - **🔄 자동 재고 업데이트**: today.csv 발견 시 DB 자동 업데이트
 - **🎚️ 사용자 정의 강조 임계값**: 슬라이더로 런웨이 기준 조절 (0.5~6개월, 기본 1개월)
-- **🚨 긴급 주문 식별**: 설정한 임계값 미만 약품 자동 하이라이트
+- **⚙️ 개별 약품 임계값**: 특정 약품에 별도 재고/런웨이 임계값 설정 가능 (v3.12)
+- **🚨 긴급 주문 식별**: 글로벌 OR 개별 임계값 미만 약품 자동 하이라이트
 - **🆕 신규 약품 알림**: 시계열 데이터 없는 신규 약품 자동 감지, 사이드바 책갈피로 표시 (hover 시 펼쳐짐)
 - **⚠️ 음수 재고 경고**: 재고 < 0인 약품 사이드바 책갈피로 경고 표시
 - **📊 런웨이 이중 계산**: 1년 이동평균 및 3개월 이동평균 기반 두 가지 런웨이 제공
@@ -280,6 +283,7 @@ yak-jaego/
 │   ├── workflow_simple.html       # 단순 재고 관리 워크플로우 페이지 (v3.6)
 │   ├── workflow_timeseries.html   # 상세 재고 관리 워크플로우 페이지
 │   ├── workflow_order.html        # 주문 계산 워크플로우 페이지
+│   ├── threshold_manage.html      # 개별 임계값 관리 페이지 (v3.12)
 │   └── error.html                 # 에러 페이지
 ├── inventory_reports/             # 재고 관리 보고서 폴더 (자동 생성)
 │   ├── simple_report_YYYYMMDD_HHMMSS.html      # 단순 보고서 (N-MA) (v3.6)
@@ -296,6 +300,7 @@ yak-jaego/
 ├── inventory_db.py                # recent_inventory.sqlite3 관리 모듈
 ├── processed_inventory_db.py      # processed_inventory.sqlite3 관리 모듈
 ├── checked_items_db.py            # checked_items.sqlite3 관리 모듈 (체크 상태 저장)
+├── drug_thresholds_db.py          # drug_thresholds.sqlite3 관리 모듈 (개별 임계값) (v3.12)
 ├── inventory_updater.py           # 재고 업데이트 모듈 (today 파일 → DB)
 ├── utils.py                       # 공통 유틸리티 함수 (Excel 파일 읽기 포함)
 ├── requirements.txt               # Python 의존성 목록
@@ -303,6 +308,7 @@ yak-jaego/
 ├── recent_inventory.sqlite3       # 최신 재고 DB (자동 생성)
 ├── processed_inventory.sqlite3    # 시계열 통계 DB (자동 생성)
 ├── checked_items.sqlite3          # 체크 상태 DB (자동 생성)
+├── drug_thresholds.sqlite3        # 개별 임계값 DB (자동 생성) (v3.12)
 └── README.md                      # 프로젝트 문서
 ```
 
@@ -481,6 +487,44 @@ for month in months_reversed:
 - 다중 인코딩 지원 (UTF-8, CP949, EUC-KR)
 
 ## 🎯 핵심 개선 사항
+
+### v3.12 업데이트 (개별 약품 임계값 설정 기능)
+
+1. **약품별 개별 임계값 설정**
+   - ⚙️ **개별 임계값 관리 페이지**: 메인 페이지 헤더에서 "개별 임계값 관리" 링크로 접근
+   - 🔍 **약품 검색 기반 설정**: 약품명으로 검색하여 임계값 설정 (약품코드 직접 입력 불필요)
+   - 📊 **두 가지 임계값 유형**:
+     - **재고 임계값**: N개 이하면 강조 표시
+     - **런웨이 임계값**: M개월 미만이면 강조 표시
+   - 🔄 **OR 조건 적용**: 둘 중 하나라도 충족하면 강조
+
+2. **주문 보고서 통합**
+   - 📋 **우선순위 정렬**: 개별 임계값이 적용된 약품이 테이블 상단에 표시
+   - 🏷️ **아이콘 표시**: 개별 설정된 약품에 ⚙️ 아이콘 표시
+   - 🎨 **하이라이트 통합**: 글로벌 임계값 OR 개별 임계값 트리거 시 노란색 배경
+
+3. **관리 페이지 기능**
+   - ➕ **모달 기반 추가**: 약품 검색 → 선택 → 임계값 입력 → 저장
+   - ✏️ **인라인 수정**: 테이블에서 직접 값 수정 가능
+   - 🗑️ **삭제**: 개별 임계값 설정 삭제
+   - 📝 **메모**: 설정 이유 메모 기능
+   - 📊 **통계 표시**: 전체 설정 수, 재고 임계값 수, 런웨이 임계값 수
+
+4. **사용 시나리오**
+   - 💊 **비정기 소모 약품**: 런웨이 기준이 맞지 않는 약품 (예: 계절성 약품)
+   - ⚠️ **잦은 품절 약품**: 평소보다 높은 재고 유지 필요
+   - 🏥 **중요 약품**: 특별 관리가 필요한 필수 약품
+
+5. **기술 구현**
+   - `drug_thresholds_db.py`: SQLite DB 관리 모듈 (CRUD + 히스토리)
+   - `drug_thresholds.sqlite3`: 개별 임계값 저장 DB
+   - `templates/threshold_manage.html`: 관리 페이지 UI
+   - `web_app.py`: API 엔드포인트 추가
+     - `GET /threshold/manage`: 관리 페이지
+     - `GET/POST/DELETE /api/drug-threshold/<drug_code>`: 단일 약품 CRUD
+     - `GET /api/drug-thresholds`: 전체 목록 조회
+     - `GET /api/drug-thresholds/stats`: 통계 조회
+   - `drug_order_calculator.py`: 보고서 생성 시 개별 임계값 반영
 
 ### v3.11 업데이트 (주문 워크플로우 런웨이 임계값 슬라이더)
 

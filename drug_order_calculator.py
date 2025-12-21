@@ -15,6 +15,7 @@ from datetime import datetime
 import webbrowser
 import inventory_db
 import processed_inventory_db
+import drug_thresholds_db
 
 
 def check_required_files():
@@ -203,7 +204,7 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
+def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, custom_thresholds=None):
     """테이블 행 HTML 생성 (인라인 차트 지원)
 
     Args:
@@ -213,6 +214,7 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
+        custom_thresholds: 개별 임계값 딕셔너리 {약품코드: {절대재고_임계값, 런웨이_임계값, ...}}
     """
     import json
     import ast
@@ -245,9 +247,27 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
     for _, row in df.iterrows():
         runway = row[cm['runway']]
         ma3_runway = row[cm['ma3_runway']]
+        stock = row[cm['stock']]
+        drug_code = str(row['약품코드'])
 
-        # 런웨이가 임계값 미만인 경우 행 전체를 빨간색으로
-        is_urgent = runway < runway_threshold or ma3_runway < runway_threshold
+        # 1. 글로벌 임계값 기준 (런웨이가 임계값 미만)
+        global_urgent = runway < runway_threshold or ma3_runway < runway_threshold
+
+        # 2. 개별 임계값 기준 (custom_thresholds에 설정된 경우)
+        custom_urgent = False
+        has_custom_threshold = False
+        if custom_thresholds and drug_code in custom_thresholds:
+            has_custom_threshold = True
+            ct = custom_thresholds[drug_code]
+            # 절대 재고 임계값 체크 (N개 이하)
+            if ct.get('절대재고_임계값') is not None and stock <= ct['절대재고_임계값']:
+                custom_urgent = True
+            # 런웨이 임계값 체크 (M개월 미만)
+            if ct.get('런웨이_임계값') is not None and runway < ct['런웨이_임계값']:
+                custom_urgent = True
+
+        # OR 조건: 글로벌 또는 개별 임계값 중 하나라도 충족하면 긴급
+        is_urgent = global_urgent or custom_urgent
         row_class = 'urgent-row clickable-row' if is_urgent else 'clickable-row'
 
         runway_class = 'urgent-cell' if runway < runway_threshold else 'normal-cell'
@@ -282,9 +302,18 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
                 trend_class = 'trend-stable'
 
         # 인라인 차트용 데이터 생성
-        drug_code = str(row['약품코드'])
         timeseries = parse_list_string(row.get('월별_조제수량_리스트', []))
         ma3_list = parse_list_string(row.get('3개월_이동평균_리스트', []))
+
+        # 개별 임계값 정보 (인라인 설정 폼용)
+        custom_threshold_info = None
+        if has_custom_threshold:
+            ct = custom_thresholds[drug_code]
+            custom_threshold_info = {
+                'stock_threshold': ct.get('절대재고_임계값'),
+                'runway_threshold': ct.get('런웨이_임계값'),
+                'memo': ct.get('메모', '')
+            }
 
         chart_data = {
             'drug_name': row['약품명'] if row['약품명'] else "정보없음",
@@ -296,16 +325,22 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
             'ma12': float(row[cm['ma12']]) if not pd.isna(row[cm['ma12']]) else 0,
             'ma3': float(row[cm['ma3']]) if not pd.isna(row[cm['ma3']]) else 0,
             'runway': runway_display,
-            'ma3_runway': ma3_runway_display
+            'ma3_runway': ma3_runway_display,
+            'custom_threshold': custom_threshold_info
         }
         chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
+
+        # 약품명에 개별 설정 아이콘 추가
+        drug_name_display = row['약품명'] if row['약품명'] else "정보없음"
+        if has_custom_threshold:
+            drug_name_display = f'<span class="custom-threshold-icon" title="개별 임계값 설정됨">⚙️</span> {drug_name_display}'
 
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
                 data-chart-data='{chart_data_json}'
                 onclick="toggleInlineChart(this, '{drug_code}')"
                 title="클릭하여 상세 차트 및 주문량 계산기 보기">
-                <td title="{html_escape(str(row['약품명']))}">{row['약품명']}</td>
+                <td title="{html_escape(str(row['약품명']))}">{drug_name_display}</td>
                 <td>{row['약품코드']}</td>
                 <td title="{html_escape(str(row['제약회사']))}">{row['제약회사']}</td>
                 <td>{row[cm['stock']]:.0f}</td>
@@ -372,6 +407,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     Returns:
         str: HTML 문자열
     """
+    import drug_thresholds_db
+
     # 기본 컬럼명 (drug_order_calculator.py 스타일)
     default_map = {
         'runway': '런웨이',
@@ -381,6 +418,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         'ma3': '3개월 이동평균'
     }
     cm = col_map if col_map else default_map
+
+    # 개별 임계값 로드
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
+    custom_threshold_count = len(custom_thresholds)
 
     # months가 없으면 빈 리스트
     if months is None:
@@ -419,9 +460,39 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     sale_urgent = len(sale_df[(sale_df[cm['runway']] < runway_threshold) | (sale_df[cm['ma3_runway']] < runway_threshold)])
     total_urgent = dispense_urgent + sale_urgent
 
+    # 긴급 약품 우선 정렬 (개별 OR 글로벌 임계값 트리거)
+    def is_urgent_check(row):
+        drug_code = str(row['약품코드'])
+        runway = row[cm['runway']]
+        ma3_runway = row[cm['ma3_runway']]
+        stock = row[cm['stock']]
+
+        # 글로벌 임계값 체크
+        if runway < runway_threshold or ma3_runway < runway_threshold:
+            return True
+
+        # 개별 임계값 체크
+        if drug_code in custom_thresholds:
+            ct = custom_thresholds[drug_code]
+            if ct.get('절대재고_임계값') is not None and stock <= ct['절대재고_임계값']:
+                return True
+            if ct.get('런웨이_임계값') is not None and runway < ct['런웨이_임계값']:
+                return True
+
+        return False
+
+    # 긴급 여부 컬럼 추가 및 정렬 (긴급 약품 먼저, 그 다음 런웨이 오름차순)
+    if len(dispense_df) > 0:
+        dispense_df['_is_urgent'] = dispense_df.apply(is_urgent_check, axis=1)
+        dispense_df = dispense_df.sort_values(['_is_urgent', cm['ma3_runway']], ascending=[False, True])
+
+    if len(sale_df) > 0:
+        sale_df['_is_urgent'] = sale_df.apply(is_urgent_check, axis=1)
+        sale_df = sale_df.sort_values(['_is_urgent', cm['ma3_runway']], ascending=[False, True])
+
     # 테이블 행 생성 (months, runway_threshold 전달)
-    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold)
-    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold)
+    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold, custom_thresholds)
+    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold, custom_thresholds)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
@@ -501,6 +572,75 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         </div>
     </div>
     """ if new_drugs_count > 0 else ""
+
+    # 개별 임계값 설정 약품 목록 생성
+    custom_threshold_drugs = []
+    for _, row in df.iterrows():
+        drug_code = str(row['약품코드'])
+        if drug_code in custom_thresholds:
+            ct = custom_thresholds[drug_code]
+            custom_threshold_drugs.append({
+                'code': drug_code,
+                'name': row['약품명'],
+                'stock': row[cm['stock']],
+                'stock_threshold': ct.get('절대재고_임계값'),
+                'runway_threshold': ct.get('런웨이_임계값'),
+                'memo': ct.get('메모', '')
+            })
+
+    custom_threshold_rows = ""
+    for drug in custom_threshold_drugs:
+        stock_th = f"{drug['stock_threshold']}개 이하" if drug['stock_threshold'] is not None else "-"
+        runway_th = f"{drug['runway_threshold']}개월 미만" if drug['runway_threshold'] is not None else "-"
+        custom_threshold_rows += f"""
+            <tr>
+                <td>{drug['name']}</td>
+                <td>{drug['code']}</td>
+                <td style="text-align: right;">{drug['stock']:.0f}</td>
+                <td style="text-align: center;">{stock_th}</td>
+                <td style="text-align: center;">{runway_th}</td>
+                <td>{drug['memo'] or '-'}</td>
+            </tr>
+"""
+
+    # 개별 설정 책갈피 HTML
+    custom_threshold_bookmark = f"""
+        <div class="alert-bookmark custom" onclick="openCustomThresholdModal()">
+            <span class="alert-icon">⚙️</span>
+            <span class="alert-title">개별 설정</span>
+            <span class="alert-count">{custom_threshold_count}개</span>
+        </div>
+    """ if custom_threshold_count > 0 else ""
+
+    # 개별 설정 모달 HTML
+    custom_threshold_modal = f"""
+    <div id="customThresholdModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #805ad5;">
+                <h3>⚙️ 개별 임계값 설정 약품 ({custom_threshold_count}개)</h3>
+                <span class="modal-close" onclick="closeCustomThresholdModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; margin-bottom: 15px;">개별 임계값이 설정된 약품입니다. 글로벌 임계값과 별도로 강조 표시됩니다.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>약품명</th>
+                            <th>약품코드</th>
+                            <th>현재 재고</th>
+                            <th>재고 임계값</th>
+                            <th>런웨이 임계값</th>
+                            <th>메모</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {custom_threshold_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    """ if custom_threshold_count > 0 else ""
 
     html = f"""
 <!DOCTYPE html>
@@ -726,6 +866,20 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         }}
         .alert-bookmark.info:hover {{
             box-shadow: -6px 6px 24px rgba(21, 101, 192, 0.4);
+        }}
+        .alert-bookmark.custom {{
+            background: linear-gradient(135deg, rgba(128, 90, 213, 0.75) 0%, rgba(91, 33, 182, 0.85) 100%);
+            box-shadow: -4px 4px 20px rgba(91, 33, 182, 0.3);
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }}
+        .alert-bookmark.custom:hover {{
+            box-shadow: -6px 6px 24px rgba(91, 33, 182, 0.4);
+        }}
+        .custom-threshold-icon {{
+            font-size: 12px;
+            margin-right: 2px;
+            cursor: help;
         }}
 
         /* 모달 스타일 */
@@ -1075,6 +1229,109 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             color: #718096;
             margin-top: 12px;
         }}
+        /* 인라인 임계값 설정 폼 */
+        .threshold-settings {{
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px dashed #e2e8f0;
+        }}
+        .threshold-settings-header {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #805ad5;
+            font-size: 14px;
+            font-weight: 600;
+        }}
+        .threshold-settings-header:hover {{
+            color: #6b46c1;
+        }}
+        .threshold-settings-form {{
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            background: #f8f4ff;
+            border-radius: 6px;
+        }}
+        .threshold-settings-form.visible {{
+            display: block;
+        }}
+        .threshold-input-group {{
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }}
+        .threshold-input {{
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }}
+        .threshold-input label {{
+            font-size: 12px;
+            color: #4a5568;
+            font-weight: 500;
+        }}
+        .threshold-input input {{
+            width: 100px;
+            padding: 6px 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }}
+        .threshold-input input:focus {{
+            outline: none;
+            border-color: #805ad5;
+            box-shadow: 0 0 0 2px rgba(128, 90, 213, 0.2);
+        }}
+        .threshold-memo-input {{
+            flex: 1;
+            min-width: 150px;
+        }}
+        .threshold-memo-input input {{
+            width: 100%;
+        }}
+        .threshold-buttons {{
+            display: flex;
+            gap: 8px;
+        }}
+        .threshold-btn {{
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }}
+        .threshold-btn.save {{
+            background: #805ad5;
+            color: white;
+        }}
+        .threshold-btn.save:hover {{
+            background: #6b46c1;
+        }}
+        .threshold-btn.delete {{
+            background: #e53e3e;
+            color: white;
+        }}
+        .threshold-btn.delete:hover {{
+            background: #c53030;
+        }}
+        .threshold-status {{
+            margin-top: 8px;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }}
+        .threshold-status.success {{
+            background: #c6f6d5;
+            color: #276749;
+        }}
+        .threshold-status.error {{
+            background: #fed7d7;
+            color: #c53030;
+        }}
     </style>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
@@ -1087,6 +1344,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <div class="alert-sidebar">
         {zero_stock_bookmark}
         {new_drugs_bookmark}
+        {custom_threshold_bookmark}
     </div>
 
     <div class="tab-container">
@@ -1148,6 +1406,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
     {zero_stock_modal}
     {new_drugs_modal}
+    {custom_threshold_modal}
 
     <script>
         function switchTab(tabName) {{
@@ -1182,15 +1441,27 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             document.getElementById('newDrugsModal').style.display = 'none';
         }}
 
+        // 개별 설정 모달 열기/닫기
+        function openCustomThresholdModal() {{
+            document.getElementById('customThresholdModal').style.display = 'block';
+        }}
+        function closeCustomThresholdModal() {{
+            document.getElementById('customThresholdModal').style.display = 'none';
+        }}
+
         // 모달 외부 클릭 시 닫기
         window.onclick = function(event) {{
             var zeroModal = document.getElementById('zeroStockModal');
             var newDrugsModal = document.getElementById('newDrugsModal');
+            var customModal = document.getElementById('customThresholdModal');
             if (event.target == zeroModal) {{
                 zeroModal.style.display = 'none';
             }}
             if (event.target == newDrugsModal) {{
                 newDrugsModal.style.display = 'none';
+            }}
+            if (event.target == customModal) {{
+                customModal.style.display = 'none';
             }}
         }}
 
@@ -1310,6 +1581,42 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                             <div class="current-stock-note">* 현재 재고: ${{chartData.stock.toLocaleString()}}개</div>
                         </div>
                     </div>
+
+                    <!-- 개별 임계값 설정 -->
+                    <div class="threshold-settings">
+                        <div class="threshold-settings-header" onclick="toggleThresholdForm('${{drugCode}}')">
+                            <span>⚙️</span>
+                            <span>개별 임계값 설정</span>
+                            <span id="threshold-toggle-${{drugCode}}">▼</span>
+                        </div>
+                        <div id="threshold-form-${{drugCode}}" class="threshold-settings-form">
+                            <div class="threshold-input-group">
+                                <div class="threshold-input">
+                                    <label>재고 임계값 (N개 이하)</label>
+                                    <input type="number" id="stock-threshold-${{drugCode}}"
+                                           value="${{chartData.custom_threshold?.stock_threshold || ''}}"
+                                           placeholder="미설정">
+                                </div>
+                                <div class="threshold-input">
+                                    <label>런웨이 임계값 (M개월 미만)</label>
+                                    <input type="number" step="0.5" id="runway-threshold-input-${{drugCode}}"
+                                           value="${{chartData.custom_threshold?.runway_threshold || ''}}"
+                                           placeholder="미설정">
+                                </div>
+                                <div class="threshold-input threshold-memo-input">
+                                    <label>메모</label>
+                                    <input type="text" id="threshold-memo-${{drugCode}}"
+                                           value="${{chartData.custom_threshold?.memo || ''}}"
+                                           placeholder="설정 이유 (선택사항)">
+                                </div>
+                                <div class="threshold-buttons">
+                                    <button class="threshold-btn save" onclick="saveThreshold('${{drugCode}}')">저장</button>
+                                    <button class="threshold-btn delete" onclick="deleteThreshold('${{drugCode}}')">삭제</button>
+                                </div>
+                            </div>
+                            <div id="threshold-status-${{drugCode}}" class="threshold-status" style="display: none;"></div>
+                        </div>
+                    </div>
                 </td>
             `;
 
@@ -1415,6 +1722,135 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
             // 1년 평균 기준 업데이트
             updateSingleProgressBar('ma12', currentRunwayMa12, targetMonths, orderMa12);
+        }}
+
+        // ========== 개별 임계값 설정 기능 ==========
+
+        // 임계값 설정 폼 토글
+        function toggleThresholdForm(drugCode) {{
+            const form = document.getElementById('threshold-form-' + drugCode);
+            const toggle = document.getElementById('threshold-toggle-' + drugCode);
+            if (form.classList.contains('visible')) {{
+                form.classList.remove('visible');
+                toggle.textContent = '▼';
+            }} else {{
+                form.classList.add('visible');
+                toggle.textContent = '▲';
+            }}
+        }}
+
+        // 임계값 저장
+        function saveThreshold(drugCode) {{
+            const stockInput = document.getElementById('stock-threshold-' + drugCode);
+            const runwayInput = document.getElementById('runway-threshold-input-' + drugCode);
+            const memoInput = document.getElementById('threshold-memo-' + drugCode);
+            const statusDiv = document.getElementById('threshold-status-' + drugCode);
+
+            const stockThreshold = stockInput.value ? parseInt(stockInput.value) : null;
+            const runwayThreshold = runwayInput.value ? parseFloat(runwayInput.value) : null;
+            const memo = memoInput.value || null;
+
+            if (stockThreshold === null && runwayThreshold === null) {{
+                statusDiv.textContent = '재고 또는 런웨이 임계값 중 하나는 설정해야 합니다.';
+                statusDiv.className = 'threshold-status error';
+                statusDiv.style.display = 'block';
+                return;
+            }}
+
+            fetch('/api/drug-threshold/' + drugCode, {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{
+                    stock_threshold: stockThreshold,
+                    runway_threshold: runwayThreshold,
+                    memo: memo
+                }})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                // 약품명 가져오기
+                const row = document.querySelector('tr[data-drug-code="' + drugCode + '"]');
+                let drugName = drugCode;
+                if (row) {{
+                    const chartDataStr = row.getAttribute('data-chart-data');
+                    if (chartDataStr) {{
+                        try {{
+                            drugName = JSON.parse(chartDataStr).drug_name || drugCode;
+                        }} catch(e) {{}}
+                    }}
+                }}
+
+                if (data.status === 'success') {{
+                    statusDiv.textContent = '✓ ' + drugName + ' 임계값이 저장되었습니다.';
+                    statusDiv.className = 'threshold-status success';
+                    // 약품명에 아이콘 추가 (없으면)
+                    if (row) {{
+                        const nameCell = row.cells[0];
+                        if (!nameCell.innerHTML.includes('custom-threshold-icon')) {{
+                            nameCell.innerHTML = '<span class="custom-threshold-icon" title="개별 임계값 설정됨">⚙️</span> ' + nameCell.innerHTML;
+                        }}
+                    }}
+                }} else {{
+                    statusDiv.textContent = '✗ ' + (data.message || '저장 실패');
+                    statusDiv.className = 'threshold-status error';
+                }}
+                statusDiv.style.display = 'block';
+            }})
+            .catch(error => {{
+                statusDiv.textContent = '✗ 저장 실패: ' + error.message;
+                statusDiv.className = 'threshold-status error';
+                statusDiv.style.display = 'block';
+            }});
+        }}
+
+        // 임계값 삭제
+        function deleteThreshold(drugCode) {{
+            const statusDiv = document.getElementById('threshold-status-' + drugCode);
+
+            // 약품명 가져오기
+            const row = document.querySelector('tr[data-drug-code="' + drugCode + '"]');
+            let drugName = drugCode;
+            if (row) {{
+                const chartDataStr = row.getAttribute('data-chart-data');
+                if (chartDataStr) {{
+                    try {{
+                        drugName = JSON.parse(chartDataStr).drug_name || drugCode;
+                    }} catch(e) {{}}
+                }}
+            }}
+
+            if (!confirm(drugName + '의 개별 임계값 설정을 삭제하시겠습니까?')) {{
+                return;
+            }}
+
+            fetch('/api/drug-threshold/' + drugCode, {{
+                method: 'DELETE'
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.status === 'success') {{
+                    statusDiv.textContent = '✓ ' + drugName + ' 임계값이 삭제되었습니다.';
+                    statusDiv.className = 'threshold-status success';
+                    // 입력 필드 초기화
+                    document.getElementById('stock-threshold-' + drugCode).value = '';
+                    document.getElementById('runway-threshold-input-' + drugCode).value = '';
+                    document.getElementById('threshold-memo-' + drugCode).value = '';
+                    // 약품명에서 아이콘 제거
+                    if (row) {{
+                        const nameCell = row.cells[0];
+                        nameCell.innerHTML = nameCell.innerHTML.replace(/<span class="custom-threshold-icon"[^>]*>⚙️<\/span>\s*/g, '');
+                    }}
+                }} else {{
+                    statusDiv.textContent = '✗ ' + (data.message || '삭제 실패');
+                    statusDiv.className = 'threshold-status error';
+                }}
+                statusDiv.style.display = 'block';
+            }})
+            .catch(error => {{
+                statusDiv.textContent = '✗ 삭제 실패: ' + error.message;
+                statusDiv.className = 'threshold-status error';
+                statusDiv.style.display = 'block';
+            }});
         }}
 
         // 차트 렌더링

@@ -26,6 +26,7 @@ import inventory_db
 import processed_inventory_db
 import inventory_updater
 import checked_items_db
+import drug_thresholds_db
 from utils import read_today_file
 
 app = Flask(__name__)
@@ -812,6 +813,153 @@ def update_inventory_api():
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 개별 임계값 관리 API
+# ============================================================
+
+@app.route('/threshold/manage')
+def threshold_manage_page():
+    """개별 임계값 관리 페이지"""
+    return render_template('threshold_manage.html')
+
+
+@app.route('/api/drug-threshold/<drug_code>', methods=['GET'])
+def get_drug_threshold(drug_code):
+    """단일 약품 임계값 조회"""
+    try:
+        threshold = drug_thresholds_db.get_threshold(drug_code)
+        return jsonify({
+            'status': 'success',
+            'data': threshold  # None이면 설정 없음
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug-threshold/<drug_code>', methods=['POST'])
+def set_drug_threshold(drug_code):
+    """단일 약품 임계값 설정/수정"""
+    try:
+        data = request.get_json()
+
+        stock_threshold = data.get('stock_threshold')
+        runway_threshold = data.get('runway_threshold')
+        memo = data.get('memo')
+
+        # 타입 변환 (빈 문자열 처리)
+        if stock_threshold == '' or stock_threshold is None:
+            stock_threshold = None
+        else:
+            stock_threshold = int(stock_threshold)
+
+        if runway_threshold == '' or runway_threshold is None:
+            runway_threshold = None
+        else:
+            runway_threshold = float(runway_threshold)
+
+        # 둘 다 없으면 에러
+        if stock_threshold is None and runway_threshold is None:
+            return jsonify({
+                'status': 'error',
+                'message': '절대재고 임계값 또는 런웨이 임계값 중 하나 이상을 설정해야 합니다.'
+            }), 400
+
+        result = drug_thresholds_db.upsert_threshold(
+            drug_code,
+            절대재고_임계값=stock_threshold,
+            런웨이_임계값=runway_threshold,
+            메모=memo
+        )
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'action': result['action']
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': result['message']
+            }), 500
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug-threshold/<drug_code>', methods=['DELETE'])
+def delete_drug_threshold(drug_code):
+    """단일 약품 임계값 삭제"""
+    try:
+        result = drug_thresholds_db.delete_threshold(drug_code)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': result['message']
+            }), 404
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug-thresholds', methods=['GET'])
+def get_all_drug_thresholds():
+    """전체 임계값 목록 조회"""
+    try:
+        df = drug_thresholds_db.get_all_thresholds()
+
+        if df.empty:
+            return jsonify({
+                'status': 'success',
+                'count': 0,
+                'data': []
+            })
+
+        # DataFrame을 딕셔너리 리스트로 변환
+        data = df.to_dict(orient='records')
+
+        # NaN을 None으로 변환 (JSON 직렬화 호환) + 약품명 추가
+        import math
+        for record in data:
+            for key, value in list(record.items()):
+                if isinstance(value, float) and math.isnan(value):
+                    record[key] = None
+
+            # 약품명 조회 (inventory_db에서)
+            drug_info = inventory_db.get_inventory(record['약품코드'])
+            record['약품명'] = drug_info.get('약품명', '-') if drug_info else '-'
+
+        return jsonify({
+            'status': 'success',
+            'count': len(data),
+            'data': data
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug-thresholds/stats', methods=['GET'])
+def get_threshold_stats():
+    """임계값 통계 조회"""
+    try:
+        stats = drug_thresholds_db.get_statistics()
+        return jsonify({
+            'status': 'success',
+            'data': stats
+        })
+    except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
