@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jaego - 약국 재고 관리 시스템</title>
+    <title>약국 적정 재고 솔루션</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,13 +15,33 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Noto Sans KR', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f5f5f5;
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 20px;
+            gap: 20px;
+        }
+
+        .title-container {
+            background: #555;
+            border-radius: 20px;
+            padding: 28px 50px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .page-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: white;
+            letter-spacing: -0.5px;
+            margin: 0;
         }
 
         .container {
@@ -47,140 +70,162 @@
             margin-bottom: 30px;
         }
 
-        .header h1 {
-            color: #2c3e50;
-            font-size: 2.2em;
-            margin-bottom: 8px;
+        /* 툴바: DB 상태 + 유틸리티 버튼 한 줄 배치 */
+        .header-toolbar {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 15px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
-        .header .emoji {
-            font-size: 2em;
-        }
-
-        .header p {
-            color: #7f8c8d;
-            font-size: 1em;
-        }
-
-        .header-utils {
-            margin-top: 15px;
-        }
-
-        .header-utils a {
-            color: #4299e1;
+        .toolbar-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
             text-decoration: none;
-            font-size: 0.9em;
-            padding: 6px 12px;
-            border: 1px solid #4299e1;
-            border-radius: 6px;
             transition: all 0.2s ease;
-        }
-
-        .header-utils a:hover {
-            background: #4299e1;
-            color: white;
-        }
-
-        .db-info {
-            background-color: #e8f5e9;
-            border-left: 4px solid #4caf50;
-            border-radius: 10px;
-            margin-bottom: 40px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .db-info-header {
-            padding: 16px 20px;
             cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
+            border: none;
+            background: none;
         }
 
-        .db-info-header:hover {
-            background-color: #e0f2f1;
-        }
-
-        .db-info-title {
+        .toolbar-item.db-status {
+            background: #e8f5e9;
             color: #2e7d32;
-            font-size: 1.1em;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            border: 1px solid #c8e6c9;
         }
 
-        .db-info-arrow {
-            color: #4caf50;
-            font-size: 0.9em;
+        .toolbar-item.db-status:hover {
+            background: #c8e6c9;
+        }
+
+        .toolbar-item.util-link {
+            background: #f5f5f5;
+            color: #555;
+            border: 1px solid #e0e0e0;
+        }
+
+        .toolbar-item.util-link:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .toolbar-arrow {
+            font-size: 0.7em;
             transition: transform 0.3s ease;
         }
 
-        .db-info-arrow.open {
+        .toolbar-arrow.open {
             transform: rotate(180deg);
         }
 
-        .db-info-content {
+        /* DB 정보 패널 */
+        .db-info-panel {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            margin-top: 15px;
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease;
+            transition: all 0.3s ease;
         }
 
-        .db-info-content.open {
-            max-height: 450px;
+        .db-info-panel.open {
+            max-height: 400px;
+            margin-top: 15px;
         }
 
-        .db-info-body {
-            padding: 0 20px 20px 20px;
+        .db-info-panel-body {
+            padding: 24px;
         }
 
-        .db-info p {
-            color: #1b5e20;
-            margin: 8px 0;
-            font-size: 0.95em;
+        .db-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
-        .db-info-summary {
-            color: #2e7d32;
-            font-size: 0.9em;
+        .db-stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e8e8e8;
+        }
+
+        .db-stat-card .stat-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 2px;
+        }
+
+        .db-stat-card .stat-label {
+            font-size: 0.75em;
+            color: #6b7280;
             font-weight: 500;
         }
 
-        .btn-rebuild-db {
-            background: #aaa;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 0.9em;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 12px;
+        .db-bottom-row {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .db-stat-card.period {
+            flex: 1;
             display: flex;
             align-items: center;
-            gap: 8px;
             justify-content: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            gap: 8px;
+            padding: 12px 16px;
+            margin: 0;
+        }
+
+        .db-stat-card.period .stat-label {
+            margin: 0;
+            font-size: 0.8em;
+        }
+
+        .db-stat-card.period .stat-value {
+            font-size: 0.9em;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .btn-rebuild-db {
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+            transition: all 0.2s ease;
+            white-space: nowrap;
         }
 
         .btn-rebuild-db:hover {
-            background: #999;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            background: #d1d5db;
+            border-color: #9ca3af;
         }
 
         .btn-rebuild-db:disabled {
-            background: #999;
+            background: #f3f4f6;
+            color: #9ca3af;
             cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
         }
 
         .rebuild-status {
@@ -342,7 +387,7 @@
         }
 
         .report-list {
-            max-height: 400px;
+            max-height: 240px;
             overflow-y: auto;
             padding-right: 5px;
         }
@@ -823,47 +868,62 @@
     </style>
 </head>
 <body>
+    <div class="title-container">
+        <h1 class="page-title">약국 적정 재고 솔루션</h1>
+    </div>
+
     <div class="container">
         <div class="header">
-            <h1>
-                <span class="emoji">🏥</span>
-                <span>Jaego</span>
-            </h1>
-            <p>약국 재고 관리 및 분석 시스템</p>
-            <div class="header-utils">
-                <a href="/inventory/edit">✏️ 재고 수정</a>
-                <a href="/threshold/manage">⚙️ 임계값 관리</a>
-            </div>
-        </div>
-
-        <div class="db-info">
-            <div class="db-info-header" onclick="toggleDbInfo()">
-                <div class="db-info-title">
+            <div class="header-toolbar">
+                <button class="toolbar-item db-status" onclick="toggleDbInfo()">
                     <span>✅</span>
-                    <span>데이터베이스 준비 완료</span>
-                    <span class="db-info-summary">({{ db_stats.recent_count }}개 약품)</span>
-                </div>
-                <span class="db-info-arrow" id="db-info-arrow">▼</span>
+                    <span>DB 준비 완료</span>
+                    <span style="opacity: 0.8;">({{ db_stats.recent_count }}개)</span>
+                    <span class="toolbar-arrow" id="db-info-arrow">▼</span>
+                </button>
+                <a href="/inventory/edit" class="toolbar-item util-link">
+                    <span>✏️</span>
+                    <span>재고 수정</span>
+                </a>
+                <a href="/threshold/manage" class="toolbar-item util-link">
+                    <span>⚙️</span>
+                    <span>임계값 관리</span>
+                </a>
             </div>
-            <div class="db-info-content" id="db-info-content">
-                <div class="db-info-body">
-                    <p><strong>최신 재고:</strong> <span id="recent-count">{{ db_stats.recent_count }}</span>개 약품</p>
-                    <p><strong>시계열 통계:</strong> <span id="processed-total">{{ db_stats.processed_stats.total }}</span>개 약품</p>
-                    {% if db_stats.processed_stats.by_type %}
-                        <div id="drug-type-stats">
-                        {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
-                        <p style="margin-left: 20px;">• {{ drug_type }}: {{ count }}개</p>
-                        {% endfor %}
-                        </div>
-                    {% endif %}
-                    {% if db_stats.data_period %}
-                    <p><strong>데이터 기간:</strong> <span id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</span></p>
-                    {% endif %}
 
-                    <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
-                        <span>🔄</span>
-                        <span>DB 재생성 (새 데이터 반영)</span>
-                    </button>
+            <div class="db-info-panel" id="db-info-content">
+                <div class="db-info-panel-body">
+                    <div class="db-stats-grid">
+                        <div class="db-stat-card">
+                            <div class="stat-value" id="recent-count">{{ db_stats.recent_count }}</div>
+                            <div class="stat-label">최신 재고</div>
+                        </div>
+                        <div class="db-stat-card">
+                            <div class="stat-value" id="processed-total">{{ db_stats.processed_stats.total }}</div>
+                            <div class="stat-label">시계열 통계</div>
+                        </div>
+                        {% if db_stats.processed_stats.by_type %}
+                        {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
+                        <div class="db-stat-card">
+                            <div class="stat-value">{{ count }}</div>
+                            <div class="stat-label">{{ drug_type }}</div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <div class="db-bottom-row">
+                        {% if db_stats.data_period %}
+                        <div class="db-stat-card period">
+                            <div class="stat-label">📅 데이터 기간</div>
+                            <div class="stat-value" id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</div>
+                        </div>
+                        {% endif %}
+                        <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
+                            <span>🔄</span>
+                            <span>DB 재생성</span>
+                        </button>
+                    </div>
 
                     <div class="rebuild-status" id="rebuild-status"></div>
                 </div>
@@ -942,7 +1002,7 @@
         </div>
 
         <div class="footer">
-            <p>Jaego v3.0 - SQLite 기반 재고 관리 시스템</p>
+            <p>약국 적정 재고 솔루션 v3.0</p>
         </div>
     </div>
 

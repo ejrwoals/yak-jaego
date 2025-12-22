@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>약국 재고 관리 보고서</title>
+    <title>재고 분석 보고서</title>
     <style>
         * {
             margin: 0;
@@ -76,7 +76,7 @@
 
         .radio-option {
             flex: 1;
-            min-width: 200px;
+            min-width: 160px;
         }
 
         .radio-option input[type="radio"] {
@@ -84,31 +84,54 @@
         }
 
         .radio-option label {
-            display: block;
-            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
             border: 2px solid #e2e8f0;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s;
-            text-align: center;
             background: #f7fafc;
+        }
+
+        .radio-option .radio-icon {
+            font-size: 1.4em;
+        }
+
+        .radio-option .radio-text {
+            text-align: left;
+        }
+
+        .radio-option .radio-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .radio-option .radio-desc {
+            font-size: 0.8em;
+            opacity: 0.7;
         }
 
         .radio-option input[type="radio"]:checked + label {
             border-color: #555;
             background: #555;
             color: white;
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .radio-option input[type="radio"]:checked + label .radio-desc {
+            opacity: 0.8;
         }
 
         .radio-option label:hover {
             border-color: #cbd5e0;
-            transform: translateY(-2px);
+            background: #edf2f7;
         }
 
         .radio-option input[type="radio"]:checked + label:hover {
             border-color: #555;
+            background: #555;
         }
 
         .select-wrapper {
@@ -193,17 +216,57 @@
         .info-box {
             background: #ebf8ff;
             border-left: 4px solid #4299e1;
-            padding: 15px;
             border-radius: 8px;
             margin-bottom: 30px;
             font-size: 0.95em;
             color: #2c5282;
+            overflow: hidden;
         }
 
-        .info-box strong {
-            display: block;
-            margin-bottom: 5px;
+        .info-box-header {
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .info-box-header:hover {
+            background: #dbeafe;
+        }
+
+        .info-box-title {
             color: #2b6cb0;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-box-arrow {
+            color: #4299e1;
+            font-size: 0.8em;
+            transition: transform 0.3s ease;
+        }
+
+        .info-box-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .info-box-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .info-box-content.open {
+            max-height: 200px;
+        }
+
+        .info-box-body {
+            padding: 0 15px 15px 15px;
+            line-height: 1.6;
         }
 
         .submit-btn {
@@ -463,14 +526,20 @@
     <div class="container">
         <a href="/" class="back-btn">← 메인으로 돌아가기</a>
 
-        <h1>📊 재고 관리 보고서</h1>
-        <p class="subtitle">약품 소모량 기반 재고 분석</p>
+        <h1>📊 재고 분석 보고서</h1>
 
         <div class="info-box">
-            <strong>💡 이 보고서는?</strong>
-            평균 소모량을 기반으로 현재 재고가 몇개월 후쯤 소진되는지 정보 등의 재고 분석을 제공합니다.<br><br>
-            이동평균 개월수를 짧게 설정할수록 최근 단기적인 변화 트렌드를 더 잘 반영합니다. 
-            반면 개월수를 길게 설정할수록 단기 변동에 민감하지 않은 보다 안정적인 장기 트렌드를 기반으로 분석합니다.
+            <div class="info-box-header" onclick="toggleInfoBox()">
+                <span class="info-box-title">💡 이 보고서는?</span>
+                <span class="info-box-arrow" id="info-box-arrow">▼</span>
+            </div>
+            <div class="info-box-content" id="info-box-content">
+                <div class="info-box-body">
+                    평균 소모량을 기반으로 현재 재고가 몇개월 후쯤 소진되는지 정보 등의 재고 분석을 제공합니다.<br><br>
+                    이동평균 개월수를 짧게 설정할수록 최근 단기적인 변화 트렌드를 더 잘 반영합니다.
+                    반면 개월수를 길게 설정할수록 단기 변동에 민감하지 않은 보다 안정적인 장기 트렌드를 기반으로 분석합니다.
+                </div>
+            </div>
         </div>
 
         <form id="reportForm" method="POST" action="/generate/simple_report">
@@ -482,17 +551,21 @@
                     <div class="radio-option">
                         <input type="radio" id="dispense" name="mode" value="dispense" checked>
                         <label for="dispense">
-                            <div style="font-size: 1.8em; margin-bottom: 10px;">💊</div>
-                            <div style="font-weight: bold; margin-bottom: 5px;">전문약</div>
-                            <div style="font-size: 0.9em; opacity: 0.8;">조제수량 기준</div>
+                            <span class="radio-icon">💊</span>
+                            <span class="radio-text">
+                                <div class="radio-title">전문약</div>
+                                <div class="radio-desc">조제수량 기준</div>
+                            </span>
                         </label>
                     </div>
                     <div class="radio-option">
                         <input type="radio" id="sale" name="mode" value="sale">
                         <label for="sale">
-                            <div style="font-size: 1.8em; margin-bottom: 10px;">🏥</div>
-                            <div style="font-weight: bold; margin-bottom: 5px;">일반약</div>
-                            <div style="font-size: 0.9em; opacity: 0.8;">판매수량 기준</div>
+                            <span class="radio-icon">🏥</span>
+                            <span class="radio-text">
+                                <div class="radio-title">일반약</div>
+                                <div class="radio-desc">판매수량 기준</div>
+                            </span>
                         </label>
                     </div>
                 </div>
@@ -575,6 +648,13 @@
     </button>
 
     <script>
+        function toggleInfoBox() {
+            const content = document.getElementById('info-box-content');
+            const arrow = document.getElementById('info-box-arrow');
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
         document.getElementById('reportForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
