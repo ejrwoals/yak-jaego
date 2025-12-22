@@ -520,9 +520,46 @@
             color: #718096;
             margin-left: 2px;
         }
+
+        /* Toast 알림 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.95em;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            max-width: 320px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
     </style>
 </head>
 <body>
+    <div class="toast-container" id="toast-container"></div>
+
     <div class="container">
         <a href="/" class="back-btn">← 메인으로 돌아가기</a>
 
@@ -648,6 +685,23 @@
     </button>
 
     <script>
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            // 애니메이션을 위해 약간의 지연 후 show 클래스 추가
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // 3초 후 자동으로 사라짐
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         function toggleInfoBox() {
             const content = document.getElementById('info-box-content');
             const arrow = document.getElementById('info-box-arrow');
@@ -684,14 +738,14 @@
                     loading.classList.remove('active');
 
                     // 성공 메시지
-                    alert('✅ 보고서가 성공적으로 생성되었습니다!');
+                    showToast('✅ 보고서가 성공적으로 생성되었습니다!', 'success');
                 } else {
                     throw new Error(data.message || '보고서 생성 실패');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('❌ 보고서 생성 중 오류가 발생했습니다:\n' + error.message);
+                showToast('❌ 보고서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
 
                 // 버튼 복원
                 submitBtn.disabled = false;

@@ -361,9 +361,46 @@
             font-size: 0.85em;
             margin-top: 5px;
         }
+
+        /* Toast 알림 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.95em;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            max-width: 320px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
     </style>
 </head>
 <body>
+    <div class="toast-container" id="toast-container"></div>
+
     <div class="container">
         <a href="/" class="back-link">← 홈으로 돌아가기</a>
 
@@ -432,6 +469,22 @@
     </button>
 
     <script>
+        // ========== 토스트 알림 ==========
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         // ========== 토글 로직 ==========
         function toggleInfoBox() {
             const content = document.getElementById('info-box-content');
@@ -586,6 +639,7 @@
 
                 if (response.ok && result.success) {
                     showStatus(`✅ 주문 수량 계산 완료! (총 ${result.drug_count}개, 긴급 ${result.urgent_count}개)`, 'success');
+                    showToast(`✅ 주문 수량 계산 완료!`, 'success');
 
                     // 새 탭에서 보고서 열기
                     setTimeout(() => {
@@ -602,11 +656,13 @@
                     }, 800);
                 } else {
                     showStatus(`❌ 오류: ${result.error}`, 'error');
+                    showToast(`❌ 오류가 발생했습니다`, 'error');
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                 }
             } catch (error) {
                 showStatus(`❌ 오류: ${error.message}`, 'error');
+                showToast(`❌ 오류가 발생했습니다`, 'error');
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
