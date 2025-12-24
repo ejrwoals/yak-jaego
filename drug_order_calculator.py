@@ -330,10 +330,19 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         }
         chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
-        # 약품명에 개별 설정 아이콘 추가
+        # 약품명에 개별 설정 아이콘 추가 (상세 툴팁 포함)
         drug_name_display = row['약품명'] if row['약품명'] else "정보없음"
         if has_custom_threshold:
-            drug_name_display = f'<span class="custom-threshold-icon" title="개별 임계값 설정됨">⚙️</span> {drug_name_display}'
+            ct = custom_thresholds[drug_code]
+            tooltip_parts = ['[개별 임계값 설정]']
+            if ct.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"• 재고: {ct['절대재고_임계값']}개 이하")
+            if ct.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"• 런웨이: {ct['런웨이_임계값']}개월 미만")
+            if ct.get('메모'):
+                tooltip_parts.append(f"• 메모: {ct['메모']}")
+            tooltip_text = html_escape('\n'.join(tooltip_parts))
+            drug_name_display = f'<span class="custom-threshold-icon" title="{tooltip_text}">⚙️</span> {drug_name_display}'
 
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
@@ -367,8 +376,8 @@ def generate_zero_stock_table_rows(df, col_map):
                 <td>{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
                 <td>{row['제약회사']}</td>
-                <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
                 <td style="color: #c62828; font-weight: bold;">{row[cm['stock']]:.0f}</td>
+                <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
                 <td>{row[cm['ma12']]:.1f}</td>
                 <td>{row[cm['ma3']]:.1f}</td>
             </tr>
@@ -382,12 +391,15 @@ def generate_new_drugs_table_rows(df, col_map):
     rows = ""
     for _, row in df.iterrows():
         stock = row[cm['stock']] if cm['stock'] in row else 0
+        drug_type = row.get('약품유형', '미분류')
+        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
         rows += f"""
             <tr>
                 <td>{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
                 <td>{row['제약회사']}</td>
                 <td style="text-align: right;">{stock:.0f}</td>
+                <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
             </tr>
 """
     return rows
@@ -515,14 +527,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             </div>
             <div class="modal-body">
                 <p style="color: #666; margin-bottom: 15px;">재고가 0 미만인 약품입니다. 즉시 주문이 필요합니다.</p>
-                <table>
+                <table class="modal-table-zero-stock">
                     <thead>
                         <tr>
                             <th>약품명</th>
                             <th>약품코드</th>
                             <th>제약회사</th>
-                            <th>약품유형</th>
                             <th>현재 재고</th>
+                            <th>약품유형</th>
                             <th>1년 이동평균</th>
                             <th>3개월 이동평균</th>
                         </tr>
@@ -555,13 +567,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             </div>
             <div class="modal-body">
                 <p style="color: #666; margin-bottom: 15px;">시계열 데이터가 없는 신규 약품입니다. 다음 달 데이터 수집 후 런웨이 계산이 가능합니다.</p>
-                <table>
+                <table class="modal-table-new-drugs">
                     <thead>
                         <tr>
                             <th>약품명</th>
                             <th>약품코드</th>
                             <th>제약회사</th>
                             <th>현재 재고</th>
+                            <th>약품유형</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -582,7 +595,9 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             custom_threshold_drugs.append({
                 'code': drug_code,
                 'name': row['약품명'],
+                'company': row.get('제약회사', '-'),
                 'stock': row[cm['stock']],
+                'drug_type': row.get('약품유형', '미분류'),
                 'stock_threshold': ct.get('절대재고_임계값'),
                 'runway_threshold': ct.get('런웨이_임계값'),
                 'memo': ct.get('메모', '')
@@ -595,11 +610,15 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     for drug in custom_threshold_drugs:
         stock_th = f"{drug['stock_threshold']}개 이하" if drug['stock_threshold'] is not None else "-"
         runway_th = f"{drug['runway_threshold']}개월 미만" if drug['runway_threshold'] is not None else "-"
+        drug_type = drug['drug_type']
+        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
         custom_threshold_rows += f"""
             <tr data-threshold-drug-code="{drug['code']}">
                 <td>{drug['name']}</td>
                 <td>{drug['code']}</td>
+                <td>{drug['company']}</td>
                 <td style="text-align: right;">{drug['stock']:.0f}</td>
+                <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
                 <td style="text-align: center;">{stock_th}</td>
                 <td style="text-align: center;">{runway_th}</td>
                 <td>{drug['memo'] or '-'}</td>
@@ -625,12 +644,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             </div>
             <div class="modal-body">
                 <p style="color: #666; margin-bottom: 15px;">개별 임계값이 설정된 약품입니다. 글로벌 임계값과 별도로 강조 표시됩니다.</p>
-                <table>
+                <table class="modal-table-threshold">
                     <thead>
                         <tr>
                             <th>약품명</th>
                             <th>약품코드</th>
+                            <th>제약회사</th>
                             <th>현재 재고</th>
+                            <th>약품유형</th>
                             <th>재고 임계값</th>
                             <th>런웨이 임계값</th>
                             <th>메모</th>
@@ -884,6 +905,41 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             margin-right: 2px;
             cursor: help;
         }}
+        /* 개별 임계값 정보 바 (차트 아래 표시) */
+        .ct-info-bar {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            border: 1px solid #c4b5fd;
+            border-left: 4px solid #8b5cf6;
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-top: 12px;
+            font-size: 13px;
+        }}
+        .ct-info-header {{
+            font-weight: 600;
+            color: #6d28d9;
+        }}
+        .ct-separator {{
+            color: #c4b5fd;
+        }}
+        .ct-item {{
+            color: #4a5568;
+        }}
+        .ct-item .ct-label {{
+            background: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            color: #7c3aed;
+        }}
+        .ct-memo-item {{
+            color: #6b7280;
+            font-style: italic;
+        }}
 
         /* 모달 스타일 */
         .modal {{
@@ -931,6 +987,54 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             max-height: 80vh;
             overflow-y: auto;
         }}
+        /* 모달 테이블 공통 스타일 */
+        .modal-body table {{
+            table-layout: auto;
+            width: 100%;
+        }}
+        /* 음수 재고 모달 (7컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 1년MA, 3개월MA */
+        .modal-table-zero-stock th:nth-child(1),
+        .modal-table-zero-stock td:nth-child(1) {{ width: 30%; }}  /* 약품명 */
+        .modal-table-zero-stock th:nth-child(2),
+        .modal-table-zero-stock td:nth-child(2) {{ width: 10%; white-space: nowrap; }}  /* 약품코드 */
+        .modal-table-zero-stock th:nth-child(3),
+        .modal-table-zero-stock td:nth-child(3) {{ width: 12%; }}  /* 제약회사 */
+        .modal-table-zero-stock th:nth-child(4),
+        .modal-table-zero-stock td:nth-child(4) {{ width: 10%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
+        .modal-table-zero-stock th:nth-child(5),
+        .modal-table-zero-stock td:nth-child(5) {{ width: 8%; white-space: nowrap; }}  /* 약품유형 */
+        .modal-table-zero-stock th:nth-child(6),
+        .modal-table-zero-stock td:nth-child(6) {{ width: 15%; white-space: nowrap; text-align: right; }}  /* 1년 이동평균 */
+        .modal-table-zero-stock th:nth-child(7),
+        .modal-table-zero-stock td:nth-child(7) {{ width: 15%; white-space: nowrap; text-align: right; }}  /* 3개월 이동평균 */
+        /* 신규 약품 모달 (5컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형 */
+        .modal-table-new-drugs th:nth-child(1),
+        .modal-table-new-drugs td:nth-child(1) {{ width: 40%; }}  /* 약품명 */
+        .modal-table-new-drugs th:nth-child(2),
+        .modal-table-new-drugs td:nth-child(2) {{ width: 15%; white-space: nowrap; }}  /* 약품코드 */
+        .modal-table-new-drugs th:nth-child(3),
+        .modal-table-new-drugs td:nth-child(3) {{ width: 18%; }}  /* 제약회사 */
+        .modal-table-new-drugs th:nth-child(4),
+        .modal-table-new-drugs td:nth-child(4) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
+        .modal-table-new-drugs th:nth-child(5),
+        .modal-table-new-drugs td:nth-child(5) {{ width: 10%; white-space: nowrap; }}  /* 약품유형 */
+        /* 개별 임계값 모달 (8컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 재고임계값, 런웨이임계값, 메모 */
+        .modal-table-threshold th:nth-child(1),
+        .modal-table-threshold td:nth-child(1) {{ width: 22%; }}  /* 약품명 */
+        .modal-table-threshold th:nth-child(2),
+        .modal-table-threshold td:nth-child(2) {{ width: 10%; white-space: nowrap; }}  /* 약품코드 */
+        .modal-table-threshold th:nth-child(3),
+        .modal-table-threshold td:nth-child(3) {{ width: 10%; }}  /* 제약회사 */
+        .modal-table-threshold th:nth-child(4),
+        .modal-table-threshold td:nth-child(4) {{ width: 8%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
+        .modal-table-threshold th:nth-child(5),
+        .modal-table-threshold td:nth-child(5) {{ width: 8%; white-space: nowrap; }}  /* 약품유형 */
+        .modal-table-threshold th:nth-child(6),
+        .modal-table-threshold td:nth-child(6) {{ width: 12%; white-space: nowrap; text-align: center; }}  /* 재고 임계값 */
+        .modal-table-threshold th:nth-child(7),
+        .modal-table-threshold td:nth-child(7) {{ width: 14%; white-space: nowrap; text-align: center; }}  /* 런웨이 임계값 */
+        .modal-table-threshold th:nth-child(8),
+        .modal-table-threshold td:nth-child(8) {{ width: 16%; word-break: break-word; }}  /* 메모 */
 
         /* 탭 스타일 */
         .tab-container {{
@@ -1407,22 +1511,41 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             currentChartDrugCode = drugCode;
             const colSpan = row.cells.length;
 
+            // 개별 임계값 정보 HTML 생성 (헤더 아래에 설명적으로 표시)
+            let thresholdInfo = '';
+            if (chartData.custom_threshold) {{
+                const ct = chartData.custom_threshold;
+                let items = [];
+                if (ct.stock_threshold !== null && ct.stock_threshold !== undefined) {{
+                    items.push(`<span class="ct-item"><span class="ct-label">재고 ${{ct.stock_threshold}}개 이하</span> 시 강조</span>`);
+                }}
+                if (ct.runway_threshold !== null && ct.runway_threshold !== undefined) {{
+                    items.push(`<span class="ct-item"><span class="ct-label">런웨이 ${{ct.runway_threshold}}개월 미만</span> 시 강조</span>`);
+                }}
+                const memoHtml = ct.memo ? `<span class="ct-item ct-memo-item">📝 메모: "${{ct.memo}}"</span>` : '';
+                thresholdInfo = `
+                    <div class="ct-info-bar">
+                        <span class="ct-info-header">⚙️ 개별 임계값</span>
+                        ${{items.join('<span class="ct-separator">│</span>')}}
+                        ${{memoHtml}}
+                    </div>
+                `;
+            }}
+
             // 차트 행 생성
             const chartRow = document.createElement('tr');
             chartRow.className = 'inline-chart-row';
             chartRow.innerHTML = `
-                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #4facfe;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h4 style="margin: 0; color: #2d3748;">${{chartData.drug_name}} (${{chartData.drug_code}})</h4>
-                        <button onclick="closeInlineChart('${{drugCode}}')"
-                                style="background: none; border: none; font-size: 20px; cursor: pointer; color: #718096;">&times;</button>
-                    </div>
+                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #4facfe; position: relative;">
+                    <button onclick="closeInlineChart('${{drugCode}}')"
+                            style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #718096; z-index: 10;">&times;</button>
 
-                    <!-- 차트(60%) + 주문량 계산기(40%) 가로 배치 -->
+                    <!-- 좌측(60%): 차트 + 개별임계값 / 우측(40%): 주문량계산기 -->
                     <div style="display: flex; gap: 20px; align-items: stretch;">
-                        <!-- 트렌드 차트 (60%) -->
-                        <div style="flex: 6; min-width: 0;">
-                            <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 350px;"></div>
+                        <!-- 좌측 섹션: 트렌드 차트 + 개별 임계값 -->
+                        <div style="flex: 6; min-width: 0; display: flex; flex-direction: column;">
+                            <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 320px;"></div>
+                            ${{thresholdInfo}}
                         </div>
 
                         <!-- 주문량 계산기 (40%) -->
