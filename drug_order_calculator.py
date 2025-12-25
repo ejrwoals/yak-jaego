@@ -204,7 +204,7 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, custom_thresholds=None):
+def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
     """테이블 행 HTML 생성 (인라인 차트 지원)
 
     Args:
@@ -214,7 +214,6 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
-        custom_thresholds: 개별 임계값 딕셔너리 {약품코드: {절대재고_임계값, 런웨이_임계값, ...}}
     """
     import json
     import ast
@@ -250,24 +249,8 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         stock = row[cm['stock']]
         drug_code = str(row['약품코드'])
 
-        # 1. 글로벌 임계값 기준 (런웨이가 임계값 미만)
-        global_urgent = runway < runway_threshold or ma3_runway < runway_threshold
-
-        # 2. 개별 임계값 기준 (custom_thresholds에 설정된 경우)
-        custom_urgent = False
-        has_custom_threshold = False
-        if custom_thresholds and drug_code in custom_thresholds:
-            has_custom_threshold = True
-            ct = custom_thresholds[drug_code]
-            # 절대 재고 임계값 체크 (N개 이하)
-            if ct.get('절대재고_임계값') is not None and stock <= ct['절대재고_임계값']:
-                custom_urgent = True
-            # 런웨이 임계값 체크 (M개월 미만)
-            if ct.get('런웨이_임계값') is not None and runway < ct['런웨이_임계값']:
-                custom_urgent = True
-
-        # OR 조건: 글로벌 또는 개별 임계값 중 하나라도 충족하면 긴급
-        is_urgent = global_urgent or custom_urgent
+        # 글로벌 임계값 기준 (런웨이가 임계값 미만)
+        is_urgent = runway < runway_threshold or ma3_runway < runway_threshold
         row_class = 'urgent-row clickable-row' if is_urgent else 'clickable-row'
 
         runway_class = 'urgent-cell' if runway < runway_threshold else 'normal-cell'
@@ -305,16 +288,6 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         timeseries = parse_list_string(row.get('월별_조제수량_리스트', []))
         ma3_list = parse_list_string(row.get('3개월_이동평균_리스트', []))
 
-        # 개별 임계값 정보 (인라인 설정 폼용)
-        custom_threshold_info = None
-        if has_custom_threshold:
-            ct = custom_thresholds[drug_code]
-            custom_threshold_info = {
-                'stock_threshold': ct.get('절대재고_임계값'),
-                'runway_threshold': ct.get('런웨이_임계값'),
-                'memo': ct.get('메모', '')
-            }
-
         chart_data = {
             'drug_name': row['약품명'] if row['약품명'] else "정보없음",
             'drug_code': drug_code,
@@ -325,24 +298,12 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
             'ma12': float(row[cm['ma12']]) if not pd.isna(row[cm['ma12']]) else 0,
             'ma3': float(row[cm['ma3']]) if not pd.isna(row[cm['ma3']]) else 0,
             'runway': runway_display,
-            'ma3_runway': ma3_runway_display,
-            'custom_threshold': custom_threshold_info
+            'ma3_runway': ma3_runway_display
         }
         chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
-        # 약품명에 개별 설정 아이콘 추가 (상세 툴팁 포함)
+        # 약품명 표시
         drug_name_display = row['약품명'] if row['약품명'] else "정보없음"
-        if has_custom_threshold:
-            ct = custom_thresholds[drug_code]
-            tooltip_parts = ['[개별 임계값 설정]']
-            if ct.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"• 재고: {ct['절대재고_임계값']}개 이하")
-            if ct.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"• 런웨이: {ct['런웨이_임계값']}개월 미만")
-            if ct.get('메모'):
-                tooltip_parts.append(f"• 메모: {ct['메모']}")
-            tooltip_text = html_escape('\n'.join(tooltip_parts))
-            drug_name_display = f'<span class="custom-threshold-icon" title="{tooltip_text}">⚙️</span> {drug_name_display}'
 
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
@@ -472,24 +433,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     sale_urgent = len(sale_df[(sale_df[cm['runway']] < runway_threshold) | (sale_df[cm['ma3_runway']] < runway_threshold)])
     total_urgent = dispense_urgent + sale_urgent
 
-    # 긴급 약품 우선 정렬 (개별 OR 글로벌 임계값 트리거)
+    # 긴급 약품 우선 정렬 (글로벌 임계값 기준만)
     def is_urgent_check(row):
-        drug_code = str(row['약품코드'])
         runway = row[cm['runway']]
         ma3_runway = row[cm['ma3_runway']]
-        stock = row[cm['stock']]
 
         # 글로벌 임계값 체크
         if runway < runway_threshold or ma3_runway < runway_threshold:
             return True
-
-        # 개별 임계값 체크
-        if drug_code in custom_thresholds:
-            ct = custom_thresholds[drug_code]
-            if ct.get('절대재고_임계값') is not None and stock <= ct['절대재고_임계값']:
-                return True
-            if ct.get('런웨이_임계값') is not None and runway < ct['런웨이_임계값']:
-                return True
 
         return False
 
@@ -503,8 +454,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         sale_df = sale_df.sort_values(['_is_urgent', cm['ma3_runway']], ascending=[False, True])
 
     # 테이블 행 생성 (months, runway_threshold 전달)
-    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold, custom_thresholds)
-    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold, custom_thresholds)
+    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold)
+    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
@@ -586,34 +537,174 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     </div>
     """ if new_drugs_count > 0 else ""
 
-    # 개별 임계값 설정 약품 목록 생성
+    # 개별 임계값 설정 약품 목록 생성 (상태 분류 포함)
+    def get_threshold_status(stock, stock_th, runway, runway_th):
+        """
+        상태 분류:
+        - urgent: 재고 ≤ 임계값 × 50% 또는 런웨이 ≤ 임계값 × 50%
+        - warning: 재고 ≤ 임계값 또는 런웨이 < 임계값
+        - safe: 그 외
+        """
+        # 재고 임계값 체크
+        if stock_th is not None:
+            if stock <= stock_th * 0.5:
+                return 'urgent'
+            elif stock <= stock_th:
+                return 'warning'
+
+        # 런웨이 임계값 체크 (재고 임계값이 없거나 안전한 경우)
+        if runway_th is not None:
+            if runway <= runway_th * 0.5:
+                return 'urgent'
+            elif runway < runway_th:
+                return 'warning'
+
+        return 'safe'
+
     custom_threshold_drugs = []
     for _, row in df.iterrows():
         drug_code = str(row['약품코드'])
         if drug_code in custom_thresholds:
             ct = custom_thresholds[drug_code]
+            stock = row[cm['stock']]
+            stock_th = ct.get('절대재고_임계값')
+            runway_th = ct.get('런웨이_임계값')
+
+            # 런웨이 값 가져오기 (숫자로 변환)
+            runway_val = row[cm['runway']]
+            if isinstance(runway_val, str):
+                try:
+                    runway_val = float(runway_val.replace('개월', '').strip())
+                except:
+                    runway_val = 999
+            runway_val = float(runway_val) if not pd.isna(runway_val) else 999
+
+            # 상태 분류
+            status = get_threshold_status(stock, stock_th, runway_val, runway_th)
+
+            # 비율 계산 (재고 기준 또는 런웨이 기준)
+            if stock_th is not None and stock_th > 0:
+                ratio = (stock / stock_th) * 100
+                ratio_type = 'stock'
+            elif runway_th is not None and runway_th > 0:
+                ratio = (runway_val / runway_th) * 100
+                ratio_type = 'runway'
+            else:
+                ratio = 100
+                ratio_type = 'none'
+
+            # 주문 권장량 (재고 임계값 기준)
+            order_qty = max(0, int(stock_th - stock)) if stock_th is not None else None
+
             custom_threshold_drugs.append({
                 'code': drug_code,
                 'name': row['약품명'],
                 'company': row.get('제약회사', '-'),
-                'stock': row[cm['stock']],
+                'stock': stock,
                 'drug_type': row.get('약품유형', '미분류'),
-                'stock_threshold': ct.get('절대재고_임계값'),
-                'runway_threshold': ct.get('런웨이_임계값'),
-                'memo': ct.get('메모', '')
+                'stock_threshold': stock_th,
+                'runway_threshold': runway_th,
+                'memo': ct.get('메모', ''),
+                'runway': runway_val,
+                'status': status,
+                'ratio': min(ratio, 200),  # 최대 200%로 제한
+                'ratio_type': ratio_type,
+                'order_qty': order_qty
             })
 
     # 오늘 파일에 있는 약품 중 개별 임계값 설정된 약품 수로 업데이트
     custom_threshold_count = len(custom_threshold_drugs)
 
+    # 상태별 분류
+    urgent_drugs = [d for d in custom_threshold_drugs if d['status'] == 'urgent']
+    warning_drugs = [d for d in custom_threshold_drugs if d['status'] == 'warning']
+    safe_drugs = [d for d in custom_threshold_drugs if d['status'] == 'safe']
+    attention_drugs = urgent_drugs + warning_drugs
+    attention_count = len(attention_drugs)
+    safe_count = len(safe_drugs)
+
+    # 상태 카드 HTML 생성 함수
+    def generate_status_card(drug):
+        """개별 상태 카드 HTML 생성"""
+        status = drug['status']
+        status_icon = '🔴' if status == 'urgent' else '🟡' if status == 'warning' else '🟢'
+        status_class = status
+
+        # 프로그레스 바 색상
+        ratio = drug['ratio']
+        if ratio > 100:
+            progress_class = 'over'
+        else:
+            progress_class = status
+
+        # 약품명 (최대 15자)
+        name = drug['name'][:15] + '...' if len(drug['name']) > 15 else drug['name']
+
+        # 메인 정보 (재고 또는 런웨이)
+        if drug['ratio_type'] == 'stock':
+            main_info = f"{drug['stock']:.0f} / {drug['stock_threshold']}개"
+            main_label = "재고"
+        elif drug['ratio_type'] == 'runway':
+            main_info = f"{drug['runway']:.1f} / {drug['runway_threshold']}개월"
+            main_label = "런웨이"
+        else:
+            main_info = f"{drug['stock']:.0f}개"
+            main_label = "재고"
+
+        # 런웨이 추가 정보 (재고 임계값이 있고 런웨이 임계값도 있는 경우)
+        runway_info = ""
+        if drug['ratio_type'] == 'stock' and drug['runway_threshold'] is not None:
+            runway_info = f'<div class="ct-card-runway">⚡ {drug["runway"]:.1f} / {drug["runway_threshold"]}개월</div>'
+
+        # 액션 가이드
+        if status in ['urgent', 'warning']:
+            if drug['order_qty'] is not None and drug['order_qty'] > 0:
+                action_text = f"📦 {drug['order_qty']}개 주문 권장"
+                action_class = "order"
+            else:
+                action_text = "⚠️ 주의 필요"
+                action_class = "order"
+        else:
+            action_text = "✅ 재고 충분"
+            action_class = "sufficient"
+
+        return f"""
+            <div class="ct-status-card {status_class}">
+                <div class="ct-card-header">
+                    <span class="ct-card-status-icon">{status_icon}</span>
+                    <span class="ct-card-name" title="{drug['name']}">{name}</span>
+                </div>
+                <div class="ct-card-stock">
+                    <span class="ct-current">{main_info}</span>
+                </div>
+                <div class="ct-card-progress">
+                    <div class="ct-progress-bar">
+                        <div class="ct-progress-fill {progress_class}" style="width: {min(ratio, 100)}%;"></div>
+                    </div>
+                    <span class="ct-progress-text">{ratio:.0f}%</span>
+                </div>
+                {runway_info}
+                <div class="ct-card-action {action_class}">{action_text}</div>
+            </div>
+        """
+
+    # 상태 카드 HTML 생성
+    attention_cards_html = ''.join([generate_status_card(d) for d in attention_drugs])
+    safe_cards_html = ''.join([generate_status_card(d) for d in safe_drugs])
+
+    # 테이블 행 HTML 생성
     custom_threshold_rows = ""
     for drug in custom_threshold_drugs:
         stock_th = f"{drug['stock_threshold']}개 이하" if drug['stock_threshold'] is not None else "-"
         runway_th = f"{drug['runway_threshold']}개월 미만" if drug['runway_threshold'] is not None else "-"
         drug_type = drug['drug_type']
         type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
+
+        # 상태에 따른 행 스타일
+        status_row_class = f"status-{drug['status']}"
+
         custom_threshold_rows += f"""
-            <tr data-threshold-drug-code="{drug['code']}">
+            <tr data-threshold-drug-code="{drug['code']}" class="{status_row_class}">
                 <td>{drug['name']}</td>
                 <td>{drug['code']}</td>
                 <td>{drug['company']}</td>
@@ -625,42 +716,82 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             </tr>
 """
 
-    # 개별 설정 책갈피 HTML
+    # 개별 설정 책갈피 HTML (주의 필요 개수 표시)
+    bookmark_count_text = f"{attention_count}개 주의" if attention_count > 0 else f"{custom_threshold_count}개"
     custom_threshold_bookmark = f"""
         <div class="alert-bookmark custom" onclick="openCustomThresholdModal()">
             <span class="alert-icon">⚙️</span>
             <span class="alert-title">개별 설정</span>
-            <span class="alert-count">{custom_threshold_count}개</span>
+            <span class="alert-count">{bookmark_count_text}</span>
         </div>
     """ if custom_threshold_count > 0 else ""
 
-    # 개별 설정 모달 HTML
+    # 상태 카드 섹션 HTML
+    status_cards_section = ""
+    if attention_count > 0 or safe_count > 0:
+        status_cards_section = f"""
+            <div class="ct-status-section">
+                <!-- 주의 필요 섹션 -->
+                {"" if attention_count == 0 else f'''
+                <div class="ct-attention-header">
+                    <span class="ct-attention-icon">⚠️</span>
+                    <span class="ct-attention-title">주의 필요</span>
+                    <span class="ct-attention-count">({attention_count}개)</span>
+                </div>
+                <div class="ct-cards-container">
+                    {attention_cards_html}
+                </div>
+                '''}
+
+                <!-- 안전 섹션 (접기/펼치기) -->
+                {"" if safe_count == 0 else f'''
+                <div class="ct-safe-section">
+                    <div class="ct-safe-header" onclick="toggleSafeCards()">
+                        <span class="ct-safe-icon">✅</span>
+                        <span class="ct-safe-title">안전</span>
+                        <span class="ct-safe-count">({safe_count}개)</span>
+                        <span class="ct-safe-toggle" id="safeToggleIcon">▼</span>
+                    </div>
+                    <div class="ct-safe-cards" id="safeCardsContainer" style="display: none;">
+                        {safe_cards_html}
+                    </div>
+                </div>
+                '''}
+            </div>
+        """
+
+    # 개별 설정 모달 HTML (상태 카드 섹션 + 테이블)
     custom_threshold_modal = f"""
     <div id="customThresholdModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 1200px;">
             <div class="modal-header" style="background-color: #805ad5;">
                 <h3>⚙️ 개별 임계값 설정 약품 (<span id="customThresholdModalCount">{custom_threshold_count}</span>개)</h3>
                 <span class="modal-close" onclick="closeCustomThresholdModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">개별 임계값이 설정된 약품입니다. 글로벌 임계값과 별도로 강조 표시됩니다.</p>
-                <table class="modal-table-threshold">
-                    <thead>
-                        <tr>
-                            <th>약품명</th>
-                            <th>약품코드</th>
-                            <th>제약회사</th>
-                            <th>현재 재고</th>
-                            <th>약품유형</th>
-                            <th>재고 임계값</th>
-                            <th>런웨이 임계값</th>
-                            <th>메모</th>
-                        </tr>
-                    </thead>
-                    <tbody id="customThresholdTbody">
-                        {custom_threshold_rows}
-                    </tbody>
-                </table>
+                {status_cards_section}
+
+                <!-- 전체 목록 테이블 -->
+                <div class="ct-table-section">
+                    <div class="ct-table-header">📋 전체 목록</div>
+                    <table class="modal-table-threshold">
+                        <thead>
+                            <tr>
+                                <th>약품명</th>
+                                <th>약품코드</th>
+                                <th>제약회사</th>
+                                <th>현재 재고</th>
+                                <th>약품유형</th>
+                                <th>재고 임계값</th>
+                                <th>런웨이 임계값</th>
+                                <th>메모</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customThresholdTbody">
+                            {custom_threshold_rows}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -900,46 +1031,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .alert-bookmark.custom:hover {{
             box-shadow: -6px 6px 24px rgba(91, 33, 182, 0.4);
         }}
-        .custom-threshold-icon {{
-            font-size: 12px;
-            margin-right: 2px;
-            cursor: help;
-        }}
-        /* 개별 임계값 정보 바 (차트 아래 표시) */
-        .ct-info-bar {{
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
-            border: 1px solid #c4b5fd;
-            border-left: 4px solid #8b5cf6;
-            border-radius: 8px;
-            padding: 10px 16px;
-            margin-top: 12px;
-            font-size: 13px;
-        }}
-        .ct-info-header {{
-            font-weight: 600;
-            color: #6d28d9;
-        }}
-        .ct-separator {{
-            color: #c4b5fd;
-        }}
-        .ct-item {{
-            color: #4a5568;
-        }}
-        .ct-item .ct-label {{
-            background: #fff;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: 500;
-            color: #7c3aed;
-        }}
-        .ct-memo-item {{
-            color: #6b7280;
-            font-style: italic;
-        }}
 
         /* 모달 스타일 */
         .modal {{
@@ -1035,6 +1126,218 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .modal-table-threshold td:nth-child(7) {{ width: 14%; white-space: nowrap; text-align: center; }}  /* 런웨이 임계값 */
         .modal-table-threshold th:nth-child(8),
         .modal-table-threshold td:nth-child(8) {{ width: 16%; word-break: break-word; }}  /* 메모 */
+
+        /* 상태 카드 섹션 스타일 */
+        .ct-status-section {{
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .ct-attention-header {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #c53030;
+        }}
+        .ct-attention-icon {{
+            font-size: 18px;
+        }}
+        .ct-attention-count {{
+            background: #fed7d7;
+            color: #c53030;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }}
+        .ct-cards-container {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-bottom: 16px;
+        }}
+        /* 개별 상태 카드 */
+        .ct-status-card {{
+            width: 195px;
+            background: white;
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }}
+        .ct-status-card:hover {{
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        }}
+        .ct-status-card.urgent {{
+            border-left: 4px solid #e53e3e;
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+        }}
+        .ct-status-card.warning {{
+            border-left: 4px solid #dd6b20;
+            background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);
+        }}
+        .ct-status-card.safe {{
+            border-left: 4px solid #38a169;
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+        }}
+        .ct-card-header {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+        }}
+        .ct-card-status-icon {{
+            font-size: 16px;
+        }}
+        .ct-card-name {{
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }}
+        .ct-card-stock {{
+            font-size: 15px;
+            margin-bottom: 10px;
+        }}
+        .ct-card-stock .ct-current {{
+            font-weight: bold;
+            color: #2d3748;
+        }}
+        .ct-card-progress {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }}
+        .ct-progress-bar {{
+            flex: 1;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }}
+        .ct-progress-fill {{
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }}
+        .ct-progress-fill.urgent {{
+            background: linear-gradient(90deg, #e53e3e 0%, #fc8181 100%);
+        }}
+        .ct-progress-fill.warning {{
+            background: linear-gradient(90deg, #dd6b20 0%, #f6ad55 100%);
+        }}
+        .ct-progress-fill.safe {{
+            background: linear-gradient(90deg, #38a169 0%, #68d391 100%);
+        }}
+        .ct-progress-fill.over {{
+            background: linear-gradient(90deg, #3182ce 0%, #63b3ed 100%);
+        }}
+        .ct-progress-text {{
+            font-size: 12px;
+            font-weight: 600;
+            color: #4a5568;
+            min-width: 42px;
+            text-align: right;
+        }}
+        .ct-card-runway {{
+            font-size: 11px;
+            color: #718096;
+            margin-bottom: 10px;
+            padding: 4px 8px;
+            background: rgba(0,0,0,0.04);
+            border-radius: 4px;
+        }}
+        .ct-card-action {{
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+        }}
+        .ct-card-action.order {{
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            color: white;
+        }}
+        .ct-card-action.sufficient {{
+            background: linear-gradient(135deg, #38a169 0%, #276749 100%);
+            color: white;
+        }}
+        /* 안전 섹션 (접기/펼치기) */
+        .ct-safe-section {{
+            margin-top: 20px;
+        }}
+        .ct-safe-header {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            border: 1px solid #9ae6b4;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }}
+        .ct-safe-header:hover {{
+            background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);
+        }}
+        .ct-safe-icon {{
+            font-size: 16px;
+        }}
+        .ct-safe-title {{
+            font-weight: 600;
+            color: #276749;
+        }}
+        .ct-safe-count {{
+            color: #38a169;
+            font-weight: 500;
+        }}
+        .ct-safe-toggle {{
+            margin-left: auto;
+            color: #38a169;
+            transition: transform 0.3s;
+            font-size: 12px;
+        }}
+        .ct-safe-toggle.expanded {{
+            transform: rotate(180deg);
+        }}
+        .ct-safe-cards {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            padding: 16px 0;
+        }}
+        /* 테이블 섹션 */
+        .ct-table-section {{
+            margin-top: 24px;
+        }}
+        .ct-table-header {{
+            font-size: 15px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }}
+        /* 테이블 상태 행 스타일 */
+        .modal-table-threshold tr.status-urgent {{
+            background-color: rgba(229, 62, 62, 0.08);
+        }}
+        .modal-table-threshold tr.status-warning {{
+            background-color: rgba(221, 107, 32, 0.08);
+        }}
+        .modal-table-threshold tr.status-safe {{
+            background-color: rgba(56, 161, 105, 0.05);
+        }}
 
         /* 탭 스타일 */
         .tab-container {{
@@ -1453,6 +1756,23 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             document.getElementById('customThresholdModal').style.display = 'none';
         }}
 
+        // 안전 카드 접기/펼치기
+        function toggleSafeCards() {{
+            const container = document.getElementById('safeCardsContainer');
+            const toggleIcon = document.getElementById('safeToggleIcon');
+            if (!container || !toggleIcon) return;
+
+            if (container.style.display === 'none') {{
+                container.style.display = 'flex';
+                toggleIcon.classList.add('expanded');
+                toggleIcon.textContent = '▲';
+            }} else {{
+                container.style.display = 'none';
+                toggleIcon.classList.remove('expanded');
+                toggleIcon.textContent = '▼';
+            }}
+        }}
+
         // 모달 외부 클릭 시 닫기
         window.onclick = function(event) {{
             var zeroModal = document.getElementById('zeroStockModal');
@@ -1511,27 +1831,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             currentChartDrugCode = drugCode;
             const colSpan = row.cells.length;
 
-            // 개별 임계값 정보 HTML 생성 (헤더 아래에 설명적으로 표시)
-            let thresholdInfo = '';
-            if (chartData.custom_threshold) {{
-                const ct = chartData.custom_threshold;
-                let items = [];
-                if (ct.stock_threshold !== null && ct.stock_threshold !== undefined) {{
-                    items.push(`<span class="ct-item"><span class="ct-label">재고 ${{ct.stock_threshold}}개 이하</span> 시 강조</span>`);
-                }}
-                if (ct.runway_threshold !== null && ct.runway_threshold !== undefined) {{
-                    items.push(`<span class="ct-item"><span class="ct-label">런웨이 ${{ct.runway_threshold}}개월 미만</span> 시 강조</span>`);
-                }}
-                const memoHtml = ct.memo ? `<span class="ct-item ct-memo-item">📝 메모: "${{ct.memo}}"</span>` : '';
-                thresholdInfo = `
-                    <div class="ct-info-bar">
-                        <span class="ct-info-header">⚙️ 개별 임계값</span>
-                        ${{items.join('<span class="ct-separator">│</span>')}}
-                        ${{memoHtml}}
-                    </div>
-                `;
-            }}
-
             // 차트 행 생성
             const chartRow = document.createElement('tr');
             chartRow.className = 'inline-chart-row';
@@ -1540,12 +1839,11 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                     <button onclick="closeInlineChart('${{drugCode}}')"
                             style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #718096; z-index: 10;">&times;</button>
 
-                    <!-- 좌측(60%): 차트 + 개별임계값 / 우측(40%): 주문량계산기 -->
+                    <!-- 좌측(60%): 차트 / 우측(40%): 주문량계산기 -->
                     <div style="display: flex; gap: 20px; align-items: stretch;">
-                        <!-- 좌측 섹션: 트렌드 차트 + 개별 임계값 -->
-                        <div style="flex: 6; min-width: 0; display: flex; flex-direction: column;">
+                        <!-- 좌측 섹션: 트렌드 차트 -->
+                        <div style="flex: 6; min-width: 0;">
                             <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 320px;"></div>
-                            ${{thresholdInfo}}
                         </div>
 
                         <!-- 주문량 계산기 (40%) -->
@@ -1812,59 +2110,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             Plotly.newPlot(chartContainer, traces, layout, {{displayModeBar: false, responsive: true}});
         }}
 
-        // ========== 페이지 로드 시 최신 임계값 동기화 ==========
+        // ========== 페이지 로드 시 최신 임계값 동기화 (책갈피만 업데이트) ==========
         window.addEventListener('DOMContentLoaded', function() {{
             fetch('/api/drug-thresholds')
                 .then(response => response.json())
                 .then(data => {{
                     if (data.status === 'success') {{
-                        // 약품코드 → 임계값 맵 생성
-                        const thresholdMap = {{}};
-                        data.data.forEach(item => {{
-                            thresholdMap[item.약품코드] = {{
-                                stock_threshold: item.절대재고_임계값,
-                                runway_threshold: item.런웨이_임계값,
-                                memo: item.메모 || ''
-                            }};
-                        }});
-
-                        // 모든 테이블 행 순회
-                        document.querySelectorAll('tr[data-drug-code]').forEach(row => {{
-                            const drugCode = row.getAttribute('data-drug-code');
-                            const nameCell = row.cells[0];
-                            if (!nameCell) return;
-                            const hasIcon = nameCell.innerHTML.includes('custom-threshold-icon');
-
-                            if (thresholdMap[drugCode]) {{
-                                // 임계값 있음 → 아이콘 추가 (없으면)
-                                if (!hasIcon) {{
-                                    nameCell.innerHTML = '<span class="custom-threshold-icon" title="개별 임계값 설정됨">⚙️</span> ' + nameCell.innerHTML;
-                                }}
-
-                                // data-chart-data 업데이트 (인라인 차트 열 때 최신 값 사용)
-                                try {{
-                                    const chartData = JSON.parse(row.getAttribute('data-chart-data'));
-                                    chartData.custom_threshold = thresholdMap[drugCode];
-                                    row.setAttribute('data-chart-data', JSON.stringify(chartData));
-                                }} catch(e) {{}}
-                            }} else {{
-                                // 임계값 없음 → 아이콘 제거 (있으면)
-                                if (hasIcon) {{
-                                    nameCell.innerHTML = nameCell.innerHTML.replace(
-                                        /<span class="custom-threshold-icon"[^>]*>⚙️<\/span>\s*/g,
-                                        ''
-                                    );
-                                }}
-
-                                // data-chart-data에서 custom_threshold 제거
-                                try {{
-                                    const chartData = JSON.parse(row.getAttribute('data-chart-data'));
-                                    chartData.custom_threshold = null;
-                                    row.setAttribute('data-chart-data', JSON.stringify(chartData));
-                                }} catch(e) {{}}
-                            }}
-                        }});
-
                         // 책갈피 카운트 업데이트
                         const countEl = document.querySelector('.alert-bookmark.custom .alert-count');
                         if (countEl) {{
@@ -1880,7 +2131,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 }})
                 .catch(error => {{
                     console.error('임계값 동기화 실패:', error);
-                    // 실패 시 기존 HTML 상태 그대로 사용 (폴백)
                 }});
         }});
     </script>
