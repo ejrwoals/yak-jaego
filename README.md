@@ -16,6 +16,7 @@
 - `checked_items.sqlite3`: 긴급 약품 확인 상태 저장 (v3.5 신규)
 - `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장 (v3.12 신규)
 - `drug_memos.sqlite3`: 통합 메모 저장 (v3.13 신규) - 모든 보고서에서 공유
+- ⚠️ **DB 재생성 시 보존되는 데이터**: "DB 재생성" 버튼은 `recent_inventory`와 `processed_inventory`만 재생성하며, 사용자 설정 DB(`checked_items`, `drug_thresholds`, `drug_memos`)는 영향받지 않음
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
 - **음수 재고 지원**: 마이너스 재고도 정확히 반영
 - **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소

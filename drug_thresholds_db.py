@@ -32,12 +32,12 @@ def init_db():
         cursor = conn.cursor()
 
         # 메인 테이블: drug_thresholds
+        # 메모는 v3.13부터 drug_memos.sqlite3에서 통합 관리
         cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                 약품코드 TEXT PRIMARY KEY,
                 절대재고_임계값 INTEGER DEFAULT NULL,
                 런웨이_임계값 REAL DEFAULT NULL,
-                메모 TEXT DEFAULT NULL,
                 활성화 INTEGER DEFAULT 1,
                 생성일시 TEXT,
                 수정일시 TEXT
@@ -219,12 +219,12 @@ def upsert_threshold(약품코드, 절대재고_임계값=None, 런웨이_임계
         existing = cursor.fetchone()
 
         if existing:
-            # UPDATE (메모 컬럼은 NULL로 설정 - 통합 메모 시스템 사용)
+            # UPDATE
             이전_절대재고, 이전_런웨이 = existing
 
             cursor.execute(f'''
                 UPDATE {TABLE_NAME}
-                SET 절대재고_임계값 = ?, 런웨이_임계값 = ?, 메모 = NULL, 활성화 = 1, 수정일시 = ?
+                SET 절대재고_임계값 = ?, 런웨이_임계값 = ?, 활성화 = 1, 수정일시 = ?
                 WHERE 약품코드 = ?
             ''', (절대재고_임계값, 런웨이_임계값, now, 약품코드))
 
@@ -235,11 +235,11 @@ def upsert_threshold(약품코드, 절대재고_임계값=None, 런웨이_임계
             action = 'update'
             message = f'{약품코드} 임계값이 수정되었습니다.'
         else:
-            # INSERT (메모 컬럼은 NULL로 설정 - 통합 메모 시스템 사용)
+            # INSERT
             cursor.execute(f'''
                 INSERT INTO {TABLE_NAME}
-                (약품코드, 절대재고_임계값, 런웨이_임계값, 메모, 활성화, 생성일시, 수정일시)
-                VALUES (?, ?, ?, NULL, 1, ?, ?)
+                (약품코드, 절대재고_임계값, 런웨이_임계값, 활성화, 생성일시, 수정일시)
+                VALUES (?, ?, ?, 1, ?, ?)
             ''', (약품코드, 절대재고_임계값, 런웨이_임계값, now, now))
 
             _record_history(cursor, 약품코드, 'CREATE',
