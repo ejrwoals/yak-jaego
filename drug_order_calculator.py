@@ -204,7 +204,7 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
+def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, custom_thresholds=None):
     """테이블 행 HTML 생성 (인라인 차트 지원)
 
     Args:
@@ -214,6 +214,7 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
                     'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
+        custom_thresholds: 개별 임계값 딕셔너리 {약품코드: {...}}
     """
     import json
     import ast
@@ -305,12 +306,26 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0):
         # 약품명 표시
         drug_name_display = row['약품명'] if row['약품명'] else "정보없음"
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if custom_thresholds and drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if th.get('메모'):
+                tooltip_parts.append(f"메모: {th['메모']}")
+            tooltip_text = html_escape(' | '.join(tooltip_parts))
+            threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
                 data-chart-data='{chart_data_json}'
                 onclick="toggleInlineChart(this, '{drug_code}')"
                 title="클릭하여 상세 차트 및 주문량 계산기 보기">
-                <td title="{html_escape(str(row['약품명']))}">{drug_name_display}</td>
+                <td title="{html_escape(str(row['약품명']))}">{threshold_icon}{drug_name_display}</td>
                 <td>{row['약품코드']}</td>
                 <td title="{html_escape(str(row['제약회사']))}">{row['제약회사']}</td>
                 <td>{row[cm['stock']]:.0f}</td>
@@ -453,9 +468,9 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         sale_df['_is_urgent'] = sale_df.apply(is_urgent_check, axis=1)
         sale_df = sale_df.sort_values(['_is_urgent', cm['ma3_runway']], ascending=[False, True])
 
-    # 테이블 행 생성 (months, runway_threshold 전달)
-    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold)
-    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold)
+    # 테이블 행 생성 (months, runway_threshold, custom_thresholds 전달)
+    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold, custom_thresholds)
+    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold, custom_thresholds)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
@@ -596,6 +611,18 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             # 주문 권장량 (재고 임계값 기준)
             order_qty = max(0, int(stock_th - stock)) if stock_th is not None else None
 
+            # 3개월 이동평균 가져오기
+            ma3_val = row[cm['ma3']] if not pd.isna(row[cm['ma3']]) else 0
+            ma3_val = float(ma3_val)
+
+            # 런웨이 기준 필요 수량 계산
+            if runway_th is not None and runway_val < runway_th:
+                runway_gap = runway_th - runway_val  # 부족한 개월 수
+                runway_order_qty = int(runway_gap * ma3_val) if ma3_val > 0 else None
+            else:
+                runway_gap = None
+                runway_order_qty = None
+
             custom_threshold_drugs.append({
                 'code': drug_code,
                 'name': row['약품명'],
@@ -609,7 +636,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 'status': status,
                 'ratio': min(ratio, 200),  # 최대 200%로 제한
                 'ratio_type': ratio_type,
-                'order_qty': order_qty
+                'order_qty': order_qty,
+                'ma3': ma3_val,
+                'runway_gap': runway_gap,
+                'runway_order_qty': runway_order_qty
             })
 
     # 오늘 파일에 있는 약품 중 개별 임계값 설정된 약품 수로 업데이트
@@ -625,66 +655,121 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
     # 상태 카드 HTML 생성 함수
     def generate_status_card(drug):
-        """개별 상태 카드 HTML 생성"""
+        """개별 상태 카드 HTML 생성 - 임계값 유형별 레이아웃"""
         status = drug['status']
-        status_icon = '🔴' if status == 'urgent' else '🟡' if status == 'warning' else '🟢'
         status_class = status
 
-        # 프로그레스 바 색상
+        # 약품명 (최대 18자)
+        name = drug['name'][:18] + '...' if len(drug['name']) > 18 else drug['name']
+
+        # 임계값 유형 판단
+        has_stock_th = drug['stock_threshold'] is not None
+        has_runway_th = drug['runway_threshold'] is not None
+
         ratio = drug['ratio']
-        if ratio > 100:
-            progress_class = 'over'
-        else:
-            progress_class = status
 
-        # 약품명 (최대 15자)
-        name = drug['name'][:15] + '...' if len(drug['name']) > 15 else drug['name']
-
-        # 메인 정보 (재고 또는 런웨이)
-        if drug['ratio_type'] == 'stock':
-            main_info = f"{drug['stock']:.0f} / {drug['stock_threshold']}개"
-            main_label = "재고"
-        elif drug['ratio_type'] == 'runway':
-            main_info = f"{drug['runway']:.1f} / {drug['runway_threshold']}개월"
-            main_label = "런웨이"
-        else:
-            main_info = f"{drug['stock']:.0f}개"
-            main_label = "재고"
-
-        # 런웨이 추가 정보 (재고 임계값이 있고 런웨이 임계값도 있는 경우)
-        runway_info = ""
-        if drug['ratio_type'] == 'stock' and drug['runway_threshold'] is not None:
-            runway_info = f'<div class="ct-card-runway">⚡ {drug["runway"]:.1f} / {drug["runway_threshold"]}개월</div>'
-
-        # 액션 가이드
-        if status in ['urgent', 'warning']:
-            if drug['order_qty'] is not None and drug['order_qty'] > 0:
-                action_text = f"📦 {drug['order_qty']}개 주문 권장"
-                action_class = "order"
+        # 메인 정보 생성 (유형별)
+        if has_stock_th and has_runway_th:
+            # 둘 다 설정된 경우: 두 줄로 표시, 프로그레스 바 없음
+            stock_ratio = (drug['stock'] / drug['stock_threshold']) * 100 if drug['stock_threshold'] > 0 else 100
+            runway_ratio = (drug['runway'] / drug['runway_threshold']) * 100 if drug['runway_threshold'] > 0 else 100
+            main_html = f'''
+                <div class="ct-card-row">
+                    <span class="ct-row-icon">📦</span>
+                    <span class="ct-row-label">현재고:</span>
+                    <span class="ct-row-value">{drug['stock']:.0f}</span>
+                    <span class="ct-row-sep">/</span>
+                    <span class="ct-row-label">목표:</span>
+                    <span class="ct-row-value">{drug['stock_threshold']}개</span>
+                    <span class="ct-row-ratio">({stock_ratio:.0f}%)</span>
+                </div>
+                <div class="ct-card-row">
+                    <span class="ct-row-icon">⏱️</span>
+                    <span class="ct-row-label">런웨이:</span>
+                    <span class="ct-row-value">{drug['runway']:.1f}</span>
+                    <span class="ct-row-sep">/</span>
+                    <span class="ct-row-label">목표:</span>
+                    <span class="ct-row-value">{drug['runway_threshold']}개월</span>
+                    <span class="ct-row-ratio">({runway_ratio:.0f}%)</span>
+                </div>
+            '''
+            # 액션: 재고 기준 우선
+            if drug['order_qty'] and drug['order_qty'] > 0:
+                action_text = f"→ <strong>{drug['order_qty']}개</strong> 주문 권장"
             else:
-                action_text = "⚠️ 주의 필요"
-                action_class = "order"
-        else:
-            action_text = "✅ 재고 충분"
-            action_class = "sufficient"
+                action_text = "✅ 재고 충분"
+            show_progress = False
 
-        return f"""
-            <div class="ct-status-card {status_class}">
-                <div class="ct-card-header">
-                    <span class="ct-card-status-icon">{status_icon}</span>
-                    <span class="ct-card-name" title="{drug['name']}">{name}</span>
+        elif has_stock_th:
+            # 재고 임계값만
+            main_html = f'''
+                <div class="ct-card-main">
+                    <span class="ct-main-icon">📦</span>
+                    <span class="ct-main-label">현재고:</span>
+                    <span class="ct-main-value">{drug['stock']:.0f}</span>
+                    <span class="ct-main-sep">/</span>
+                    <span class="ct-main-label">목표:</span>
+                    <span class="ct-main-value">{drug['stock_threshold']}개</span>
                 </div>
-                <div class="ct-card-stock">
-                    <span class="ct-current">{main_info}</span>
+            '''
+            if drug['order_qty'] and drug['order_qty'] > 0:
+                action_text = f"→ <strong>{drug['order_qty']}개</strong> 주문 권장"
+            else:
+                action_text = "✅ 재고 충분"
+            show_progress = True
+
+        elif has_runway_th:
+            # 런웨이 임계값만
+            main_html = f'''
+                <div class="ct-card-main">
+                    <span class="ct-main-icon">⏱️</span>
+                    <span class="ct-main-label">런웨이:</span>
+                    <span class="ct-main-value">{drug['runway']:.1f}</span>
+                    <span class="ct-main-sep">/</span>
+                    <span class="ct-main-label">목표:</span>
+                    <span class="ct-main-value">{drug['runway_threshold']}개월</span>
                 </div>
+            '''
+            # 런웨이 기준 액션 가이드 (수량 포함)
+            if drug.get('runway_gap') and drug.get('runway_order_qty'):
+                action_text = f"→ <strong>{drug['runway_gap']:.1f}개월분({drug['runway_order_qty']}개)</strong> 추가 확보 필요"
+            elif drug.get('runway_gap'):
+                action_text = f"→ <strong>{drug['runway_gap']:.1f}개월분</strong> 추가 확보 필요"
+            else:
+                action_text = "✅ 런웨이 충분"
+            show_progress = True
+
+        else:
+            # 임계값 없음 (예외)
+            main_html = f'<div class="ct-card-main">{drug["stock"]:.0f}개</div>'
+            action_text = "-"
+            show_progress = False
+
+        # 프로그레스 바 (단일 색상)
+        progress_html = ""
+        if show_progress:
+            progress_html = f'''
                 <div class="ct-card-progress">
                     <div class="ct-progress-bar">
-                        <div class="ct-progress-fill {progress_class}" style="width: {min(ratio, 100)}%;"></div>
+                        <div class="ct-progress-fill" style="width: {min(ratio, 100)}%;"></div>
                     </div>
                     <span class="ct-progress-text">{ratio:.0f}%</span>
                 </div>
-                {runway_info}
-                <div class="ct-card-action {action_class}">{action_text}</div>
+            '''
+
+        # 메모 표시 (있는 경우)
+        memo_html = ""
+        if drug.get('memo'):
+            memo_text = drug['memo'][:30] + '...' if len(drug['memo']) > 30 else drug['memo']
+            memo_html = f'<div class="ct-card-memo" title="{drug["memo"]}">📝 {memo_text}</div>'
+
+        return f"""
+            <div class="ct-status-card {status_class}">
+                <div class="ct-card-name" title="{drug['name']}">{name}</div>
+                {main_html}
+                {progress_html}
+                <div class="ct-card-action">{action_text}</div>
+                {memo_html}
             </div>
         """
 
@@ -1159,117 +1244,117 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             gap: 14px;
             margin-bottom: 16px;
         }}
-        /* 개별 상태 카드 */
+        /* 개별 상태 카드 - 단순화된 디자인 */
         .ct-status-card {{
-            width: 195px;
-            background: white;
-            border-radius: 12px;
+            width: 317px;
+            background: #ffffff;
+            border-radius: 10px;
             padding: 14px;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }}
         .ct-status-card:hover {{
-            transform: translateY(-3px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }}
-        .ct-status-card.urgent {{
-            border-left: 4px solid #e53e3e;
-            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
-        }}
-        .ct-status-card.warning {{
-            border-left: 4px solid #dd6b20;
-            background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);
-        }}
-        .ct-status-card.safe {{
-            border-left: 4px solid #38a169;
-            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
-        }}
-        .ct-card-header {{
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 10px;
-        }}
-        .ct-card-status-icon {{
-            font-size: 16px;
-        }}
+        /* 좌측 테두리만 상태 색상 */
+        .ct-status-card.urgent {{ border-left: 4px solid #e53e3e; }}
+        .ct-status-card.warning {{ border-left: 4px solid #dd6b20; }}
+        .ct-status-card.safe {{ border-left: 4px solid #38a169; }}
+
+        /* 약품명 */
         .ct-card-name {{
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
-            color: #2d3748;
+            color: #1a202c;
+            margin-bottom: 12px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            flex: 1;
         }}
-        .ct-card-stock {{
-            font-size: 15px;
+
+        /* 메인 정보 (단일 행) */
+        .ct-card-main {{
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+            font-size: 14px;
+            color: #4a5568;
             margin-bottom: 10px;
         }}
-        .ct-card-stock .ct-current {{
-            font-weight: bold;
-            color: #2d3748;
+        .ct-main-icon {{ font-size: 14px; }}
+        .ct-main-label {{ color: #718096; font-size: 12px; }}
+        .ct-main-value {{ font-weight: 600; color: #2d3748; }}
+        .ct-main-sep {{ color: #a0aec0; }}
+
+        /* 메인 정보 (복수 행 - 둘 다 설정) */
+        .ct-card-row {{
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 3px;
+            font-size: 12px;
+            color: #4a5568;
+            margin-bottom: 6px;
         }}
+        .ct-row-icon {{ font-size: 12px; }}
+        .ct-row-label {{ color: #718096; }}
+        .ct-row-value {{ font-weight: 600; color: #2d3748; }}
+        .ct-row-sep {{ color: #a0aec0; }}
+        .ct-row-ratio {{ color: #a0aec0; font-size: 11px; }}
+
+        /* 메모 표시 */
+        .ct-card-memo {{
+            font-size: 11px;
+            color: #718096;
+            margin-top: 8px;
+            padding: 6px 8px;
+            background: #f7fafc;
+            border-radius: 4px;
+            border-left: 2px solid #cbd5e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        /* 프로그레스 바 - 단일 색상 */
         .ct-card-progress {{
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 8px;
+            margin-bottom: 12px;
         }}
         .ct-progress-bar {{
             flex: 1;
-            height: 8px;
+            height: 6px;
             background: #e2e8f0;
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
         }}
         .ct-progress-fill {{
             height: 100%;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }}
-        .ct-progress-fill.urgent {{
-            background: linear-gradient(90deg, #e53e3e 0%, #fc8181 100%);
-        }}
-        .ct-progress-fill.warning {{
-            background: linear-gradient(90deg, #dd6b20 0%, #f6ad55 100%);
-        }}
-        .ct-progress-fill.safe {{
-            background: linear-gradient(90deg, #38a169 0%, #68d391 100%);
-        }}
-        .ct-progress-fill.over {{
-            background: linear-gradient(90deg, #3182ce 0%, #63b3ed 100%);
+            background: #4299e1;  /* 단일 파란색 */
+            border-radius: 3px;
         }}
         .ct-progress-text {{
             font-size: 12px;
-            font-weight: 600;
-            color: #4a5568;
-            min-width: 42px;
-            text-align: right;
-        }}
-        .ct-card-runway {{
-            font-size: 11px;
             color: #718096;
-            margin-bottom: 10px;
-            padding: 4px 8px;
-            background: rgba(0,0,0,0.04);
-            border-radius: 4px;
+            min-width: 35px;
         }}
+
+        /* 액션 가이드 */
         .ct-card-action {{
-            font-size: 12px;
-            padding: 6px 10px;
+            font-size: 14px;
+            color: #1a202c;
+            font-weight: 400;
+            padding: 10px 12px;
+            margin-top: 10px;
+            background: #fffbeb;
             border-radius: 6px;
-            text-align: center;
-            font-weight: 600;
+            border-left: 3px solid #d69e2e;
         }}
-        .ct-card-action.order {{
-            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
-            color: white;
-        }}
-        .ct-card-action.sufficient {{
-            background: linear-gradient(135deg, #38a169 0%, #276749 100%);
-            color: white;
+        .ct-card-action strong {{
+            font-weight: 700;
+            color: #b7791f;
         }}
         /* 안전 섹션 (접기/펼치기) */
         .ct-safe-section {{
@@ -1280,15 +1365,16 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             align-items: center;
             gap: 8px;
             padding: 12px 16px;
-            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
-            border: 1px solid #9ae6b4;
-            border-radius: 10px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #38a169;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
             font-size: 14px;
         }}
         .ct-safe-header:hover {{
-            background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);
+            background: #edf2f7;
         }}
         .ct-safe-icon {{
             font-size: 16px;
@@ -1460,6 +1546,17 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         }}
         .clickable-row:hover {{
             background-color: #edf2f7 !important;
+        }}
+
+        /* 개별 임계값 표시 아이콘 */
+        .threshold-indicator {{
+            margin-right: 6px;
+            cursor: help;
+            font-size: 14px;
+            opacity: 0.8;
+        }}
+        .threshold-indicator:hover {{
+            opacity: 1;
         }}
 
         /* 트렌드 아이콘 스타일 */
