@@ -7,6 +7,8 @@ from datetime import datetime
 import json
 import inventory_db
 import checked_items_db
+import drug_memos_db
+import drug_thresholds_db
 
 def calculate_custom_ma(timeseries, n_months):
     """
@@ -121,6 +123,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         'sale': f'일반약 재고 관리 보고서 ({ma_months}개월 이동평균)'
     }
     report_title = mode_titles.get(mode, f'약품 재고 관리 보고서 ({ma_months}개월 이동평균)')
+
+    # 개별 임계값 데이터 로드
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     # HTML 템플릿 시작
     html_content = f"""
@@ -375,6 +380,16 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             .memo-btn.has-memo:hover {{
                 border-color: #ed8936;
                 color: #ed8936;
+            }}
+            /* 개별 임계값 표시 아이콘 */
+            .threshold-indicator {{
+                margin-right: 6px;
+                cursor: help;
+                font-size: 14px;
+                opacity: 0.8;
+            }}
+            .threshold-indicator:hover {{
+                opacity: 1;
             }}
             .checkbox-memo-container {{
                 display: flex;
@@ -1905,7 +1920,10 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
     checked_codes = checked_items_db.get_checked_items()
 
     # 메모 목록 가져오기 (카테고리 없이)
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
+
+    # 개별 임계값 로드
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div style="padding: 15px; background: #fff8f8; border-radius: 8px; margin-bottom: 15px;">
@@ -1975,6 +1993,19 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         # 인라인 차트용 데이터 생성
         chart_data = {
             'drug_name': row['약품명'] if row['약품명'] else "정보없음",
@@ -2011,7 +2042,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                                             </button>
                                         </div>
                                     </td>
-                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td style="color: #c53030; font-weight: bold;">0</td>
@@ -2066,7 +2097,8 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
 
     # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
     checked_codes = checked_items_db.get_checked_items()
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div style="padding: 15px; background: #fffbeb; border-radius: 8px; margin-bottom: 15px;">
@@ -2123,6 +2155,19 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
@@ -2160,7 +2205,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
                                             </button>
                                         </div>
                                     </td>
-                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{row['최종_재고수량']:,.0f}</td>
@@ -2198,7 +2243,8 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
 
     # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
     checked_codes = checked_items_db.get_checked_items()
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 15px;">
@@ -2251,6 +2297,19 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
@@ -2288,7 +2347,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
                                             </button>
                                         </div>
                                     </td>
-                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{row['최종_재고수량']:,.0f}</td>
@@ -2329,7 +2388,8 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
 
     # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
     checked_codes = checked_items_db.get_checked_items()
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div style="padding: 15px; background: #eff6ff; border-radius: 8px; margin-bottom: 15px;">
@@ -2385,6 +2445,19 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
@@ -2422,7 +2495,7 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
                                             </button>
                                         </div>
                                     </td>
-                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{row['최종_재고수량']:,.0f}</td>
@@ -2459,7 +2532,8 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
 
     # DB에서 체크된 약품 코드 목록 가져오기 (카테고리 없이)
     checked_codes = checked_items_db.get_checked_items()
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div style="padding: 15px; background: #edf2f7; border-radius: 8px; margin-bottom: 15px;">
@@ -2514,6 +2588,19 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = memo[:50] + '...' if len(memo) > 50 else memo
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
@@ -2550,7 +2637,7 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
                                             </button>
                                         </div>
                                     </td>
-                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td style="color: #2d5016; font-weight: bold;">{row['최종_재고수량']:,.0f}</td>
@@ -2587,7 +2674,7 @@ def generate_negative_stock_section(negative_stock_drugs, ma_months, months):
 
     # DB에서 체크된 약품 코드 목록 가져오기
     checked_codes = checked_items_db.get_checked_items()
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
 
     html = f"""
                     <div style="padding: 15px; background: #fef2f2; border-radius: 8px; margin-bottom: 15px;">
@@ -2719,7 +2806,8 @@ def generate_hidden_drugs_section(df, ma_months, months):
 
     # 체크된 항목(숨김 처리된 항목) 가져오기
     checked_items = checked_items_db.get_checked_items()
-    memos = checked_items_db.get_all_memos()
+    memos = drug_memos_db.get_all_memos()
+    custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div id="hidden-empty-message" style="padding: 40px; text-align: center; color: #718096; display: none;">
@@ -2807,6 +2895,19 @@ def generate_hidden_drugs_section(df, ma_months, months):
         }
         chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
         html += f"""
                                 <tr class="hidden-row-item tab-clickable-row" data-drug-code="{drug_code}"
                                     data-chart-data='{chart_data_json}' style="{row_display_style}"
@@ -2824,7 +2925,7 @@ def generate_hidden_drugs_section(df, ma_months, months):
                                             </button>
                                         </div>
                                     </td>
-                                    <td style="font-weight: bold;">{drug_name_display}</td>
+                                    <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{stock:,.0f}</td>

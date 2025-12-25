@@ -204,7 +204,7 @@ def merge_and_calculate(today_df, processed_df):
     return result_df
 
 
-def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, custom_thresholds=None):
+def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, custom_thresholds=None, memos=None):
     """테이블 행 HTML 생성 (인라인 차트 지원)
 
     Args:
@@ -215,6 +215,7 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
         custom_thresholds: 개별 임계값 딕셔너리 {약품코드: {...}}
+        memos: 메모 딕셔너리 {약품코드: 메모내용}
     """
     import json
     import ast
@@ -229,6 +230,10 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         'ma3': '3개월 이동평균'
     }
     cm = col_map if col_map else default_map
+
+    # memos가 None이면 빈 딕셔너리로 초기화
+    if memos is None:
+        memos = {}
 
     def parse_list_string(x):
         """문자열로 저장된 리스트를 실제 리스트로 변환"""
@@ -315,16 +320,27 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
                 tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
             if th.get('런웨이_임계값') is not None:
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
-            if th.get('메모'):
-                tooltip_parts.append(f"메모: {th['메모']}")
             tooltip_text = html_escape(' | '.join(tooltip_parts))
             threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+
+        # 메모 버튼 생성
+        memo = memos.get(drug_code, '')
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = html_escape(memo[:50] + '...' if len(memo) > 50 else memo) if memo else '메모 추가'
 
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
                 data-chart-data='{chart_data_json}'
                 onclick="toggleInlineChart(this, '{drug_code}')"
                 title="클릭하여 상세 차트 및 주문량 계산기 보기">
+                <td style="text-align: center;" onclick="event.stopPropagation()">
+                    <button class="memo-btn {memo_btn_class}"
+                            data-drug-code="{drug_code}"
+                            onclick="event.stopPropagation(); openMemoModal('{drug_code}')"
+                            title="{memo_preview}">
+                        ✎
+                    </button>
+                </td>
                 <td title="{html_escape(str(row['약품명']))}">{threshold_icon}{drug_name_display}</td>
                 <td>{row['약품코드']}</td>
                 <td title="{html_escape(str(row['제약회사']))}">{row['제약회사']}</td>
@@ -396,6 +412,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         str: HTML 문자열
     """
     import drug_thresholds_db
+    import drug_memos_db
 
     # 기본 컬럼명 (drug_order_calculator.py 스타일)
     default_map = {
@@ -410,6 +427,9 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     # 개별 임계값 로드
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
     custom_threshold_count = len(custom_thresholds)
+
+    # 통합 메모 로드
+    all_memos = drug_memos_db.get_all_memos()
 
     # months가 없으면 빈 리스트
     if months is None:
@@ -469,8 +489,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         sale_df = sale_df.sort_values(['_is_urgent', cm['ma3_runway']], ascending=[False, True])
 
     # 테이블 행 생성 (months, runway_threshold, custom_thresholds 전달)
-    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold, custom_thresholds)
-    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold, custom_thresholds)
+    dispense_rows = generate_table_rows(dispense_df, cm, months, runway_threshold, custom_thresholds, all_memos)
+    sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold, custom_thresholds, all_memos)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
 
@@ -631,7 +651,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 'drug_type': row.get('약품유형', '미분류'),
                 'stock_threshold': stock_th,
                 'runway_threshold': runway_th,
-                'memo': ct.get('메모', ''),
+                'memo': all_memos.get(drug_code, ''),  # 통합 메모 사용
                 'runway': runway_val,
                 'status': status,
                 'ratio': min(ratio, 200),  # 최대 200%로 제한
@@ -881,6 +901,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         </div>
     </div>
     """ if custom_threshold_count > 0 else ""
+
+    # 메모 데이터를 JSON으로 변환
+    import json
+    memos_json = json.dumps(all_memos, ensure_ascii=False)
 
     html = f"""
 <!DOCTYPE html>
@@ -1559,6 +1583,122 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             opacity: 1;
         }}
 
+        /* 메모 버튼 스타일 */
+        .memo-btn {{
+            width: 28px;
+            height: 28px;
+            border: 2px solid #cbd5e0;
+            border-radius: 6px;
+            background: white;
+            color: #718096;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }}
+        .memo-btn:hover {{
+            border-color: #f6ad55;
+            color: #f6ad55;
+            background-color: #fffaf0;
+        }}
+        .memo-btn.has-memo {{
+            border-color: #f6ad55;
+            color: #f6ad55;
+            background-color: #fffaf0;
+        }}
+
+        /* 메모 모달 스타일 */
+        .memo-modal {{
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }}
+        .memo-modal-content {{
+            background-color: white;
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }}
+        .memo-modal-header {{
+            background: linear-gradient(135deg, #f6ad55, #ed8936);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .memo-modal-header h3 {{
+            margin: 0;
+            font-size: 16px;
+        }}
+        .memo-modal-close {{
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }}
+        .memo-modal-close:hover {{
+            opacity: 0.8;
+        }}
+        .memo-modal-body {{
+            padding: 20px;
+        }}
+        .memo-modal-body textarea {{
+            width: 100%;
+            height: 120px;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: vertical;
+            font-family: inherit;
+        }}
+        .memo-modal-body textarea:focus {{
+            outline: none;
+            border-color: #f6ad55;
+            box-shadow: 0 0 0 3px rgba(246, 173, 85, 0.1);
+        }}
+        .memo-modal-footer {{
+            padding: 12px 20px 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }}
+        .memo-modal-footer button {{
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .memo-btn-cancel {{
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #4a5568;
+        }}
+        .memo-btn-cancel:hover {{
+            background: #f7fafc;
+        }}
+        .memo-btn-save {{
+            background: linear-gradient(135deg, #f6ad55, #ed8936);
+            border: none;
+            color: white;
+        }}
+        .memo-btn-save:hover {{
+            opacity: 0.9;
+        }}
+
         /* 트렌드 아이콘 스타일 */
         .trend-up {{
             color: #e53e3e;
@@ -1769,6 +1909,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             {f'''<table>
                 <thead>
                     <tr>
+                        <th style="width: 50px;">메모</th>
                         <th>약품명</th>
                         <th>약품코드</th>
                         <th>제약회사</th>
@@ -1790,6 +1931,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             {f'''<table>
                 <thead>
                     <tr>
+                        <th style="width: 50px;">메모</th>
                         <th>약품명</th>
                         <th>약품코드</th>
                         <th>제약회사</th>
@@ -1812,7 +1954,26 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     {new_drugs_modal}
     {custom_threshold_modal}
 
+    <!-- 메모 모달 -->
+    <div id="memoModal" class="memo-modal">
+        <div class="memo-modal-content">
+            <div class="memo-modal-header">
+                <h3>📝 메모</h3>
+                <span class="memo-modal-close" onclick="closeMemoModal()">&times;</span>
+            </div>
+            <div class="memo-modal-body">
+                <textarea id="memoTextarea" placeholder="메모를 입력하세요..."></textarea>
+            </div>
+            <div class="memo-modal-footer">
+                <button class="memo-btn-cancel" onclick="closeMemoModal()">취소</button>
+                <button class="memo-btn-save" onclick="saveMemo()">저장</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // 메모 데이터 (전역)
+        var drugMemos = {memos_json};
         function switchTab(tabName) {{
             // 모든 탭 버튼 비활성화
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1853,6 +2014,73 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             document.getElementById('customThresholdModal').style.display = 'none';
         }}
 
+        // 메모 모달 열기/닫기/저장
+        var currentMemoDrugCode = null;
+
+        function openMemoModal(drugCode) {{
+            currentMemoDrugCode = drugCode;
+            var memo = drugMemos[drugCode] || '';
+            document.getElementById('memoTextarea').value = memo;
+            document.getElementById('memoModal').style.display = 'block';
+        }}
+
+        function closeMemoModal() {{
+            document.getElementById('memoModal').style.display = 'none';
+            currentMemoDrugCode = null;
+        }}
+
+        function saveMemo() {{
+            if (!currentMemoDrugCode) return;
+
+            var memo = document.getElementById('memoTextarea').value.trim();
+            var drugCode = currentMemoDrugCode;
+
+            // API 호출
+            fetch('/api/update_memo', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ drug_code: drugCode, memo: memo }})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.status === 'success') {{
+                    // 로컬 데이터 업데이트
+                    if (memo) {{
+                        drugMemos[drugCode] = memo;
+                    }} else {{
+                        delete drugMemos[drugCode];
+                    }}
+
+                    // 버튼 상태 업데이트
+                    syncMemoButtonState(drugCode, memo);
+
+                    // 모달 닫기
+                    closeMemoModal();
+                }} else {{
+                    alert('메모 저장 실패: ' + (data.message || '알 수 없는 오류'));
+                }}
+            }})
+            .catch(error => {{
+                alert('메모 저장 중 오류가 발생했습니다.');
+                console.error('Error:', error);
+            }});
+        }}
+
+        function syncMemoButtonState(drugCode, memo) {{
+            // 해당 약품코드의 모든 메모 버튼 업데이트
+            var buttons = document.querySelectorAll('.memo-btn[data-drug-code="' + drugCode + '"]');
+            buttons.forEach(function(btn) {{
+                if (memo) {{
+                    btn.classList.add('has-memo');
+                    var preview = memo.length > 50 ? memo.substring(0, 50) + '...' : memo;
+                    btn.title = preview;
+                }} else {{
+                    btn.classList.remove('has-memo');
+                    btn.title = '메모 추가';
+                }}
+            }});
+        }}
+
         // 안전 카드 접기/펼치기
         function toggleSafeCards() {{
             const container = document.getElementById('safeCardsContainer');
@@ -1875,6 +2103,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             var zeroModal = document.getElementById('zeroStockModal');
             var newDrugsModal = document.getElementById('newDrugsModal');
             var customModal = document.getElementById('customThresholdModal');
+            var memoModal = document.getElementById('memoModal');
             if (event.target == zeroModal) {{
                 zeroModal.style.display = 'none';
             }}
@@ -1883,6 +2112,9 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             }}
             if (event.target == customModal) {{
                 customModal.style.display = 'none';
+            }}
+            if (event.target == memoModal) {{
+                closeMemoModal();
             }}
         }}
 

@@ -88,7 +88,7 @@ def get_threshold(약품코드):
         cursor = conn.cursor()
 
         cursor.execute(f'''
-            SELECT 약품코드, 절대재고_임계값, 런웨이_임계값, 메모, 활성화, 생성일시, 수정일시
+            SELECT 약품코드, 절대재고_임계값, 런웨이_임계값, 활성화, 생성일시, 수정일시
             FROM {TABLE_NAME}
             WHERE 약품코드 = ?
         ''', (str(약품코드),))
@@ -101,14 +101,13 @@ def get_threshold(약품코드):
                 '약품코드': row[0],
                 '절대재고_임계값': row[1],
                 '런웨이_임계값': row[2],
-                '메모': row[3],
-                '활성화': bool(row[4]),
-                '생성일시': row[5],
-                '수정일시': row[6]
+                '활성화': bool(row[3]),
+                '생성일시': row[4],
+                '수정일시': row[5]
             }
         return None
     except Exception as e:
-        print(f"❌ 임계값 조회 실패: {e}")
+        print(f"임계값 조회 실패: {e}")
         return None
 
 
@@ -141,7 +140,7 @@ def get_threshold_dict():
         cursor = conn.cursor()
 
         cursor.execute(f'''
-            SELECT 약품코드, 절대재고_임계값, 런웨이_임계값, 메모, 활성화
+            SELECT 약품코드, 절대재고_임계값, 런웨이_임계값, 활성화
             FROM {TABLE_NAME}
             WHERE 활성화 = 1
         ''')
@@ -154,12 +153,11 @@ def get_threshold_dict():
             result[row[0]] = {
                 '절대재고_임계값': row[1],
                 '런웨이_임계값': row[2],
-                '메모': row[3],
-                '활성화': bool(row[4])
+                '활성화': bool(row[3])
             }
         return result
     except Exception as e:
-        print(f"❌ 임계값 딕셔너리 조회 실패: {e}")
+        print(f"임계값 딕셔너리 조회 실패: {e}")
         return {}
 
 
@@ -203,7 +201,7 @@ def upsert_threshold(약품코드, 절대재고_임계값=None, 런웨이_임계
         약품코드: 약품 코드
         절대재고_임계값: 재고가 이 값 이하면 강조 (None이면 미사용)
         런웨이_임계값: 런웨이가 이 값 미만이면 강조 (None이면 미사용)
-        메모: 설정 이유 메모
+        메모: [DEPRECATED] 무시됨 - 통합 메모 시스템(drug_memos_db) 사용
 
     Returns:
         dict: {'success': bool, 'message': str, 'action': 'create'|'update'}
@@ -221,14 +219,14 @@ def upsert_threshold(약품코드, 절대재고_임계값=None, 런웨이_임계
         existing = cursor.fetchone()
 
         if existing:
-            # UPDATE
+            # UPDATE (메모 컬럼은 NULL로 설정 - 통합 메모 시스템 사용)
             이전_절대재고, 이전_런웨이 = existing
 
             cursor.execute(f'''
                 UPDATE {TABLE_NAME}
-                SET 절대재고_임계값 = ?, 런웨이_임계값 = ?, 메모 = ?, 활성화 = 1, 수정일시 = ?
+                SET 절대재고_임계값 = ?, 런웨이_임계값 = ?, 메모 = NULL, 활성화 = 1, 수정일시 = ?
                 WHERE 약품코드 = ?
-            ''', (절대재고_임계값, 런웨이_임계값, 메모, now, 약품코드))
+            ''', (절대재고_임계값, 런웨이_임계값, now, 약품코드))
 
             _record_history(cursor, 약품코드, 'UPDATE',
                            이전_절대재고, 절대재고_임계값,
@@ -237,12 +235,12 @@ def upsert_threshold(약품코드, 절대재고_임계값=None, 런웨이_임계
             action = 'update'
             message = f'{약품코드} 임계값이 수정되었습니다.'
         else:
-            # INSERT
+            # INSERT (메모 컬럼은 NULL로 설정 - 통합 메모 시스템 사용)
             cursor.execute(f'''
                 INSERT INTO {TABLE_NAME}
                 (약품코드, 절대재고_임계값, 런웨이_임계값, 메모, 활성화, 생성일시, 수정일시)
-                VALUES (?, ?, ?, ?, 1, ?, ?)
-            ''', (약품코드, 절대재고_임계값, 런웨이_임계값, 메모, now, now))
+                VALUES (?, ?, ?, NULL, 1, ?, ?)
+            ''', (약품코드, 절대재고_임계값, 런웨이_임계값, now, now))
 
             _record_history(cursor, 약품코드, 'CREATE',
                            None, 절대재고_임계값,
@@ -257,7 +255,7 @@ def upsert_threshold(약품코드, 절대재고_임계값=None, 런웨이_임계
         return {'success': True, 'message': message, 'action': action}
 
     except Exception as e:
-        print(f"❌ 임계값 저장 실패: {e}")
+        print(f"임계값 저장 실패: {e}")
         return {'success': False, 'message': str(e), 'action': None}
 
 

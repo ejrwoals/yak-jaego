@@ -15,6 +15,7 @@
 - `processed_inventory.sqlite3`: 시계열 통계 데이터 (1년 이동평균, 3개월 이동평균, 런웨이 등)
 - `checked_items.sqlite3`: 긴급 약품 확인 상태 저장 (v3.5 신규)
 - `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장 (v3.12 신규)
+- `drug_memos.sqlite3`: 통합 메모 저장 (v3.13 신규) - 모든 보고서에서 공유
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
 - **음수 재고 지원**: 마이너스 재고도 정확히 반영
 - **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소
@@ -301,6 +302,7 @@ yak-jaego/
 ├── processed_inventory_db.py      # processed_inventory.sqlite3 관리 모듈
 ├── checked_items_db.py            # checked_items.sqlite3 관리 모듈 (체크 상태 저장)
 ├── drug_thresholds_db.py          # drug_thresholds.sqlite3 관리 모듈 (개별 임계값) (v3.12)
+├── drug_memos_db.py               # drug_memos.sqlite3 관리 모듈 (통합 메모) (v3.13)
 ├── inventory_updater.py           # 재고 업데이트 모듈 (today 파일 → DB)
 ├── utils.py                       # 공통 유틸리티 함수 (Excel 파일 읽기 포함)
 ├── requirements.txt               # Python 의존성 목록
@@ -309,6 +311,7 @@ yak-jaego/
 ├── processed_inventory.sqlite3    # 시계열 통계 DB (자동 생성)
 ├── checked_items.sqlite3          # 체크 상태 DB (자동 생성)
 ├── drug_thresholds.sqlite3        # 개별 임계값 DB (자동 생성) (v3.12)
+├── drug_memos.sqlite3             # 통합 메모 DB (자동 생성) (v3.13)
 └── README.md                      # 프로젝트 문서
 ```
 
@@ -488,6 +491,35 @@ for month in months_reversed:
 
 ## 🎯 핵심 개선 사항
 
+### v3.13 업데이트 (통합 메모 시스템)
+
+1. **통합 메모 DB 도입**
+   - 📝 **단일 메모 저장소**: `drug_memos.sqlite3`에서 모든 약품 메모를 통합 관리
+   - 🔗 **크로스 보고서 공유**: inventory_reports와 order_calc_reports에서 동일한 메모 표시
+   - 🔄 **하위 호환성 유지**: 기존 `checked_items_db` 메모 함수들이 통합 DB로 자동 위임
+
+2. **재고 관리 보고서 개선 (inventory_reports)**
+   - ⚙️ **개별 임계값 뱃지**: 임계값이 설정된 약품에 기어 아이콘(⚙️) 표시
+   - 💡 **툴팁 정보**: 마우스 오버 시 "재고 N개 이하 | 런웨이 M개월 미만" 임계값 정보 표시
+   - 📋 **모든 탭 적용**: 긴급/부족/충분/과다/악성재고/숨김 모든 탭에서 뱃지 표시
+
+3. **주문 수량 산출 보고서 개선 (order_calc_reports)**
+   - ✏️ **메모 버튼 추가**: 메인 테이블에 메모 버튼(✎) 컬럼 추가
+   - 🎨 **시각적 구분**: 메모가 있는 약품은 주황색 테두리로 표시
+   - 🔗 **개별 임계값 모달 연동**: 모달에서 통합 메모 표시 및 편집 가능
+
+4. **개별 임계값 관리 페이지 개선**
+   - 📝 **메모 입력 필드 복원**: 임계값 설정 시 메모도 함께 입력 가능
+   - 🔄 **통합 메모 시스템 연동**: 입력된 메모가 `drug_memos.sqlite3`에 저장
+   - ✏️ **인라인 편집**: 수정 시 기존 메모 불러와서 편집 가능
+
+5. **기술 구현**
+   - `drug_memos_db.py`: 통합 메모 DB 관리 모듈 (CRUD)
+   - `drug_memos.sqlite3`: 약품코드 기준 메모 저장
+   - `checked_items_db.py`: 메모 함수들을 `drug_memos_db` 래퍼로 변경
+   - `drug_thresholds_db.py`: 메모 파라미터 deprecated 처리
+   - API 엔드포인트: `/api/update_memo`, `/api/get_memo/<drug_code>` (기존 유지)
+
 ### v3.12 업데이트 (개별 약품 임계값 설정 기능)
 
 1. **약품별 개별 임계값 설정**
@@ -511,7 +543,7 @@ for month in months_reversed:
    - ➕ **모달 기반 추가**: 약품 검색 → 선택 → 임계값 입력 → 저장
    - ✏️ **인라인 수정**: 테이블에서 직접 값 수정 가능
    - 🗑️ **삭제**: 개별 임계값 설정 삭제
-   - 📝 **메모**: 설정 이유 메모 기능
+   - 📝 **메모**: 설정 이유 메모 기능 (v3.13부터 통합 메모 시스템으로 관리)
    - 📊 **통계 표시**: 전체 설정 수, 재고 임계값 수, 런웨이 임계값 수
 
 4. **사용 시나리오**

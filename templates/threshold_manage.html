@@ -549,29 +549,6 @@
             box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
         }
 
-        /* Memo Input */
-        .memo-input label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #4a5568;
-            margin-bottom: 8px;
-        }
-
-        .memo-input input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #cbd5e0;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .memo-input input:focus {
-            outline: none;
-            border-color: #4299e1;
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
-        }
-
         /* Shutdown Button */
         .btn-shutdown {
             position: fixed;
@@ -652,16 +629,6 @@
             border-radius: 20px;
             font-size: 0.85em;
             font-weight: 500;
-        }
-
-        .threshold-memo {
-            font-size: 0.9em;
-            color: #718096;
-            font-style: italic;
-            margin-bottom: 12px;
-            padding: 8px 12px;
-            background: #edf2f7;
-            border-radius: 8px;
         }
 
         .threshold-card-footer {
@@ -799,11 +766,13 @@
                         </div>
                     </div>
 
-                    <!-- Memo -->
-                    <div class="memo-input">
-                        <label>메모</label>
-                        <input type="text" id="modalMemo" placeholder="설정 이유 (선택사항)">
+                    <!-- Memo Input -->
+                    <div class="memo-input-section" style="margin-top: 16px;">
+                        <label style="display: block; font-size: 14px; color: #4a5568; margin-bottom: 8px;">메모 (선택사항)</label>
+                        <textarea id="modalMemo" placeholder="이 약품에 대한 메모를 입력하세요..."
+                                  style="width: 100%; height: 80px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
                     </div>
+
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="closeAddModal()">취소</button>
@@ -814,7 +783,7 @@
 
         <div class="search-section">
             <input type="text" class="search-input" id="searchInput"
-                   placeholder="약품명, 약품코드 또는 메모로 검색..."
+                   placeholder="약품명 또는 약품코드로 검색..."
                    oninput="filterTable()"
                    style="max-width: 100%; width: 100%; border-radius: 12px;">
         </div>
@@ -889,7 +858,6 @@
                                 : ''}
                         </div>
                     </div>
-                    ${item.메모 ? `<div class="threshold-memo">"${item.메모}"</div>` : ''}
                     <div class="threshold-card-footer">
                         <div class="threshold-date">${item.수정일시 || item.생성일시 || '-'}</div>
                         <div class="threshold-actions">
@@ -905,8 +873,7 @@
             const query = document.getElementById('searchInput').value.toLowerCase();
             const filtered = thresholds.filter(item =>
                 item.약품코드.toLowerCase().includes(query) ||
-                (item.약품명 && item.약품명.toLowerCase().includes(query)) ||
-                (item.메모 && item.메모.toLowerCase().includes(query))
+                (item.약품명 && item.약품명.toLowerCase().includes(query))
             );
             renderTable(filtered);
         }
@@ -1014,25 +981,39 @@
                 return;
             }
 
+            // 임계값 저장
             fetch('/api/drug-threshold/' + encodeURIComponent(selectedDrugCode), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     stock_threshold: stockThreshold ? parseInt(stockThreshold) : null,
-                    runway_threshold: runwayThreshold ? parseFloat(runwayThreshold) : null,
-                    memo: memo || null
+                    runway_threshold: runwayThreshold ? parseFloat(runwayThreshold) : null
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    showStatus(selectedDrugName + ' 임계값이 추가되었습니다.', 'success');
-                    closeAddModal();
-                    loadThresholds();
-                    loadStats();
+                    // 메모도 함께 저장 (통합 메모 시스템)
+                    if (memo) {
+                        return fetch('/api/update_memo', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                drug_code: selectedDrugCode,
+                                memo: memo
+                            })
+                        }).then(() => data);
+                    }
+                    return data;
                 } else {
-                    showStatus(data.message || '저장 실패', 'error');
+                    throw new Error(data.message || '저장 실패');
                 }
+            })
+            .then(data => {
+                showStatus(selectedDrugName + ' 임계값이 추가되었습니다.', 'success');
+                closeAddModal();
+                loadThresholds();
+                loadStats();
             })
             .catch(error => {
                 showStatus('저장 실패: ' + error.message, 'error');
@@ -1062,41 +1043,85 @@
 
             if (!item || !card) return;
 
-            card.innerHTML = `
-                <div class="threshold-card-header">
-                    <div>
-                        <div class="threshold-drug-name">${item.약품명 || item.약품코드}</div>
-                        <div class="threshold-drug-code">${drugCode}</div>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 120px;">
-                        <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">재고 임계값 (개)</label>
-                        <input type="number" class="edit-input" id="edit-stock-${drugCode}"
-                               value="${item.절대재고_임계값 || ''}" placeholder="미설정" style="width: 100%;">
-                    </div>
-                    <div style="flex: 1; min-width: 120px;">
-                        <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">런웨이 임계값 (개월)</label>
-                        <input type="number" step="0.5" class="edit-input" id="edit-runway-${drugCode}"
-                               value="${item.런웨이_임계값 || ''}" placeholder="미설정" style="width: 100%;">
-                    </div>
-                </div>
-                <div style="margin-bottom: 12px;">
-                    <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">메모</label>
-                    <input type="text" class="edit-input" id="edit-memo-${drugCode}"
-                           value="${item.메모 || ''}" placeholder="메모 (선택사항)" style="width: 100%;">
-                </div>
-                <div class="threshold-card-footer">
-                    <div class="threshold-date">${item.수정일시 || item.생성일시 || '-'}</div>
-                    <div class="threshold-actions">
-                        <button class="threshold-action-btn edit" onclick="saveEdit('${drugCode}')" style="background: #48bb78; color: white;">저장</button>
-                        <button class="threshold-action-btn" onclick="loadThresholds()" style="background: #e2e8f0;">취소</button>
-                    </div>
-                </div>
-            `;
+            // 기존 메모 불러오기
+            fetch('/api/get_memo/' + encodeURIComponent(drugCode))
+                .then(response => response.json())
+                .then(memoData => {
+                    const existingMemo = memoData.memo || '';
 
-            // Focus on the first input
-            document.getElementById(`edit-stock-${drugCode}`).focus();
+                    card.innerHTML = `
+                        <div class="threshold-card-header">
+                            <div>
+                                <div class="threshold-drug-name">${item.약품명 || item.약품코드}</div>
+                                <div class="threshold-drug-code">${drugCode}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">재고 임계값 (개)</label>
+                                <input type="number" class="edit-input" id="edit-stock-${drugCode}"
+                                       value="${item.절대재고_임계값 || ''}" placeholder="미설정" style="width: 100%;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">런웨이 임계값 (개월)</label>
+                                <input type="number" step="0.5" class="edit-input" id="edit-runway-${drugCode}"
+                                       value="${item.런웨이_임계값 || ''}" placeholder="미설정" style="width: 100%;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">메모</label>
+                            <textarea class="edit-input" id="edit-memo-${drugCode}" placeholder="메모 입력..."
+                                      style="width: 100%; height: 60px; resize: vertical;">${existingMemo}</textarea>
+                        </div>
+                        <div class="threshold-card-footer">
+                            <div class="threshold-date">${item.수정일시 || item.생성일시 || '-'}</div>
+                            <div class="threshold-actions">
+                                <button class="threshold-action-btn edit" onclick="saveEdit('${drugCode}')" style="background: #48bb78; color: white;">저장</button>
+                                <button class="threshold-action-btn" onclick="loadThresholds()" style="background: #e2e8f0;">취소</button>
+                            </div>
+                        </div>
+                    `;
+
+                    // Focus on the first input
+                    document.getElementById(`edit-stock-${drugCode}`).focus();
+                })
+                .catch(() => {
+                    // 메모 로드 실패 시에도 편집 폼 표시 (메모 없이)
+                    card.innerHTML = `
+                        <div class="threshold-card-header">
+                            <div>
+                                <div class="threshold-drug-name">${item.약품명 || item.약품코드}</div>
+                                <div class="threshold-drug-code">${drugCode}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">재고 임계값 (개)</label>
+                                <input type="number" class="edit-input" id="edit-stock-${drugCode}"
+                                       value="${item.절대재고_임계값 || ''}" placeholder="미설정" style="width: 100%;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">런웨이 임계값 (개월)</label>
+                                <input type="number" step="0.5" class="edit-input" id="edit-runway-${drugCode}"
+                                       value="${item.런웨이_임계값 || ''}" placeholder="미설정" style="width: 100%;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 12px;">
+                            <label style="font-size: 12px; color: #718096; display: block; margin-bottom: 4px;">메모</label>
+                            <textarea class="edit-input" id="edit-memo-${drugCode}" placeholder="메모 입력..."
+                                      style="width: 100%; height: 60px; resize: vertical;"></textarea>
+                        </div>
+                        <div class="threshold-card-footer">
+                            <div class="threshold-date">${item.수정일시 || item.생성일시 || '-'}</div>
+                            <div class="threshold-actions">
+                                <button class="threshold-action-btn edit" onclick="saveEdit('${drugCode}')" style="background: #48bb78; color: white;">저장</button>
+                                <button class="threshold-action-btn" onclick="loadThresholds()" style="background: #e2e8f0;">취소</button>
+                            </div>
+                        </div>
+                    `;
+
+                    document.getElementById(`edit-stock-${drugCode}`).focus();
+                });
         }
 
         function saveEdit(drugCode) {
@@ -1111,24 +1136,35 @@
                 return;
             }
 
+            // 임계값 저장
             fetch('/api/drug-threshold/' + encodeURIComponent(drugCode), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     stock_threshold: stockThreshold ? parseInt(stockThreshold) : null,
-                    runway_threshold: runwayThreshold ? parseFloat(runwayThreshold) : null,
-                    memo: memo || null
+                    runway_threshold: runwayThreshold ? parseFloat(runwayThreshold) : null
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    showStatus(drugName + ' 임계값이 수정되었습니다.', 'success');
-                    loadThresholds();
-                    loadStats();
+                    // 메모도 함께 저장 (통합 메모 시스템)
+                    return fetch('/api/update_memo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            drug_code: drugCode,
+                            memo: memo
+                        })
+                    }).then(() => data);
                 } else {
-                    showStatus(data.message || '수정 실패', 'error');
+                    throw new Error(data.message || '수정 실패');
                 }
+            })
+            .then(data => {
+                showStatus(drugName + ' 임계값이 수정되었습니다.', 'success');
+                loadThresholds();
+                loadStats();
             })
             .catch(error => {
                 showStatus('수정 실패: ' + error.message, 'error');

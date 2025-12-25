@@ -164,14 +164,14 @@ def get_all_checked_items():
 
 def update_memo(drug_code, category_or_memo, memo=None):
     """
-    약품의 메모 업데이트
+    약품의 메모 업데이트 (통합 메모 DB로 위임)
 
     Args:
         drug_code (str): 약품코드
         category_or_memo: 메모 내용 또는 카테고리 (하위 호환성)
         memo (str, optional): 메모 내용 (category_or_memo가 카테고리인 경우)
     """
-    init_checked_items_db()  # DB가 없으면 생성
+    import drug_memos_db
 
     # 하위 호환성: update_memo(drug_code, category, memo) 형태로 호출된 경우
     if memo is not None:
@@ -179,28 +179,16 @@ def update_memo(drug_code, category_or_memo, memo=None):
     else:
         actual_memo = category_or_memo
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    # 기존 체크 상태 유지
-    cursor.execute('SELECT 체크여부 FROM checked_items WHERE 약품코드 = ?', (drug_code,))
-    result = cursor.fetchone()
-    checked = result[0] if result else 0
-
-    cursor.execute('''
-        INSERT OR REPLACE INTO checked_items (약품코드, 체크여부, 체크일시, 메모)
-        VALUES (?, ?, ?, ?)
-    ''', (drug_code, checked, now, actual_memo))
-
-    conn.commit()
-    conn.close()
+    # 통합 메모 DB 사용
+    if actual_memo:
+        drug_memos_db.upsert_memo(drug_code, actual_memo)
+    else:
+        drug_memos_db.delete_memo(drug_code)
 
 
 def get_memo(drug_code, category=None):
     """
-    약품의 메모 조회
+    약품의 메모 조회 (통합 메모 DB로 위임)
 
     Args:
         drug_code (str): 약품코드
@@ -209,25 +197,13 @@ def get_memo(drug_code, category=None):
     Returns:
         str: 메모 내용 (없으면 빈 문자열)
     """
-    if not os.path.exists(DB_PATH):
-        return ''
-
-    init_checked_items_db()  # 마이그레이션 확인
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT 메모 FROM checked_items WHERE 약품코드 = ?', (drug_code,))
-
-    result = cursor.fetchone()
-    conn.close()
-
-    return result[0] if result and result[0] else ''
+    import drug_memos_db
+    return drug_memos_db.get_memo(drug_code)
 
 
 def get_all_memos(category=None):
     """
-    모든 메모 조회
+    모든 메모 조회 (통합 메모 DB로 위임)
 
     Args:
         category: 무시됨 (하위 호환성 유지용)
@@ -235,23 +211,8 @@ def get_all_memos(category=None):
     Returns:
         dict: {약품코드: 메모내용}
     """
-    if not os.path.exists(DB_PATH):
-        return {}
-
-    init_checked_items_db()  # 마이그레이션 확인
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT 약품코드, 메모 FROM checked_items
-        WHERE 메모 IS NOT NULL AND 메모 != ''
-    ''')
-
-    memos = {row[0]: row[1] for row in cursor.fetchall()}
-
-    conn.close()
-    return memos
+    import drug_memos_db
+    return drug_memos_db.get_all_memos()
 
 
 if __name__ == '__main__':

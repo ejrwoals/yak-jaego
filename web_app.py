@@ -27,6 +27,7 @@ import processed_inventory_db
 import inventory_updater
 import checked_items_db
 import drug_thresholds_db
+import drug_memos_db
 from utils import read_today_file
 
 app = Flask(__name__)
@@ -615,7 +616,7 @@ def toggle_checked_item():
 
 @app.route('/api/update_memo', methods=['POST'])
 def update_memo():
-    """메모 업데이트 API (카테고리 없이 약품코드만 사용)"""
+    """통합 메모 업데이트 API (drug_memos_db 사용)"""
     try:
         data = request.get_json()
         drug_code = data.get('drug_code')
@@ -624,8 +625,11 @@ def update_memo():
         if not drug_code:
             return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
 
-        # 메모 업데이트 (카테고리 없이)
-        checked_items_db.update_memo(drug_code, memo)
+        # 통합 메모 DB 사용
+        if memo:
+            drug_memos_db.upsert_memo(drug_code, memo)
+        else:
+            drug_memos_db.delete_memo(drug_code)
 
         return jsonify({'status': 'success', 'message': '메모가 저장되었습니다.'})
 
@@ -637,15 +641,15 @@ def update_memo():
 
 @app.route('/api/get_memo', methods=['GET'])
 def get_memo():
-    """메모 조회 API (카테고리 없이 약품코드만 사용)"""
+    """통합 메모 조회 API (drug_memos_db 사용)"""
     try:
         drug_code = request.args.get('drug_code')
 
         if not drug_code:
             return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
 
-        # 메모 조회 (카테고리 없이)
-        memo = checked_items_db.get_memo(drug_code)
+        # 통합 메모 DB 사용
+        memo = drug_memos_db.get_memo(drug_code)
 
         return jsonify({'status': 'success', 'memo': memo})
 
