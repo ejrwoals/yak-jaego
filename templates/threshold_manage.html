@@ -1044,7 +1044,7 @@
             if (!item || !card) return;
 
             // 기존 메모 불러오기
-            fetch('/api/get_memo/' + encodeURIComponent(drugCode))
+            fetch('/api/get_memo?drug_code=' + encodeURIComponent(drugCode))
                 .then(response => response.json())
                 .then(memoData => {
                     const existingMemo = memoData.memo || '';

@@ -967,6 +967,82 @@ def get_threshold_stats():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# ============================================================
+# 메모 관리 (v3.13)
+# ============================================================
+
+@app.route('/memo/manage')
+def memo_manage_page():
+    """메모 관리 페이지"""
+    return render_template('memo_manage.html')
+
+
+@app.route('/api/memos', methods=['GET'])
+def get_all_memos_api():
+    """전체 메모 목록 조회 (약품명, 재고, 임계값 정보 포함)"""
+    try:
+        # 1. 메모 목록 조회 (수정일시 내림차순)
+        memos = drug_memos_db.get_all_memos_with_details()
+
+        # 2. 각 메모에 추가 정보 붙이기
+        enriched_memos = []
+        for memo in memos:
+            drug_code = memo['약품코드']
+
+            # 약품 정보 조회 (약품명, 현재 재고)
+            drug_info = inventory_db.get_inventory(drug_code)
+            drug_name = drug_info.get('약품명', '알 수 없음') if drug_info else '알 수 없음'
+            current_stock = drug_info.get('현재재고') if drug_info else None
+
+            # 임계값 정보 조회
+            threshold = drug_thresholds_db.get_threshold(drug_code)
+
+            enriched_memos.append({
+                'drug_code': drug_code,
+                'drug_name': drug_name,
+                'memo': memo['메모'],
+                'created_at': memo['작성일시'],
+                'updated_at': memo['수정일시'],
+                'current_stock': current_stock,
+                'threshold': {
+                    'stock': threshold.get('절대재고_임계값') if threshold else None,
+                    'runway': threshold.get('런웨이_임계값') if threshold else None
+                } if threshold else None
+            })
+
+        return jsonify({
+            'status': 'success',
+            'count': len(enriched_memos),
+            'memos': enriched_memos
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/memo/<drug_code>', methods=['DELETE'])
+def delete_memo_api(drug_code):
+    """메모 삭제"""
+    try:
+        result = drug_memos_db.delete_memo(drug_code)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': result['message']
+            }), 500
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
     """Flask 앱 종료 API"""

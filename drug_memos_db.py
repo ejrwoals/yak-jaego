@@ -110,6 +110,44 @@ def get_all_memos():
         return {}
 
 
+def get_all_memos_with_details():
+    """
+    전체 메모 목록을 수정일시 내림차순으로 반환 (메모 관리 페이지용)
+
+    Returns:
+        list: [{'약품코드': str, '메모': str, '작성일시': str, '수정일시': str}, ...]
+    """
+    if not db_exists():
+        init_db()
+        return []
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f'''
+            SELECT 약품코드, 메모, 작성일시, 수정일시 FROM {TABLE_NAME}
+            WHERE 메모 IS NOT NULL AND 메모 != ''
+            ORDER BY 수정일시 DESC
+        ''')
+
+        memos = [
+            {
+                '약품코드': row[0],
+                '메모': row[1],
+                '작성일시': row[2],
+                '수정일시': row[3]
+            }
+            for row in cursor.fetchall()
+        ]
+        conn.close()
+
+        return memos
+    except Exception as e:
+        print(f"메모 상세 목록 조회 실패: {e}")
+        return []
+
+
 def get_memos_for_codes(약품코드_리스트):
     """
     여러 약품의 메모 조회 (성능 최적화용)
