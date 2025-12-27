@@ -361,6 +361,66 @@ def search_inventory(keyword, limit=50):
         return []
 
 
+def update_drug_name(약품코드, 새_약품명):
+    """
+    약품명만 수정 (약품코드는 유지)
+
+    Args:
+        약품코드 (str): 수정할 약품의 코드
+        새_약품명 (str): 새로운 약품명
+
+    Returns:
+        dict: {
+            'success': bool,
+            'message': str,
+            'previous_name': str (성공 시),
+            'new_name': str (성공 시)
+        }
+    """
+    if not 새_약품명 or not 새_약품명.strip():
+        return {'success': False, 'message': '약품명은 필수입니다.'}
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 기존 데이터 확인
+        cursor.execute(f'''
+            SELECT 약품명 FROM {TABLE_NAME}
+            WHERE 약품코드 = ?
+        ''', (str(약품코드),))
+
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return {'success': False, 'message': '해당 약품을 찾을 수 없습니다.'}
+
+        previous_name = row[0]
+        새_약품명 = 새_약품명.strip()
+        update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 약품명 업데이트
+        cursor.execute(f'''
+            UPDATE {TABLE_NAME}
+            SET 약품명 = ?, 최종_업데이트일시 = ?
+            WHERE 약품코드 = ?
+        ''', (새_약품명, update_time, str(약품코드)))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            'success': True,
+            'message': '약품명이 성공적으로 수정되었습니다.',
+            'previous_name': previous_name,
+            'new_name': 새_약품명
+        }
+
+    except Exception as e:
+        print(f"❌ 약품명 수정 실패: {e}")
+        return {'success': False, 'message': str(e)}
+
+
 if __name__ == '__main__':
     # 테스트 코드
     print("=== inventory_db.py 테스트 ===\n")

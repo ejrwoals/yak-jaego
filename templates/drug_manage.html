@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>약품 개별 관리 - Jaego</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .back-link {
+            color: #4299e1;
+            text-decoration: none;
+            font-size: 14px;
+            display: inline-block;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .btn-shutdown {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+
+        .btn-shutdown:hover {
+            background: #c53030;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            color: white;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        /* Search */
+        .search-section {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 15px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+
+        /* Drug Card List */
+        .drug-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .drug-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .drug-card:hover {
+            border-color: #cbd5e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .drug-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .drug-card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .star-flag {
+            font-size: 1.3em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .star-flag.off {
+            color: #cbd5e0;
+        }
+
+        .star-flag.off:hover {
+            color: #a0aec0;
+        }
+
+        .star-flag.on {
+            color: #f6e05e;
+            text-shadow: 0 0 8px rgba(246, 224, 94, 0.5);
+        }
+
+        .star-flag.on:hover {
+            color: #ecc94b;
+        }
+
+        .drug-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .drug-code {
+            font-size: 13px;
+            color: #718096;
+        }
+
+        .drug-info {
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 10px;
+        }
+
+        .drug-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .badge-threshold {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .badge-memo {
+            background: #feebc8;
+            color: #c05621;
+        }
+
+        .badge-patient {
+            background: #e8f4fd;
+            color: #2b6cb0;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #4299e1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3182ce;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        .btn-danger {
+            background: #fc8181;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #f56565;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.visible {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            color: #2d3748;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            cursor: pointer;
+            color: #a0aec0;
+        }
+
+        .modal-close:hover {
+            color: #718096;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: white;
+        }
+
+        /* Form sections */
+        .form-section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .form-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 12px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .current-value {
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 6px;
+        }
+
+        /* Patient tags */
+        .patient-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .patient-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #e8f4fd;
+            border: 1px solid #90cdf4;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #2b6cb0;
+        }
+
+        .patient-tag .remove-btn {
+            cursor: pointer;
+            color: #4299e1;
+            font-weight: bold;
+        }
+
+        .patient-tag .remove-btn:hover {
+            color: #e53e3e;
+        }
+
+        .patient-search-container {
+            position: relative;
+        }
+
+        .patient-search-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .patient-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .patient-search-results.visible {
+            display: block;
+        }
+
+        .patient-result-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .patient-result-item:hover {
+            background: #f7fafc;
+        }
+
+        .patient-result-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Add patient modal */
+        .add-patient-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            background: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .add-patient-btn:hover {
+            background: #38a169;
+        }
+
+        /* Status message */
+        .status-message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #c6f6d5;
+            color: #276749;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #fed7d7;
+            color: #c53030;
+            display: block;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        /* Drug search in modal */
+        .drug-search-section {
+            margin-bottom: 20px;
+        }
+
+        .drug-search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .drug-search-results.visible {
+            display: block;
+        }
+
+        .drug-result-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .drug-result-item:hover {
+            background: #f7fafc;
+        }
+
+        .selected-drug {
+            padding: 12px;
+            background: #ebf8ff;
+            border: 1px solid #90cdf4;
+            border-radius: 8px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .selected-drug.visible {
+            display: block;
+        }
+
+        .selected-drug-clear {
+            background: none;
+            border: none;
+            color: #e53e3e;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Editable fields section - hidden until drug selected */
+        .editable-fields-section {
+            display: none;
+        }
+
+        .editable-fields-section.visible {
+            display: block;
+        }
+
+        .unselected-hint {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0aec0;
+            font-size: 14px;
+            border: 2px dashed #e2e8f0;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .unselected-hint-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        /* Changed field indicator */
+        .form-section.changed {
+            border-left: 3px solid #4299e1;
+            background: linear-gradient(90deg, #ebf8ff 0%, white 100%);
+        }
+
+        .form-section.changed .form-section-title::after {
+            content: ' (변경됨)';
+            color: #4299e1;
+            font-size: 12px;
+            font-weight: normal;
+        }
+
+        /* Disabled save button */
+        .btn-primary:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .btn-primary:disabled:hover {
+            background: #cbd5e0;
+        }
+
+        /* Current value display */
+        .current-value-display {
+            font-size: 13px;
+            color: #4a5568;
+            padding: 8px 12px;
+            background: #f7fafc;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .current-value-display strong {
+            color: #2d3748;
+        }
+    </style>
+</head>
+<body>
+    <button class="btn-shutdown" onclick="shutdownServer()">
+        <span>🛑</span>
+        <span>종료</span>
+    </button>
+
+    <div class="container">
+        <a href="/" class="back-link" style="margin-bottom: 20px;">← 홈으로 돌아가기</a>
+
+        <div style="display: block; text-align: center; padding-bottom: 10px; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
+            <h1 style="color: #2d3748; font-size: 1.8em; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span>⚙️</span>
+                약품 개별 관리
+            </h1>
+            <p style="color: #718096; margin-top: 8px;">약품별 모든 설정을 한 곳에서 관리합니다</p>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item">
+                <span>전체 관리:</span>
+                <span class="stat-value" id="statTotal">0</span>개
+            </div>
+            <div class="stat-item">
+                <span>⭐ 특별관리:</span>
+                <span class="stat-value" id="statFlagged">0</span>개
+            </div>
+            <div class="stat-item">
+                <span>📝 메모:</span>
+                <span class="stat-value" id="statMemo">0</span>개
+            </div>
+            <div class="stat-item">
+                <span>⚙️ 임계값:</span>
+                <span class="stat-value" id="statThreshold">0</span>개
+            </div>
+            <div class="stat-item">
+                <span>👤 등록 환자:</span>
+                <span class="stat-value" id="statPatient">0</span>명
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; align-items: stretch; margin-bottom: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 250px;">
+                <input type="text" class="search-input" id="searchInput"
+                       placeholder="약품명, 약품코드, 제약회사로 검색..."
+                       oninput="filterDrugs()">
+            </div>
+            <button class="btn btn-primary" onclick="openAddModal()" style="white-space: nowrap;">+ 새 약품 관리 추가</button>
+        </div>
+
+        <div class="drug-list" id="drugList">
+            <div class="empty-state">
+                <div class="empty-state-icon">⚙️</div>
+                <div>관리 중인 약품이 없습니다.</div>
+                <div style="margin-top: 10px; font-size: 14px;">검색하여 약품을 추가하거나, "새 약품 관리 추가" 버튼을 클릭하세요.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Drug Modal -->
+    <div id="drugModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">⚙️ 약품 상세 관리</h3>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- Drug Search (for new) -->
+                <div class="drug-search-section" id="drugSearchSection">
+                    <label style="font-size: 14px; color: #4a5568; margin-bottom: 8px; display: block;">약품 검색</label>
+                    <input type="text" class="search-input" id="modalDrugSearch"
+                           placeholder="약품명 또는 약품코드로 검색..."
+                           oninput="searchDrugsForModal()">
+                    <div class="drug-search-results" id="modalDrugResults"></div>
+                    <div class="selected-drug" id="selectedDrug">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="star-flag" id="addStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글">☆</div>
+                                <div>
+                                    <div style="font-weight: 600;" id="selectedDrugName">-</div>
+                                    <div style="font-size: 13px; color: #718096;" id="selectedDrugCode">-</div>
+                                </div>
+                            </div>
+                            <button class="selected-drug-clear" onclick="clearDrugSelection()">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drug Info (for edit) -->
+                <div class="form-section" id="drugInfoSection" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 18px; font-weight: 600;" id="editDrugName">-</div>
+                            <div style="font-size: 14px; color: #718096;" id="editDrugCode">-</div>
+                            <div style="font-size: 13px; color: #a0aec0;" id="editDrugCompany">-</div>
+                        </div>
+                        <div class="star-flag" id="editStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글">☆</div>
+                    </div>
+                </div>
+
+                <!-- Hint when no drug selected -->
+                <div class="unselected-hint" id="unselectedHint">
+                    <div class="unselected-hint-icon">👆</div>
+                    <div>위에서 약품을 먼저 검색하여 선택해주세요</div>
+                    <div style="margin-top: 5px; font-size: 12px;">약품 선택 후 아래 편집 옵션이 표시됩니다</div>
+                </div>
+
+                <!-- Editable fields (hidden until drug selected) -->
+                <div class="editable-fields-section" id="editableFieldsSection">
+                    <!-- 1. Drug Name Edit -->
+                    <div class="form-section" id="sectionDrugName">
+                        <div class="form-section-title">📦 약품명 수정</div>
+                        <div class="current-value-display" id="currentDrugName">현재 약품명: -</div>
+                        <div class="form-group">
+                            <label>새 약품명 (변경 시에만 입력)</label>
+                            <input type="text" id="inputDrugName" placeholder="변경할 약품명 입력..." oninput="checkChanges()">
+                        </div>
+                    </div>
+
+                    <!-- 2. Stock Edit -->
+                    <div class="form-section" id="sectionStock">
+                        <div class="form-section-title">📊 재고 수정</div>
+                        <div class="current-value-display" id="currentStock">현재 재고: -</div>
+                        <div class="form-group">
+                            <label>새 재고수량 (변경 시에만 입력)</label>
+                            <input type="number" id="inputStock" placeholder="변경할 재고수량 입력 (음수 가능)" oninput="checkChanges()">
+                        </div>
+                    </div>
+
+                    <!-- 3. Threshold -->
+                    <div class="form-section" id="sectionThreshold">
+                        <div class="form-section-title">⚙️ 임계값 설정</div>
+                        <div class="current-value-display" id="currentThreshold">현재 설정: 없음</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>재고 임계값 (개)</label>
+                                <input type="number" id="inputStockThreshold" placeholder="이 값 이하 시 강조" oninput="checkChanges()">
+                            </div>
+                            <div class="form-group">
+                                <label>런웨이 임계값 (개월)</label>
+                                <input type="number" step="0.1" id="inputRunwayThreshold" placeholder="이 값 미만 시 강조" oninput="checkChanges()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Patients -->
+                    <div class="form-section" id="sectionPatients">
+                        <div class="form-section-title">👤 환자 태그</div>
+                        <div class="patient-tags" id="patientTags">
+                            <!-- Patient tags will be added here -->
+                        </div>
+                        <div class="patient-search-container">
+                            <input type="text" class="patient-search-input" id="patientSearchInput"
+                                   placeholder="환자명으로 검색하여 추가..."
+                                   oninput="searchPatients()">
+                            <div class="patient-search-results" id="patientSearchResults"></div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <button class="add-patient-btn" onclick="openPatientModal()">+ 새 환자 등록</button>
+                        </div>
+                    </div>
+
+                    <!-- 5. Memo -->
+                    <div class="form-section" id="sectionMemo">
+                        <div class="form-section-title">📝 메모</div>
+                        <div class="current-value-display" id="currentMemo">현재 메모: 없음</div>
+                        <div class="form-group">
+                            <textarea id="inputMemo" placeholder="메모를 입력하세요..." oninput="checkChanges()"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+                <button class="btn btn-primary" id="saveBtn" onclick="saveDrugManagement()" disabled>저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Registration Modal -->
+    <div id="patientModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>👤 새 환자 등록</h3>
+                <span class="modal-close" onclick="closePatientModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>환자명 *</label>
+                    <input type="text" id="newPatientName" placeholder="환자명">
+                </div>
+                <div class="form-group">
+                    <label>주민등록번호 앞자리</label>
+                    <input type="text" id="newPatientBirth" maxlength="6" placeholder="6자리 (예: 900101)">
+                </div>
+                <div class="form-group">
+                    <label>환자 메모</label>
+                    <textarea id="newPatientMemo" placeholder="환자에 대한 메모..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePatientModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveNewPatient()">등록</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let managedDrugs = [];
+        let selectedDrugCode = null;
+        let selectedPatientIds = [];
+        let modalFlag = false;
+        let isEditMode = false;
+        let searchTimeout = null;
+
+        // Original data for change tracking
+        let originalData = {
+            drugName: '',
+            stock: '',
+            stockThreshold: '',
+            runwayThreshold: '',
+            memo: '',
+            patientIds: [],
+            flag: false
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadManagedDrugs();
+        });
+
+        function loadStats() {
+            fetch('/api/managed-drugs/stats')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const stats = data.data;
+                        document.getElementById('statMemo').textContent = stats.memo_count;
+                        document.getElementById('statThreshold').textContent = stats.threshold_count;
+                        document.getElementById('statFlagged').textContent = stats.flagged_count;
+                        document.getElementById('statPatient').textContent = stats.patient_count;
+                    }
+                });
+        }
+
+        function loadManagedDrugs() {
+            fetch('/api/managed-drugs')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        managedDrugs = data.data;
+                        document.getElementById('statTotal').textContent = data.count;
+                        renderDrugs(managedDrugs);
+                    }
+                })
+                .catch(error => {
+                    showStatus('데이터 로드 실패: ' + error.message, 'error');
+                });
+        }
+
+        function renderDrugs(drugs) {
+            const listDiv = document.getElementById('drugList');
+
+            if (drugs.length === 0) {
+                listDiv.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚙️</div>
+                        <div>관리 중인 약품이 없습니다.</div>
+                        <div style="margin-top: 10px; font-size: 14px;">검색하여 약품을 추가하거나, "새 약품 관리 추가" 버튼을 클릭하세요.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            listDiv.innerHTML = drugs.map(drug => {
+                const starClass = drug.special_flag ? 'on' : 'off';
+                const starIcon = drug.special_flag ? '★' : '☆';
+
+                let badges = '';
+                if (drug.has_threshold) {
+                    let thInfo = [];
+                    if (drug.threshold.stock) thInfo.push(drug.threshold.stock + '개이하');
+                    if (drug.threshold.runway) thInfo.push(drug.threshold.runway + '개월미만');
+                    badges += `<span class="badge badge-threshold">⚙️ ${thInfo.join(', ')}</span>`;
+                }
+                if (drug.has_memo) {
+                    badges += `<span class="badge badge-memo">📝 메모</span>`;
+                }
+                if (drug.patients && drug.patients.length > 0) {
+                    const names = drug.patients.map(p => p['환자명']).join(', ');
+                    badges += `<span class="badge badge-patient">👤 ${names}</span>`;
+                }
+
+                return `
+                    <div class="drug-card" data-code="${drug.drug_code}">
+                        <div class="drug-card-header">
+                            <div class="drug-card-title">
+                                <span class="star-flag ${starClass}" onclick="toggleFlag('${drug.drug_code}')">${starIcon}</span>
+                                <div>
+                                    <div class="drug-name">${drug.drug_name}</div>
+                                    <div class="drug-code">${drug.drug_code}</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" onclick="openEditModal('${drug.drug_code}')">관리</button>
+                        </div>
+                        <div class="drug-info">${drug.company} | 재고: ${drug.current_stock}개</div>
+                        <div class="drug-badges">${badges || '<span style="color: #a0aec0; font-size: 13px;">설정 없음</span>'}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterDrugs() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            if (!query) {
+                renderDrugs(managedDrugs);
+                return;
+            }
+
+            const filtered = managedDrugs.filter(drug =>
+                drug.drug_name.toLowerCase().includes(query) ||
+                drug.drug_code.toLowerCase().includes(query) ||
+                (drug.company && drug.company.toLowerCase().includes(query))
+            );
+            renderDrugs(filtered);
+        }
+
+        function toggleFlag(drugCode) {
+            fetch(`/api/drug/${drugCode}/toggle-flag`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        loadManagedDrugs();
+                        loadStats();
+                    }
+                });
+        }
+
+        // Modal Functions
+        function openAddModal() {
+            isEditMode = false;
+            selectedDrugCode = null;
+            selectedPatientIds = [];
+            modalFlag = false;
+
+            // Reset original data
+            originalData = {
+                drugName: '',
+                stock: '',
+                stockThreshold: '',
+                runwayThreshold: '',
+                memo: '',
+                patientIds: [],
+                flag: false
+            };
+
+            document.getElementById('modalTitle').textContent = '⚙️ 새 약품 관리 추가';
+            document.getElementById('drugSearchSection').style.display = 'block';
+            document.getElementById('drugInfoSection').style.display = 'none';
+
+            // Show hint, hide editable fields
+            document.getElementById('unselectedHint').style.display = 'block';
+            document.getElementById('editableFieldsSection').classList.remove('visible');
+
+            // Clear inputs
+            document.getElementById('modalDrugSearch').value = '';
+            document.getElementById('modalDrugResults').innerHTML = '';
+            document.getElementById('selectedDrug').classList.remove('visible');
+            document.getElementById('inputDrugName').value = '';
+            document.getElementById('inputStock').value = '';
+            document.getElementById('inputStockThreshold').value = '';
+            document.getElementById('inputRunwayThreshold').value = '';
+            document.getElementById('inputMemo').value = '';
+            document.getElementById('currentStock').textContent = '현재 재고: -';
+            document.getElementById('currentDrugName').textContent = '현재 약품명: -';
+            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+            document.getElementById('currentMemo').textContent = '현재 메모: 없음';
+            updateFlagUI();
+            renderPatientTags();
+
+            // Disable save button
+            document.getElementById('saveBtn').disabled = true;
+            clearAllChangedMarkers();
+
+            document.getElementById('drugModal').classList.add('visible');
+        }
+
+        function openEditModal(drugCode) {
+            isEditMode = true;
+            selectedDrugCode = drugCode;
+
+            fetch(`/api/drug-management/${drugCode}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const d = data.data;
+
+                        document.getElementById('modalTitle').textContent = '⚙️ 약품 상세 관리';
+                        document.getElementById('drugSearchSection').style.display = 'none';
+                        document.getElementById('drugInfoSection').style.display = 'block';
+
+                        // Hide hint, show editable fields
+                        document.getElementById('unselectedHint').style.display = 'none';
+                        document.getElementById('editableFieldsSection').classList.add('visible');
+
+                        document.getElementById('editDrugName').textContent = d.drug_name;
+                        document.getElementById('editDrugCode').textContent = d.drug_code;
+                        document.getElementById('editDrugCompany').textContent = d.company;
+
+                        // Store original data for change tracking
+                        const stockTh = d.threshold ? (d.threshold.stock !== null ? String(d.threshold.stock) : '') : '';
+                        const runwayTh = d.threshold ? (d.threshold.runway !== null ? String(d.threshold.runway) : '') : '';
+
+                        originalData = {
+                            drugName: d.drug_name,
+                            stock: String(d.current_stock),
+                            stockThreshold: stockTh,
+                            runwayThreshold: runwayTh,
+                            memo: (d.memo || '').trim(),
+                            patientIds: d.patients.map(p => p['환자ID']).sort(),
+                            flag: d.special_flag
+                        };
+
+                        // Display current values
+                        document.getElementById('currentDrugName').innerHTML = `현재 약품명: <strong>${d.drug_name}</strong>`;
+                        document.getElementById('currentStock').innerHTML = `현재 재고: <strong>${d.current_stock}개</strong>`;
+
+                        if (d.threshold && (d.threshold.stock !== null || d.threshold.runway !== null)) {
+                            let thText = [];
+                            if (d.threshold.stock !== null) thText.push(`재고 ${d.threshold.stock}개 이하`);
+                            if (d.threshold.runway !== null) thText.push(`런웨이 ${d.threshold.runway}개월 미만`);
+                            document.getElementById('currentThreshold').innerHTML = `현재 설정: <strong>${thText.join(', ')}</strong>`;
+                        } else {
+                            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+                        }
+
+                        if (d.memo) {
+                            const memoPreview = d.memo.length > 30 ? d.memo.substring(0, 30) + '...' : d.memo;
+                            document.getElementById('currentMemo').innerHTML = `현재 메모: <strong>${escapeHtml(memoPreview)}</strong>`;
+                        } else {
+                            document.getElementById('currentMemo').textContent = '현재 메모: 없음';
+                        }
+
+                        // Set form values (pre-fill for easy editing)
+                        document.getElementById('inputDrugName').value = d.drug_name;
+                        document.getElementById('inputStock').value = '';
+                        document.getElementById('inputStockThreshold').value = stockTh;
+                        document.getElementById('inputRunwayThreshold').value = runwayTh;
+                        document.getElementById('inputMemo').value = d.memo || '';
+
+                        modalFlag = d.special_flag;
+                        updateFlagUI();
+
+                        // Patients
+                        selectedPatientIds = d.patients.map(p => p['환자ID']);
+                        renderPatientTags(d.patients);
+
+                        // Disable save button initially
+                        document.getElementById('saveBtn').disabled = true;
+                        clearAllChangedMarkers();
+
+                        document.getElementById('drugModal').classList.add('visible');
+                    }
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('drugModal').classList.remove('visible');
+        }
+
+        function searchDrugsForModal() {
+            clearTimeout(searchTimeout);
+            const query = document.getElementById('modalDrugSearch').value.trim();
+            const resultsDiv = document.getElementById('modalDrugResults');
+
+            if (query.length < 2) {
+                resultsDiv.classList.remove('visible');
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/search-inventory?q=${encodeURIComponent(query)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'success' && data.results.length > 0) {
+                            resultsDiv.innerHTML = data.results.slice(0, 10).map(item => `
+                                <div class="drug-result-item" onclick="selectDrugForModal('${item['약품코드']}', '${escapeHtml(item['약품명'])}', '${escapeHtml(item['제약회사'])}', ${item['현재_재고수량']})">
+                                    <div style="font-weight: 500;">${item['약품명']}</div>
+                                    <div style="font-size: 13px; color: #718096;">${item['약품코드']} | ${item['제약회사']} | 재고: ${item['현재_재고수량']}</div>
+                                </div>
+                            `).join('');
+                            resultsDiv.classList.add('visible');
+                        } else {
+                            resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">검색 결과가 없습니다</div>';
+                            resultsDiv.classList.add('visible');
+                        }
+                    });
+            }, 300);
+        }
+
+        function selectDrugForModal(code, name, company, stock) {
+            selectedDrugCode = code;
+            document.getElementById('selectedDrugName').textContent = name;
+            document.getElementById('selectedDrugCode').textContent = code + ' | ' + company;
+            document.getElementById('selectedDrug').classList.add('visible');
+            document.getElementById('modalDrugResults').classList.remove('visible');
+            document.getElementById('modalDrugSearch').value = '';
+
+            // Hide hint, show editable fields
+            document.getElementById('unselectedHint').style.display = 'none';
+            document.getElementById('editableFieldsSection').classList.add('visible');
+
+            // Display current values
+            document.getElementById('currentDrugName').innerHTML = `현재 약품명: <strong>${escapeHtml(name)}</strong>`;
+            document.getElementById('currentStock').innerHTML = `현재 재고: <strong>${stock}개</strong>`;
+
+            // Load existing data if any
+            fetch(`/api/drug-management/${code}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const d = data.data;
+                        const stockTh = d.threshold ? (d.threshold.stock !== null ? String(d.threshold.stock) : '') : '';
+                        const runwayTh = d.threshold ? (d.threshold.runway !== null ? String(d.threshold.runway) : '') : '';
+
+                        // Store original data
+                        originalData = {
+                            drugName: name,
+                            stock: String(stock),
+                            stockThreshold: stockTh,
+                            runwayThreshold: runwayTh,
+                            memo: (d.memo || '').trim(),
+                            patientIds: d.patients.map(p => p['환자ID']).sort(),
+                            flag: d.special_flag
+                        };
+
+                        // Display current threshold
+                        if (d.threshold && (d.threshold.stock !== null || d.threshold.runway !== null)) {
+                            let thText = [];
+                            if (d.threshold.stock !== null) thText.push(`재고 ${d.threshold.stock}개 이하`);
+                            if (d.threshold.runway !== null) thText.push(`런웨이 ${d.threshold.runway}개월 미만`);
+                            document.getElementById('currentThreshold').innerHTML = `현재 설정: <strong>${thText.join(', ')}</strong>`;
+                        } else {
+                            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+                        }
+
+                        // Display current memo
+                        if (d.memo) {
+                            const memoPreview = d.memo.length > 30 ? d.memo.substring(0, 30) + '...' : d.memo;
+                            document.getElementById('currentMemo').innerHTML = `현재 메모: <strong>${escapeHtml(memoPreview)}</strong>`;
+                        } else {
+                            document.getElementById('currentMemo').textContent = '현재 메모: 없음';
+                        }
+
+                        // Set form values (pre-fill for easy editing)
+                        document.getElementById('inputDrugName').value = name;
+                        document.getElementById('inputStock').value = '';
+                        document.getElementById('inputStockThreshold').value = stockTh;
+                        document.getElementById('inputRunwayThreshold').value = runwayTh;
+                        document.getElementById('inputMemo').value = d.memo || '';
+
+                        modalFlag = d.special_flag;
+                        updateFlagUI();
+                        selectedPatientIds = d.patients.map(p => p['환자ID']);
+                        renderPatientTags(d.patients);
+
+                        // Disable save button initially
+                        document.getElementById('saveBtn').disabled = true;
+                        clearAllChangedMarkers();
+                    }
+                });
+        }
+
+        function clearDrugSelection() {
+            selectedDrugCode = null;
+            document.getElementById('selectedDrug').classList.remove('visible');
+
+            // Show hint, hide editable fields
+            document.getElementById('unselectedHint').style.display = 'block';
+            document.getElementById('editableFieldsSection').classList.remove('visible');
+
+            // Clear inputs
+            document.getElementById('inputDrugName').value = '';
+            document.getElementById('inputStock').value = '';
+            document.getElementById('inputStockThreshold').value = '';
+            document.getElementById('inputRunwayThreshold').value = '';
+            document.getElementById('inputMemo').value = '';
+            document.getElementById('currentStock').textContent = '현재 재고: -';
+            document.getElementById('currentDrugName').textContent = '현재 약품명: -';
+            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+            document.getElementById('currentMemo').textContent = '현재 메모: 없음';
+            modalFlag = false;
+            updateFlagUI();
+            selectedPatientIds = [];
+            renderPatientTags();
+
+            // Reset original data and disable save
+            originalData = {
+                drugName: '',
+                stock: '',
+                stockThreshold: '',
+                runwayThreshold: '',
+                memo: '',
+                patientIds: [],
+                flag: false
+            };
+            document.getElementById('saveBtn').disabled = true;
+            clearAllChangedMarkers();
+        }
+
+        function toggleModalFlag() {
+            modalFlag = !modalFlag;
+            updateFlagUI();
+            checkChanges();
+        }
+
+        function updateFlagUI() {
+            const editStar = document.getElementById('editStarFlag');
+            const addStar = document.getElementById('addStarFlag');
+
+            if (modalFlag) {
+                if (editStar) {
+                    editStar.textContent = '★';
+                    editStar.classList.remove('off');
+                    editStar.classList.add('on');
+                }
+                if (addStar) {
+                    addStar.textContent = '★';
+                    addStar.classList.remove('off');
+                    addStar.classList.add('on');
+                }
+            } else {
+                if (editStar) {
+                    editStar.textContent = '☆';
+                    editStar.classList.remove('on');
+                    editStar.classList.add('off');
+                }
+                if (addStar) {
+                    addStar.textContent = '☆';
+                    addStar.classList.remove('on');
+                    addStar.classList.add('off');
+                }
+            }
+        }
+
+        // Patient functions
+        function renderPatientTags(patients) {
+            const container = document.getElementById('patientTags');
+            if (!patients || patients.length === 0) {
+                container.innerHTML = '<span style="color: #a0aec0; font-size: 13px;">연결된 환자가 없습니다</span>';
+                return;
+            }
+
+            container.innerHTML = patients.map(p => `
+                <span class="patient-tag">
+                    ${p['환자명']}${p['주민번호_앞자리'] ? ' (' + p['주민번호_앞자리'] + ')' : ''}
+                    <span class="remove-btn" onclick="removePatient(${p['환자ID']})">&times;</span>
+                </span>
+            `).join('');
+        }
+
+        function removePatient(patientId) {
+            selectedPatientIds = selectedPatientIds.filter(id => id !== patientId);
+            // Re-render (need to fetch patient info again)
+            const tags = document.querySelectorAll('.patient-tag');
+            tags.forEach(tag => {
+                if (tag.querySelector('.remove-btn').getAttribute('onclick').includes(patientId)) {
+                    tag.remove();
+                }
+            });
+            if (selectedPatientIds.length === 0) {
+                document.getElementById('patientTags').innerHTML = '<span style="color: #a0aec0; font-size: 13px;">연결된 환자가 없습니다</span>';
+            }
+            checkChanges();
+        }
+
+        function searchPatients() {
+            clearTimeout(searchTimeout);
+            const query = document.getElementById('patientSearchInput').value.trim();
+            const resultsDiv = document.getElementById('patientSearchResults');
+
+            if (!query) {
+                resultsDiv.classList.remove('visible');
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/search-patients?q=${encodeURIComponent(query)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'success' && data.data.length > 0) {
+                            const filtered = data.data.filter(p => !selectedPatientIds.includes(p['환자ID']));
+                            if (filtered.length > 0) {
+                                resultsDiv.innerHTML = filtered.map(p => `
+                                    <div class="patient-result-item" onclick="addPatient(${p['환자ID']}, '${escapeHtml(p['환자명'])}', '${p['주민번호_앞자리'] || ''}')">
+                                        ${p['환자명']}${p['주민번호_앞자리'] ? ' (' + p['주민번호_앞자리'] + ')' : ''}
+                                    </div>
+                                `).join('');
+                            } else {
+                                resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">이미 모두 추가됨</div>';
+                            }
+                            resultsDiv.classList.add('visible');
+                        } else {
+                            resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">검색 결과가 없습니다</div>';
+                            resultsDiv.classList.add('visible');
+                        }
+                    });
+            }, 300);
+        }
+
+        function addPatient(patientId, name, birth) {
+            if (!selectedPatientIds.includes(patientId)) {
+                selectedPatientIds.push(patientId);
+
+                const container = document.getElementById('patientTags');
+                if (container.querySelector('span[style]')) {
+                    container.innerHTML = '';
+                }
+                container.innerHTML += `
+                    <span class="patient-tag">
+                        ${name}${birth ? ' (' + birth + ')' : ''}
+                        <span class="remove-btn" onclick="removePatient(${patientId})">&times;</span>
+                    </span>
+                `;
+            }
+
+            document.getElementById('patientSearchInput').value = '';
+            document.getElementById('patientSearchResults').classList.remove('visible');
+            checkChanges();
+        }
+
+        // Patient Modal
+        function openPatientModal() {
+            document.getElementById('newPatientName').value = '';
+            document.getElementById('newPatientBirth').value = '';
+            document.getElementById('newPatientMemo').value = '';
+            document.getElementById('patientModal').classList.add('visible');
+        }
+
+        function closePatientModal() {
+            document.getElementById('patientModal').classList.remove('visible');
+        }
+
+        function saveNewPatient() {
+            const name = document.getElementById('newPatientName').value.trim();
+            const birth = document.getElementById('newPatientBirth').value.trim();
+            const memo = document.getElementById('newPatientMemo').value.trim();
+
+            if (!name) {
+                alert('환자명은 필수입니다.');
+                return;
+            }
+
+            fetch('/api/patient', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, birth, memo })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    closePatientModal();
+                    addPatient(data.patient_id, name, birth);
+                    loadStats();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        // Save Drug Management
+        function saveDrugManagement() {
+            if (!selectedDrugCode) {
+                showStatus('약품을 선택해주세요.', 'error');
+                return;
+            }
+
+            const payload = {};
+
+            const drugName = document.getElementById('inputDrugName').value.trim();
+            if (drugName) payload.drug_name = drugName;
+
+            const stock = document.getElementById('inputStock').value;
+            if (stock !== '') payload.stock = parseFloat(stock);
+
+            const stockTh = document.getElementById('inputStockThreshold').value;
+            const runwayTh = document.getElementById('inputRunwayThreshold').value;
+            payload.threshold = {
+                stock: stockTh !== '' ? parseInt(stockTh) : null,
+                runway: runwayTh !== '' ? parseFloat(runwayTh) : null
+            };
+
+            payload.memo = document.getElementById('inputMemo').value.trim();
+            payload.special_flag = modalFlag;
+            payload.patient_ids = selectedPatientIds;
+
+            fetch(`/api/drug-management/${selectedDrugCode}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success' || data.status === 'partial') {
+                    closeModal();
+                    loadManagedDrugs();
+                    loadStats();
+                    showStatus('저장되었습니다.', 'success');
+                } else {
+                    showStatus(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('저장 실패: ' + error.message, 'error');
+            });
+        }
+
+        // Change Tracking Functions
+        function checkChanges() {
+            if (!selectedDrugCode) {
+                document.getElementById('saveBtn').disabled = true;
+                return;
+            }
+
+            const currentDrugName = document.getElementById('inputDrugName').value.trim();
+            const currentStock = document.getElementById('inputStock').value;
+            const currentStockTh = document.getElementById('inputStockThreshold').value;
+            const currentRunwayTh = document.getElementById('inputRunwayThreshold').value;
+            const currentMemo = document.getElementById('inputMemo').value.trim();
+            const currentPatientIds = [...selectedPatientIds].sort();
+
+            // Check each section for changes
+            const changes = {
+                drugName: currentDrugName !== originalData.drugName,
+                stock: currentStock !== '' && currentStock !== originalData.stock,
+                threshold: currentStockTh !== originalData.stockThreshold ||
+                           currentRunwayTh !== originalData.runwayThreshold,
+                memo: currentMemo !== originalData.memo,
+                patients: JSON.stringify(currentPatientIds) !== JSON.stringify(originalData.patientIds),
+                flag: modalFlag !== originalData.flag
+            };
+
+            // Update section styling
+            updateSectionStyle('sectionDrugName', changes.drugName);
+            updateSectionStyle('sectionStock', changes.stock);
+            updateSectionStyle('sectionThreshold', changes.threshold);
+            updateSectionStyle('sectionMemo', changes.memo);
+            updateSectionStyle('sectionPatients', changes.patients);
+
+            // Enable/disable save button
+            const hasChanges = Object.values(changes).some(v => v);
+            document.getElementById('saveBtn').disabled = !hasChanges;
+        }
+
+        function updateSectionStyle(sectionId, hasChanges) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                if (hasChanges) {
+                    section.classList.add('changed');
+                } else {
+                    section.classList.remove('changed');
+                }
+            }
+        }
+
+        function clearAllChangedMarkers() {
+            const sections = ['sectionDrugName', 'sectionStock', 'sectionThreshold', 'sectionMemo', 'sectionPatients'];
+            sections.forEach(id => {
+                const section = document.getElementById(id);
+                if (section) section.classList.remove('changed');
+            });
+        }
+
+        // Utility
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message ' + type;
+            setTimeout(() => {
+                statusDiv.className = 'status-message';
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        function shutdownServer() {
+            if (!confirm('애플리케이션을 종료하시겠습니까?')) return;
+
+            fetch('/api/shutdown', { method: 'POST' })
+                .then(() => {
+                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                })
+                .catch(() => {
+                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                });
+        }
+
+        // Close modal on outside click
+        document.getElementById('drugModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        document.getElementById('patientModal').addEventListener('click', function(e) {
+            if (e.target === this) closePatientModal();
+        });
+
+        // ESC to close modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+                closePatientModal();
+            }
+        });
+    </script>
+</body>
+</html>

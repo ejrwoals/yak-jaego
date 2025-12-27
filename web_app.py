@@ -28,6 +28,9 @@ import inventory_updater
 import checked_items_db
 import drug_thresholds_db
 import drug_memos_db
+import patients_db
+import drug_patient_map_db
+import drug_flags_db
 from utils import read_today_file
 
 app = Flask(__name__)
@@ -728,14 +731,6 @@ def delete_report():
 # 재고 수정 관련 API
 # ============================================================
 
-@app.route('/inventory/edit')
-def inventory_edit_page():
-    """재고 수정 전용 페이지"""
-    # 쿼리 파라미터로 약품코드가 전달되면 pre-select 상태로 표시
-    preselect_code = request.args.get('drug_code', None)
-    return render_template('inventory_edit.html', preselect_code=preselect_code)
-
-
 @app.route('/api/search-inventory', methods=['GET'])
 def search_inventory_api():
     """약품 검색 API"""
@@ -823,12 +818,6 @@ def update_inventory_api():
 # ============================================================
 # 개별 임계값 관리 API
 # ============================================================
-
-@app.route('/threshold/manage')
-def threshold_manage_page():
-    """개별 임계값 관리 페이지"""
-    return render_template('threshold_manage.html')
-
 
 @app.route('/api/drug-threshold/<drug_code>', methods=['GET'])
 def get_drug_threshold(drug_code):
@@ -971,12 +960,6 @@ def get_threshold_stats():
 # 메모 관리 (v3.13)
 # ============================================================
 
-@app.route('/memo/manage')
-def memo_manage_page():
-    """메모 관리 페이지"""
-    return render_template('memo_manage.html')
-
-
 @app.route('/api/memos', methods=['GET'])
 def get_all_memos_api():
     """전체 메모 목록 조회 (약품명, 재고, 임계값 정보 포함)"""
@@ -1038,6 +1021,513 @@ def delete_memo_api(drug_code):
                 'status': 'error',
                 'message': result['message']
             }), 500
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 통합 약품 개별 관리 (v3.14)
+# ============================================================
+
+@app.route('/drug/manage')
+def drug_manage_page():
+    """통합 약품 개별 관리 페이지"""
+    return render_template('drug_manage.html')
+
+
+@app.route('/api/drug-management/<drug_code>', methods=['GET'])
+def get_drug_management(drug_code):
+    """약품의 통합 정보 조회 (재고, 임계값, 메모, 플래그, 환자)"""
+    try:
+        # 1. 기본 약품 정보
+        drug_info = inventory_db.get_inventory(drug_code)
+        if not drug_info:
+            return jsonify({'status': 'error', 'message': '해당 약품을 찾을 수 없습니다.'}), 404
+
+        # 2. 임계값 정보
+        threshold = drug_thresholds_db.get_threshold(drug_code)
+
+        # 3. 메모 정보
+        memo = drug_memos_db.get_memo(drug_code)
+
+        # 4. 특별관리 플래그
+        special_flag = drug_flags_db.get_flag(drug_code)
+
+        # 5. 연결된 환자 목록
+        patients = drug_patient_map_db.get_patients_for_drug(drug_code)
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'drug_code': drug_code,
+                'drug_name': drug_info.get('약품명', ''),
+                'company': drug_info.get('제약회사', ''),
+                'drug_type': drug_info.get('약품유형', '미분류'),
+                'current_stock': drug_info.get('현재_재고수량', 0),
+                'last_updated': drug_info.get('최종_업데이트일시', ''),
+                'threshold': {
+                    'stock': threshold.get('절대재고_임계값') if threshold else None,
+                    'runway': threshold.get('런웨이_임계값') if threshold else None,
+                    'active': threshold.get('활성화', True) if threshold else False
+                } if threshold else None,
+                'memo': memo,
+                'special_flag': special_flag,
+                'patients': patients
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug-management/<drug_code>', methods=['POST'])
+def save_drug_management(drug_code):
+    """약품 통합 정보 저장"""
+    try:
+        data = request.get_json()
+
+        results = []
+
+        # 1. 약품명 수정
+        if 'drug_name' in data and data['drug_name']:
+            result = inventory_db.update_drug_name(drug_code, data['drug_name'])
+            results.append(('약품명', result))
+
+        # 2. 재고 수정
+        if 'stock' in data and data['stock'] is not None:
+            result = inventory_db.update_single_inventory(drug_code, float(data['stock']))
+            results.append(('재고', result))
+
+        # 3. 임계값 설정
+        if 'threshold' in data:
+            th = data['threshold']
+            stock_th = th.get('stock')
+            runway_th = th.get('runway')
+
+            # 빈 문자열 처리
+            if stock_th == '':
+                stock_th = None
+            if runway_th == '':
+                runway_th = None
+
+            if stock_th is not None or runway_th is not None:
+                result = drug_thresholds_db.upsert_threshold(
+                    drug_code,
+                    절대재고_임계값=int(stock_th) if stock_th is not None else None,
+                    런웨이_임계값=float(runway_th) if runway_th is not None else None
+                )
+                results.append(('임계값', result))
+            else:
+                # 둘 다 없으면 임계값 삭제
+                drug_thresholds_db.delete_threshold(drug_code)
+                results.append(('임계값', {'success': True, 'message': '임계값이 삭제되었습니다.'}))
+
+        # 4. 메모 저장
+        if 'memo' in data:
+            memo = data['memo']
+            if memo:
+                result = drug_memos_db.upsert_memo(drug_code, memo)
+            else:
+                result = drug_memos_db.delete_memo(drug_code)
+            results.append(('메모', result))
+
+        # 5. 특별관리 플래그
+        if 'special_flag' in data:
+            result = drug_flags_db.set_flag(drug_code, data['special_flag'])
+            results.append(('특별관리', result))
+
+        # 6. 환자 연결 (전체 교체 방식)
+        if 'patient_ids' in data:
+            patient_ids = data['patient_ids']
+            result = drug_patient_map_db.set_patients_for_drug(drug_code, patient_ids)
+            results.append(('환자연결', result))
+
+        # 결과 요약
+        failed = [r for r in results if not r[1].get('success', False)]
+        if failed:
+            return jsonify({
+                'status': 'partial',
+                'message': f'{len(results) - len(failed)}개 성공, {len(failed)}개 실패',
+                'details': {r[0]: r[1] for r in results}
+            })
+
+        return jsonify({
+            'status': 'success',
+            'message': '모든 설정이 저장되었습니다.',
+            'details': {r[0]: r[1] for r in results}
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/managed-drugs', methods=['GET'])
+def get_managed_drugs():
+    """설정이 있는 약품 목록 조회 (메모, 임계값, 플래그, 환자 중 하나라도 설정된 약품)"""
+    try:
+        # 각 DB에서 설정된 약품코드 수집
+        drug_codes = set()
+
+        # 1. 메모가 있는 약품
+        memos = drug_memos_db.get_all_memos()
+        drug_codes.update(memos.keys())
+
+        # 2. 임계값이 설정된 약품
+        thresholds_df = drug_thresholds_db.get_all_thresholds()
+        if not thresholds_df.empty:
+            drug_codes.update(thresholds_df['약품코드'].tolist())
+
+        # 3. 특별관리 플래그가 설정된 약품
+        flagged = drug_flags_db.get_flagged_drugs()
+        drug_codes.update(flagged)
+
+        # 4. 환자가 연결된 약품
+        drugs_with_patients = drug_patient_map_db.get_all_drugs_with_patients()
+        drug_codes.update(drugs_with_patients)
+
+        # 약품 정보 조회 및 조합
+        result = []
+        all_flags = drug_flags_db.get_all_flags()
+        all_mappings = drug_patient_map_db.get_all_mappings_dict()
+
+        for drug_code in drug_codes:
+            drug_info = inventory_db.get_inventory(drug_code)
+            if not drug_info:
+                continue
+
+            threshold = drug_thresholds_db.get_threshold(drug_code)
+            memo = memos.get(drug_code, '')
+            flag = all_flags.get(drug_code, False)
+            patient_ids = all_mappings.get(drug_code, [])
+
+            # 환자 정보 조회
+            patients = []
+            for pid in patient_ids:
+                patient = patients_db.get_patient(pid)
+                if patient:
+                    patients.append({
+                        '환자ID': patient['환자ID'],
+                        '환자명': patient['환자명'],
+                        '주민번호_앞자리': patient['주민번호_앞자리']
+                    })
+
+            result.append({
+                'drug_code': drug_code,
+                'drug_name': drug_info.get('약품명', ''),
+                'company': drug_info.get('제약회사', ''),
+                'current_stock': drug_info.get('현재_재고수량', 0),
+                'has_threshold': threshold is not None,
+                'threshold': {
+                    'stock': threshold.get('절대재고_임계값') if threshold else None,
+                    'runway': threshold.get('런웨이_임계값') if threshold else None
+                } if threshold else None,
+                'has_memo': bool(memo),
+                'memo_preview': memo[:50] + '...' if len(memo) > 50 else memo,
+                'special_flag': flag,
+                'patients': patients
+            })
+
+        # 약품명 기준 정렬
+        result.sort(key=lambda x: x['drug_name'])
+
+        return jsonify({
+            'status': 'success',
+            'count': len(result),
+            'data': result
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/managed-drugs/stats', methods=['GET'])
+def get_managed_drugs_stats():
+    """관리 약품 통계 조회"""
+    try:
+        memo_count = drug_memos_db.get_memo_count()
+        threshold_stats = drug_thresholds_db.get_statistics()
+        flagged_count = drug_flags_db.get_flagged_count()
+        drugs_with_patients = len(drug_patient_map_db.get_all_drugs_with_patients())
+        patient_count = patients_db.get_patient_count()
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'memo_count': memo_count,
+                'threshold_count': threshold_stats.get('total', 0),
+                'flagged_count': flagged_count,
+                'drugs_with_patients': drugs_with_patients,
+                'patient_count': patient_count
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 환자 관리 API (v3.14)
+# ============================================================
+
+@app.route('/api/patients', methods=['GET'])
+def get_all_patients():
+    """전체 환자 목록 조회"""
+    try:
+        patients = patients_db.get_all_patients()
+        return jsonify({
+            'status': 'success',
+            'count': len(patients),
+            'data': patients
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient', methods=['POST'])
+def create_patient():
+    """환자 생성"""
+    try:
+        data = request.get_json()
+        환자명 = data.get('name', '').strip()
+        주민번호_앞자리 = data.get('birth', '').strip() if data.get('birth') else None
+        메모 = data.get('memo', '').strip() if data.get('memo') else None
+
+        if not 환자명:
+            return jsonify({'status': 'error', 'message': '환자명은 필수입니다.'}), 400
+
+        result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'patient_id': result['patient_id']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 400
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient/<int:patient_id>', methods=['GET'])
+def get_patient(patient_id):
+    """단일 환자 조회"""
+    try:
+        patient = patients_db.get_patient(patient_id)
+        if patient:
+            return jsonify({
+                'status': 'success',
+                'data': patient
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '해당 환자를 찾을 수 없습니다.'}), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient/<int:patient_id>', methods=['PUT'])
+def update_patient(patient_id):
+    """환자 수정"""
+    try:
+        data = request.get_json()
+        환자명 = data.get('name', '').strip()
+        주민번호_앞자리 = data.get('birth', '').strip() if data.get('birth') else None
+        메모 = data.get('memo', '').strip() if data.get('memo') else None
+
+        if not 환자명:
+            return jsonify({'status': 'error', 'message': '환자명은 필수입니다.'}), 400
+
+        result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모, 환자ID=patient_id)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 400
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient/<int:patient_id>', methods=['DELETE'])
+def delete_patient(patient_id):
+    """환자 삭제 (CASCADE: 연결된 약품 매핑도 삭제)"""
+    try:
+        result = patients_db.delete_patient(patient_id)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 404
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/search-patients', methods=['GET'])
+def search_patients():
+    """환자 검색"""
+    try:
+        keyword = request.args.get('q', '').strip()
+
+        if not keyword:
+            return jsonify({'status': 'success', 'data': []})
+
+        patients = patients_db.search_patients(keyword, limit=20)
+
+        return jsonify({
+            'status': 'success',
+            'count': len(patients),
+            'data': patients
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 약품-환자 매핑 API (v3.14)
+# ============================================================
+
+@app.route('/api/drug/<drug_code>/patients', methods=['GET'])
+def get_drug_patients(drug_code):
+    """약품에 연결된 환자 목록 조회"""
+    try:
+        patients = drug_patient_map_db.get_patients_for_drug(drug_code)
+        return jsonify({
+            'status': 'success',
+            'count': len(patients),
+            'data': patients
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug/<drug_code>/patient/<int:patient_id>', methods=['POST'])
+def link_drug_patient(drug_code, patient_id):
+    """약품과 환자 연결"""
+    try:
+        result = drug_patient_map_db.link_patient(drug_code, patient_id)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 400
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/drug/<drug_code>/patient/<int:patient_id>', methods=['DELETE'])
+def unlink_drug_patient(drug_code, patient_id):
+    """약품과 환자 연결 해제"""
+    try:
+        result = drug_patient_map_db.unlink_patient(drug_code, patient_id)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 404
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 특별관리 플래그 API (v3.14)
+# ============================================================
+
+@app.route('/api/drug/<drug_code>/toggle-flag', methods=['POST'])
+def toggle_drug_flag(drug_code):
+    """특별관리 플래그 토글"""
+    try:
+        result = drug_flags_db.toggle_flag(drug_code)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'flag': result['flag']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 500
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/flagged-drugs', methods=['GET'])
+def get_flagged_drugs():
+    """특별관리 약품 목록 조회"""
+    try:
+        drug_codes = drug_flags_db.get_flagged_drugs()
+
+        # 약품 정보와 함께 반환
+        result = []
+        for drug_code in drug_codes:
+            drug_info = inventory_db.get_inventory(drug_code)
+            if drug_info:
+                result.append({
+                    'drug_code': drug_code,
+                    'drug_name': drug_info.get('약품명', ''),
+                    'company': drug_info.get('제약회사', ''),
+                    'current_stock': drug_info.get('현재_재고수량', 0)
+                })
+
+        return jsonify({
+            'status': 'success',
+            'count': len(result),
+            'data': result
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 약품명 수정 API (v3.14)
+# ============================================================
+
+@app.route('/api/drug/<drug_code>/rename', methods=['POST'])
+def rename_drug(drug_code):
+    """약품명 수정"""
+    try:
+        data = request.get_json()
+        new_name = data.get('name', '').strip()
+
+        if not new_name:
+            return jsonify({'status': 'error', 'message': '약품명은 필수입니다.'}), 400
+
+        result = inventory_db.update_drug_name(drug_code, new_name)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'previous_name': result.get('previous_name'),
+                'new_name': result.get('new_name')
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 400
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
