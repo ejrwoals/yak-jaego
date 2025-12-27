@@ -8,6 +8,7 @@
 *.sqlite3
 .DS_Store
 __pycache__/
+.venv/
 
 # Claude Code files
 CLAUDE.md

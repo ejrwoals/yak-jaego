@@ -1,0 +1,16 @@
+[project]
+name = "jaego"
+version = "3.14.0"
+description = "약국 재고 관리 시스템"
+requires-python = ">=3.11"
+
+dependencies = [
+    "flask>=3.0.0",
+    "pandas>=2.2.2",
+    "openpyxl>=3.1.5",
+    "plotly>=5.18.0",
+    "python-calamine>=0.5.4",
+]
+
+[tool.uv]
+dev-dependencies = []
