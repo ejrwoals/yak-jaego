@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -111,33 +111,38 @@
         .drug-list {
             max-height: 600px;
             overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
         }
 
         .drug-card {
             background: #f7fafc;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
+            padding: 14px;
             transition: all 0.2s;
         }
 
         .drug-card:hover {
             border-color: #cbd5e0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
         }
 
         .drug-card-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
 
         .drug-card-title {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
         }
 
         .star-flag {
@@ -164,20 +169,94 @@
         }
 
         .drug-name {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a202c;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .drug-code {
-            font-size: 13px;
+            font-size: 12px;
             color: #718096;
         }
 
-        .drug-info {
-            font-size: 13px;
-            color: #718096;
+        .drug-company {
+            font-size: 12px;
+            color: #a0aec0;
+            margin-bottom: 8px;
+        }
+
+        .drug-stock {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #4a5568;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
             margin-bottom: 10px;
+        }
+
+        .drug-stock-label {
+            font-weight: 400;
+            opacity: 0.85;
+        }
+
+        /* Tooltip */
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: #e2e8f0;
+            color: #718096;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: help;
+            margin-left: 6px;
+            position: relative;
+        }
+
+        .help-icon:hover {
+            background: #cbd5e0;
+            color: #4a5568;
+        }
+
+        .help-icon .tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            background: #2d3748;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 400;
+            white-space: normal;
+            width: 280px;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+
+        .help-icon .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 12px;
+            border: 6px solid transparent;
+            border-top-color: #2d3748;
+        }
+
+        .help-icon:hover .tooltip {
+            display: block;
         }
 
         .drug-badges {
@@ -497,6 +576,7 @@
             text-align: center;
             padding: 60px 20px;
             color: #a0aec0;
+            grid-column: 1 / -1;
         }
 
         .empty-state-icon {
@@ -742,14 +822,19 @@
                         <div class="current-value-display" id="currentStock">현재 재고: -</div>
                         <div class="form-group">
                             <label>새 재고수량 (변경 시에만 입력)</label>
-                            <input type="number" id="inputStock" placeholder="변경할 재고수량 입력 (음수 가능)" oninput="checkChanges()">
+                            <input type="number" id="inputStock" placeholder="변경할 재고수량 입력" oninput="checkChanges()">
                         </div>
                     </div>
 
                     <!-- 3. Threshold -->
                     <div class="form-section" id="sectionThreshold">
-                        <div class="form-section-title">⚙️ 임계값 설정</div>
-                        <div class="current-value-display" id="currentThreshold">현재 설정: 없음</div>
+                        <div class="form-section-title">
+                            ⚙️ 재고 부족 감지 임계값 설정
+                            <span class="help-icon">?
+                                <span class="tooltip">설정한 임계값 이하로 재고가 떨어지면 재고 현황 리포트에서 해당 약품이 강조 표시됩니다. 재고 임계값은 수량 기준, 런웨이 임계값은 현재 사용 속도 대비 남은 개월 수 기준입니다.</span>
+                            </span>
+                        </div>
+                        <div class="current-value-display" id="currentThreshold">현재 설정: 디폴트 기준값 사용</div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>재고 임계값 (개)</label>
@@ -764,7 +849,12 @@
 
                     <!-- 4. Patients -->
                     <div class="form-section" id="sectionPatients">
-                        <div class="form-section-title">👤 환자 태그</div>
+                        <div class="form-section-title">
+                            👤 환자 태그
+                            <span class="help-icon">?
+                                <span class="tooltip">특정 환자에게만 처방되는 약품에 환자를 태그하면, 발주량 계산 시 해당 환자의 처방 패턴을 기반으로 더 정확한 예측이 가능합니다.</span>
+                            </span>
+                        </div>
                         <div class="patient-tags" id="patientTags">
                             <!-- Patient tags will be added here -->
                         </div>
@@ -915,16 +1005,20 @@
                     <div class="drug-card" data-code="${drug.drug_code}">
                         <div class="drug-card-header">
                             <div class="drug-card-title">
-                                <span class="star-flag ${starClass}" onclick="toggleFlag('${drug.drug_code}')">${starIcon}</span>
-                                <div>
-                                    <div class="drug-name">${drug.drug_name}</div>
+                                <span class="star-flag ${starClass}" onclick="toggleFlag('${drug.drug_code}')" title="특별 관리">${starIcon}</span>
+                                <div style="min-width: 0; flex: 1;">
+                                    <div class="drug-name" title="${drug.drug_name}">${drug.drug_name}</div>
                                     <div class="drug-code">${drug.drug_code}</div>
                                 </div>
                             </div>
-                            <button class="btn btn-secondary" onclick="openEditModal('${drug.drug_code}')">관리</button>
+                            <button class="btn btn-secondary" onclick="openEditModal('${drug.drug_code}')" style="padding: 6px 12px; font-size: 13px;">관리</button>
                         </div>
-                        <div class="drug-info">${drug.company} | 재고: ${drug.current_stock}개</div>
-                        <div class="drug-badges">${badges || '<span style="color: #a0aec0; font-size: 13px;">설정 없음</span>'}</div>
+                        <div class="drug-company">${drug.company}</div>
+                        <div class="drug-stock">
+                            <span class="drug-stock-label">현재고 :</span>
+                            <span>${drug.current_stock.toLocaleString()}</span>
+                        </div>
+                        <div class="drug-badges">${badges || ''}</div>
                     </div>
                 `;
             }).join('');
@@ -993,7 +1087,7 @@
             document.getElementById('inputMemo').value = '';
             document.getElementById('currentStock').textContent = '현재 재고: -';
             document.getElementById('currentDrugName').textContent = '현재 약품명: -';
-            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+            document.getElementById('currentThreshold').textContent = '현재 설정: 디폴트 기준값 사용';
             document.getElementById('currentMemo').textContent = '현재 메모: 없음';
             updateFlagUI();
             renderPatientTags();
@@ -1051,7 +1145,7 @@
                             if (d.threshold.runway !== null) thText.push(`런웨이 ${d.threshold.runway}개월 미만`);
                             document.getElementById('currentThreshold').innerHTML = `현재 설정: <strong>${thText.join(', ')}</strong>`;
                         } else {
-                            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+                            document.getElementById('currentThreshold').textContent = '현재 설정: 디폴트 기준값 사용';
                         }
 
                         if (d.memo) {
@@ -1161,7 +1255,7 @@
                             if (d.threshold.runway !== null) thText.push(`런웨이 ${d.threshold.runway}개월 미만`);
                             document.getElementById('currentThreshold').innerHTML = `현재 설정: <strong>${thText.join(', ')}</strong>`;
                         } else {
-                            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+                            document.getElementById('currentThreshold').textContent = '현재 설정: 디폴트 기준값 사용';
                         }
 
                         // Display current memo
@@ -1207,7 +1301,7 @@
             document.getElementById('inputMemo').value = '';
             document.getElementById('currentStock').textContent = '현재 재고: -';
             document.getElementById('currentDrugName').textContent = '현재 약품명: -';
-            document.getElementById('currentThreshold').textContent = '현재 설정: 없음';
+            document.getElementById('currentThreshold').textContent = '현재 설정: 디폴트 기준값 사용';
             document.getElementById('currentMemo').textContent = '현재 메모: 없음';
             modalFlag = false;
             updateFlagUI();
