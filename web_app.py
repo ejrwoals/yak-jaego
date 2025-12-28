@@ -31,6 +31,7 @@ import drug_memos_db
 import patients_db
 import drug_patient_map_db
 import drug_flags_db
+import buffer_calculator
 from utils import read_today_file
 
 app = Flask(__name__)
@@ -1140,7 +1141,14 @@ def save_drug_management(drug_code):
             results.append(('특별관리', result))
 
         # 6. 환자 연결 (전체 교체 방식)
-        if 'patient_ids' in data:
+        # 새 형식: patients (처방량 포함) 또는 이전 형식: patient_ids (호환성)
+        if 'patients' in data:
+            # 새 형식: [{'patient_id': int, 'dosage': int}, ...]
+            patients = data['patients']
+            result = drug_patient_map_db.set_patients_for_drug(drug_code, patients)
+            results.append(('환자연결', result))
+        elif 'patient_ids' in data:
+            # 이전 형식: [patient_id, ...]
             patient_ids = data['patient_ids']
             result = drug_patient_map_db.set_patients_for_drug(drug_code, patient_ids)
             results.append(('환자연결', result))
@@ -1298,11 +1306,18 @@ def create_patient():
         환자명 = data.get('name', '').strip()
         주민번호_앞자리 = data.get('birth', '').strip() if data.get('birth') else None
         메모 = data.get('memo', '').strip() if data.get('memo') else None
+        방문주기_일 = data.get('visit_cycle')
+
+        if 방문주기_일:
+            try:
+                방문주기_일 = int(방문주기_일)
+            except (ValueError, TypeError):
+                방문주기_일 = None
 
         if not 환자명:
             return jsonify({'status': 'error', 'message': '환자명은 필수입니다.'}), 400
 
-        result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모)
+        result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모, 방문주기_일=방문주기_일)
 
         if result['success']:
             return jsonify({
@@ -1499,6 +1514,61 @@ def get_flagged_drugs():
             'data': result
         })
 
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 최소 재고 버퍼 계산 API (v3.15)
+# ============================================================
+
+@app.route('/api/drug/<drug_code>/calculate-buffer', methods=['POST'])
+def calculate_drug_buffer(drug_code):
+    """약품의 최소 재고 버퍼 계산"""
+    try:
+        data = request.get_json() or {}
+        risk_level = data.get('risk_level', 'safe')
+
+        # 클라이언트에서 patients 데이터를 보내면 그것을 사용 (아직 저장 전인 경우)
+        # 그렇지 않으면 DB에서 조회
+        if 'patients' in data and data['patients']:
+            # 클라이언트 데이터 사용 (아직 저장 전인 환자 정보)
+            patients_data = []
+            for p in data['patients']:
+                patient_info = patients_db.get_patient(p.get('patient_id'))
+                if patient_info:
+                    patients_data.append({
+                        '환자ID': patient_info['환자ID'],
+                        '환자명': patient_info.get('환자명', ''),
+                        '방문주기_일': p.get('visit_cycle') or patient_info.get('방문주기_일') or 30,
+                        '1회_처방량': p.get('dosage') or 1
+                    })
+        else:
+            # DB에서 조회
+            patients_data = drug_patient_map_db.get_patients_for_drug_with_dosage(drug_code)
+
+        # 버퍼 계산
+        result = buffer_calculator.calculate_min_buffer(patients_data, risk_level)
+
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/risk-levels', methods=['GET'])
+def get_risk_levels():
+    """사용 가능한 리스크 수준 목록 조회"""
+    try:
+        levels = buffer_calculator.get_risk_levels()
+        return jsonify({
+            'status': 'success',
+            'data': levels
+        })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

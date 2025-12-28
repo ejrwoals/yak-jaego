@@ -33,6 +33,12 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes highlight {
+            0% { background-color: transparent; }
+            30% { background-color: #bee3f8; }
+            100% { background-color: transparent; }
+        }
+
         .back-link {
             color: #4299e1;
             text-decoration: none;
@@ -477,14 +483,138 @@
             color: #2b6cb0;
         }
 
+        .patient-tag .tag-content {
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .patient-tag .tag-content:hover {
+            color: #2c5282;
+        }
+
+        .patient-tag .tag-content:hover .patient-dosage-badge {
+            background: #2b6cb0;
+        }
+
         .patient-tag .remove-btn {
             cursor: pointer;
             color: #4299e1;
             font-weight: bold;
+            margin-left: 2px;
         }
 
         .patient-tag .remove-btn:hover {
             color: #e53e3e;
+        }
+
+        .patient-dosage-badge {
+            background: #4299e1;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* Buffer Calculation Section */
+        .buffer-calc-container {
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .risk-level-chips {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .risk-chip {
+            padding: 8px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            color: #4a5568;
+        }
+
+        .risk-chip:hover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+
+        .risk-chip.selected {
+            border-color: #4299e1;
+            background: #4299e1;
+            color: #fff;
+        }
+
+        .risk-chip .chip-label {
+            font-weight: 500;
+        }
+
+        .buffer-result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .buffer-result-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .buffer-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #4299e1;
+        }
+
+        .buffer-unit {
+            font-size: 16px;
+            color: #718096;
+            margin-left: 5px;
+        }
+
+        .buffer-explanation {
+            font-size: 14px;
+            color: #4a5568;
+            text-align: center;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .buffer-details {
+            font-size: 13px;
+            color: #718096;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+
+        .buffer-patient-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .buffer-patient-item:last-child {
+            border-bottom: none;
+        }
+
+        .buffer-patient-included {
+            color: #2b6cb0;
+            font-weight: 500;
         }
 
         .patient-search-container {
@@ -852,7 +982,7 @@
                         <div class="form-section-title">
                             👤 환자 태그
                             <span class="help-icon">?
-                                <span class="tooltip">특정 환자에게만 처방되는 약품에 환자를 태그하면, 발주량 계산 시 해당 환자의 처방 패턴을 기반으로 더 정확한 예측이 가능합니다.</span>
+                                <span class="tooltip">특정 환자에게만 처방되는 약품에 환자를 태그하고 방문 주기와 1회 처방량을 입력하면, 최소 재고 버퍼를 계산할 수 있습니다.</span>
                             </span>
                         </div>
                         <div class="patient-tags" id="patientTags">
@@ -869,7 +999,53 @@
                         </div>
                     </div>
 
-                    <!-- 5. Memo -->
+                    <!-- 5. Buffer Calculation -->
+                    <div class="form-section" id="sectionBuffer">
+                        <div class="form-section-title">
+                            📊 최소 재고 버퍼 계산
+                            <span class="help-icon">?
+                                <span class="tooltip">연결된 환자들의 방문 주기와 처방량을 기반으로, 동시 방문 확률을 계산하여 필요한 최소 재고 버퍼를 산출합니다. 포아송 이항분포 모델을 사용합니다.</span>
+                            </span>
+                        </div>
+                        <div class="buffer-calc-container">
+                            <div class="form-group">
+                                <label>허용 리스크 수준</label>
+                                <div class="risk-level-chips">
+                                    <button type="button" class="risk-chip" data-value="relaxed" onclick="selectRiskLevel('relaxed')">
+                                        <span class="chip-label">절약</span>
+                                    </button>
+                                    <button type="button" class="risk-chip" data-value="normal" onclick="selectRiskLevel('normal')">
+                                        <span class="chip-label">보통</span>
+                                    </button>
+                                    <button type="button" class="risk-chip selected" data-value="safe" onclick="selectRiskLevel('safe')">
+                                        <span class="chip-label">안전</span>
+                                    </button>
+                                    <button type="button" class="risk-chip" data-value="very_safe" onclick="selectRiskLevel('very_safe')">
+                                        <span class="chip-label">매우 안전</span>
+                                    </button>
+                                </div>
+                                <div style="font-size: 12px; color: #718096; margin-top: 8px; text-align: center;" id="riskLevelDescription">
+                                    드문 동시 방문까지 대비
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" onclick="calculateBuffer()" id="calcBufferBtn" disabled style="margin-top: 10px;">
+                                계산하기
+                            </button>
+                            <div class="buffer-result" id="bufferResult" style="display: none;">
+                                <div class="buffer-result-header">
+                                    <span class="buffer-value" id="bufferValue">-</span>
+                                    <span class="buffer-unit">개</span>
+                                </div>
+                                <div class="buffer-explanation" id="bufferExplanation"></div>
+                                <div class="buffer-details" id="bufferDetails"></div>
+                                <button class="btn btn-primary" onclick="applyBufferToThreshold()" id="applyBufferBtn" style="margin-top: 12px; width: 100%;">
+                                    재고 임계값에 적용하기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Memo -->
                     <div class="form-section" id="sectionMemo">
                         <div class="form-section-title">📝 메모</div>
                         <div class="current-value-display" id="currentMemo">현재 메모: 없음</div>
@@ -903,6 +1079,13 @@
                     <input type="text" id="newPatientBirth" maxlength="6" placeholder="6자리 (예: 900101)">
                 </div>
                 <div class="form-group">
+                    <label>방문 주기 (일)</label>
+                    <input type="number" id="newPatientVisitCycle" placeholder="예: 30" min="1">
+                    <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                        환자가 평균적으로 몇 일마다 방문하는지 입력하세요
+                    </div>
+                </div>
+                <div class="form-group">
                     <label>환자 메모</label>
                     <textarea id="newPatientMemo" placeholder="환자에 대한 메모..."></textarea>
                 </div>
@@ -914,13 +1097,48 @@
         </div>
     </div>
 
+    <!-- Dosage Input Modal -->
+    <div id="dosageModal" class="modal">
+        <div class="modal-content" style="max-width: 380px;">
+            <div class="modal-header">
+                <h3 id="dosageModalTitle">💊 1회 처방량 입력</h3>
+                <span class="modal-close" onclick="closeDosageModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px;">
+                    <span id="dosagePatientName" style="font-weight: 600; color: #2d3748;"></span>
+                    <span id="dosagePatientInfo" style="color: #718096; font-size: 13px;"></span>
+                </div>
+                <div class="form-group">
+                    <label>1회 처방량 *</label>
+                    <input type="number" id="inputDosage" placeholder="예: 30" min="1" value="1">
+                    <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                        이 환자에게 한 번 방문 시 처방하는 약품 수량
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDosageModal()">취소</button>
+                <button class="btn btn-primary" onclick="confirmDosageModal()" id="dosageModalBtn">추가</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let managedDrugs = [];
         let selectedDrugCode = null;
         let selectedPatientIds = [];
+        let selectedPatientData = [];  // {patientId, name, birth, visitCycle, dosage}
         let modalFlag = false;
         let isEditMode = false;
         let searchTimeout = null;
+
+        // Dosage modal state
+        let pendingPatient = null;
+        let isEditingDosage = false;  // true when editing existing patient's dosage
+
+        // Buffer calculation state
+        let lastCalculatedBuffer = null;
 
         // Original data for change tracking
         let originalData = {
@@ -1055,7 +1273,9 @@
             isEditMode = false;
             selectedDrugCode = null;
             selectedPatientIds = [];
+            selectedPatientData = [];
             modalFlag = false;
+            lastCalculatedBuffer = null;
 
             // Reset original data
             originalData = {
@@ -1090,7 +1310,11 @@
             document.getElementById('currentThreshold').textContent = '현재 설정: 디폴트 기준값 사용';
             document.getElementById('currentMemo').textContent = '현재 메모: 없음';
             updateFlagUI();
-            renderPatientTags();
+            renderPatientTagsWithDosage();
+
+            // Reset buffer calculation
+            document.getElementById('bufferResult').style.display = 'none';
+            updateBufferCalcButton();
 
             // Disable save button
             document.getElementById('saveBtn').disabled = true;
@@ -1165,9 +1389,21 @@
                         modalFlag = d.special_flag;
                         updateFlagUI();
 
-                        // Patients
+                        // Patients - load with dosage info
                         selectedPatientIds = d.patients.map(p => p['환자ID']);
-                        renderPatientTags(d.patients);
+                        selectedPatientData = d.patients.map(p => ({
+                            patientId: p['환자ID'],
+                            name: p['환자명'],
+                            birth: p['주민번호_앞자리'] || '',
+                            visitCycle: p['방문주기_일'] || 30,
+                            dosage: p['1회_처방량'] || 1
+                        }));
+                        renderPatientTagsWithDosage();
+
+                        // Reset buffer calculation
+                        lastCalculatedBuffer = null;
+                        document.getElementById('bufferResult').style.display = 'none';
+                        updateBufferCalcButton();
 
                         // Disable save button initially
                         document.getElementById('saveBtn').disabled = true;
@@ -1406,8 +1642,9 @@
                             const filtered = data.data.filter(p => !selectedPatientIds.includes(p['환자ID']));
                             if (filtered.length > 0) {
                                 resultsDiv.innerHTML = filtered.map(p => `
-                                    <div class="patient-result-item" onclick="addPatient(${p['환자ID']}, '${escapeHtml(p['환자명'])}', '${p['주민번호_앞자리'] || ''}')">
+                                    <div class="patient-result-item" onclick="openDosageModal(${p['환자ID']}, '${escapeHtml(p['환자명'])}', '${p['주민번호_앞자리'] || ''}', ${p['방문주기_일'] || 30})">
                                         ${p['환자명']}${p['주민번호_앞자리'] ? ' (' + p['주민번호_앞자리'] + ')' : ''}
+                                        ${p['방문주기_일'] ? '<span style="color: #718096; font-size: 12px; margin-left: 8px;">' + p['방문주기_일'] + '일 주기</span>' : ''}
                                     </div>
                                 `).join('');
                             } else {
@@ -1447,6 +1684,7 @@
         function openPatientModal() {
             document.getElementById('newPatientName').value = '';
             document.getElementById('newPatientBirth').value = '';
+            document.getElementById('newPatientVisitCycle').value = '';
             document.getElementById('newPatientMemo').value = '';
             document.getElementById('patientModal').classList.add('visible');
         }
@@ -1455,9 +1693,242 @@
             document.getElementById('patientModal').classList.remove('visible');
         }
 
+        // Dosage Modal Functions
+        function openDosageModal(patientId, name, birth, visitCycle, currentDosage = 1, editMode = false) {
+            pendingPatient = { patientId, name, birth, visitCycle: visitCycle || 30 };
+            isEditingDosage = editMode;
+
+            document.getElementById('dosagePatientName').textContent = name;
+            document.getElementById('dosagePatientInfo').textContent = birth ? ` (${birth})` : '';
+            document.getElementById('inputDosage').value = currentDosage;
+
+            // Update modal title and button based on mode
+            if (editMode) {
+                document.getElementById('dosageModalTitle').textContent = '✏️ 처방량 수정';
+                document.getElementById('dosageModalBtn').textContent = '수정';
+            } else {
+                document.getElementById('dosageModalTitle').textContent = '💊 1회 처방량 입력';
+                document.getElementById('dosageModalBtn').textContent = '추가';
+            }
+
+            document.getElementById('dosageModal').classList.add('visible');
+        }
+
+        function openEditDosageModal(patientId) {
+            const patient = selectedPatientData.find(p => p.patientId === patientId);
+            if (!patient) return;
+
+            openDosageModal(
+                patient.patientId,
+                patient.name,
+                patient.birth,
+                patient.visitCycle,
+                patient.dosage,
+                true  // editMode = true
+            );
+        }
+
+        function closeDosageModal() {
+            document.getElementById('dosageModal').classList.remove('visible');
+            pendingPatient = null;
+            isEditingDosage = false;
+        }
+
+        function confirmDosageModal() {
+            if (!pendingPatient) return;
+
+            const dosage = parseInt(document.getElementById('inputDosage').value) || 1;
+
+            if (isEditingDosage) {
+                // Update existing patient's dosage
+                const patient = selectedPatientData.find(p => p.patientId === pendingPatient.patientId);
+                if (patient) {
+                    patient.dosage = dosage;
+                    renderPatientTagsWithDosage();
+                    // Hide buffer result when dosage changes
+                    document.getElementById('bufferResult').style.display = 'none';
+                    lastCalculatedBuffer = null;
+                    checkChanges();
+                }
+            } else {
+                // Add new patient
+                addPatientWithDosage(
+                    pendingPatient.patientId,
+                    pendingPatient.name,
+                    pendingPatient.birth,
+                    pendingPatient.visitCycle,
+                    dosage
+                );
+            }
+
+            closeDosageModal();
+        }
+
+        // Keep old function name for backward compatibility
+        function confirmAddPatientWithDosage() {
+            confirmDosageModal();
+        }
+
+        function addPatientWithDosage(patientId, name, birth, visitCycle, dosage) {
+            if (selectedPatientIds.includes(patientId)) return;
+
+            selectedPatientIds.push(patientId);
+            selectedPatientData.push({
+                patientId, name, birth,
+                visitCycle: visitCycle || 30,
+                dosage: dosage || 1
+            });
+
+            renderPatientTagsWithDosage();
+            updateBufferCalcButton();
+            checkChanges();
+        }
+
+        function renderPatientTagsWithDosage() {
+            const container = document.getElementById('patientTags');
+            if (selectedPatientData.length === 0) {
+                container.innerHTML = '<span style="color: #a0aec0; font-size: 13px;">연결된 환자가 없습니다</span>';
+                return;
+            }
+
+            container.innerHTML = selectedPatientData.map(p => `
+                <span class="patient-tag">
+                    <span class="tag-content" onclick="openEditDosageModal(${p.patientId})" title="클릭하여 처방량 수정">
+                        ${escapeHtml(p.name)}${p.birth ? ' (' + p.birth + ')' : ''}
+                        <span class="patient-dosage-badge">${p.dosage}개/회</span>
+                    </span>
+                    <span class="remove-btn" onclick="removePatientWithData(${p.patientId})">&times;</span>
+                </span>
+            `).join('');
+        }
+
+        function removePatientWithData(patientId) {
+            selectedPatientIds = selectedPatientIds.filter(id => id !== patientId);
+            selectedPatientData = selectedPatientData.filter(p => p.patientId !== patientId);
+            renderPatientTagsWithDosage();
+            updateBufferCalcButton();
+            // Hide buffer result when patients change
+            document.getElementById('bufferResult').style.display = 'none';
+            lastCalculatedBuffer = null;
+            checkChanges();
+        }
+
+        function updateBufferCalcButton() {
+            const hasPatients = selectedPatientData.length > 0;
+            document.getElementById('calcBufferBtn').disabled = !hasPatients;
+            if (!hasPatients) {
+                document.getElementById('bufferResult').style.display = 'none';
+            }
+        }
+
+        // Buffer Calculation Functions
+        let selectedRiskLevel = 'safe';  // Default value
+
+        function selectRiskLevel(level) {
+            selectedRiskLevel = level;
+
+            // Update UI
+            document.querySelectorAll('.risk-chip').forEach(chip => {
+                chip.classList.remove('selected');
+                if (chip.dataset.value === level) {
+                    chip.classList.add('selected');
+                }
+            });
+
+            // Update description
+            const descriptions = {
+                'relaxed': '흔한 동시 방문만 대비',
+                'normal': '일반적인 동시 방문 대비',
+                'safe': '드문 동시 방문까지 대비',
+                'very_safe': '매우 드문 동시 방문까지 대비'
+            };
+            document.getElementById('riskLevelDescription').textContent = descriptions[level] || '';
+        }
+
+        function calculateBuffer() {
+            if (!selectedDrugCode || selectedPatientData.length === 0) return;
+
+            const riskLevel = selectedRiskLevel;
+            const calcBtn = document.getElementById('calcBufferBtn');
+            calcBtn.disabled = true;
+            calcBtn.textContent = '계산 중...';
+
+            // Send current UI patient data (may not be saved yet)
+            const patientsForCalc = selectedPatientData.map(p => ({
+                patient_id: p.patientId,
+                visit_cycle: p.visitCycle,
+                dosage: p.dosage
+            }));
+
+            fetch(`/api/drug/${selectedDrugCode}/calculate-buffer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ risk_level: riskLevel, patients: patientsForCalc })
+            })
+            .then(r => r.json())
+            .then(data => {
+                calcBtn.disabled = false;
+                calcBtn.textContent = '계산하기';
+
+                if (data.status === 'success') {
+                    displayBufferResult(data.data);
+                } else {
+                    alert(data.message || '계산 실패');
+                }
+            })
+            .catch(error => {
+                calcBtn.disabled = false;
+                calcBtn.textContent = '계산하기';
+                alert('계산 오류: ' + error.message);
+            });
+        }
+
+        function displayBufferResult(result) {
+            lastCalculatedBuffer = result.min_buffer;
+
+            document.getElementById('bufferValue').textContent = result.min_buffer;
+            document.getElementById('bufferExplanation').textContent = result.explanation;
+
+            // Show patient details
+            if (result.all_patients && result.all_patients.length > 0) {
+                let detailsHtml = '<div style="font-weight: 600; margin-bottom: 8px;">환자별 정보:</div>';
+                result.all_patients.forEach(p => {
+                    const includedClass = p['버퍼포함'] ? 'buffer-patient-included' : '';
+                    const includedIcon = p['버퍼포함'] ? '✓ ' : '';
+                    detailsHtml += `
+                        <div class="buffer-patient-item ${includedClass}">
+                            <span>${includedIcon}${p['환자명']} (${p['방문주기_일']}일 주기)</span>
+                            <span>${p['1회_처방량']}개/회</span>
+                        </div>
+                    `;
+                });
+                document.getElementById('bufferDetails').innerHTML = detailsHtml;
+            } else {
+                document.getElementById('bufferDetails').innerHTML = '';
+            }
+
+            document.getElementById('bufferResult').style.display = 'block';
+        }
+
+        function applyBufferToThreshold() {
+            if (lastCalculatedBuffer === null) return;
+
+            document.getElementById('inputStockThreshold').value = lastCalculatedBuffer;
+            checkChanges();
+
+            // Visual feedback
+            const thresholdSection = document.getElementById('sectionThreshold');
+            thresholdSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            thresholdSection.style.animation = 'highlight 1s ease';
+            setTimeout(() => {
+                thresholdSection.style.animation = '';
+            }, 1000);
+        }
+
         function saveNewPatient() {
             const name = document.getElementById('newPatientName').value.trim();
             const birth = document.getElementById('newPatientBirth').value.trim();
+            const visitCycle = document.getElementById('newPatientVisitCycle').value;
             const memo = document.getElementById('newPatientMemo').value.trim();
 
             if (!name) {
@@ -1468,13 +1939,14 @@
             fetch('/api/patient', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, birth, memo })
+                body: JSON.stringify({ name, birth, memo, visit_cycle: visitCycle })
             })
             .then(r => r.json())
             .then(data => {
                 if (data.status === 'success') {
                     closePatientModal();
-                    addPatient(data.patient_id, name, birth);
+                    // Open dosage modal for the newly created patient
+                    openDosageModal(data.patient_id, name, birth, parseInt(visitCycle) || 30);
                     loadStats();
                 } else {
                     alert(data.message);
@@ -1506,6 +1978,12 @@
 
             payload.memo = document.getElementById('inputMemo').value.trim();
             payload.special_flag = modalFlag;
+            // Send patients with dosage info
+            payload.patients = selectedPatientData.map(p => ({
+                patient_id: p.patientId,
+                dosage: p.dosage
+            }));
+            // Keep patient_ids for backward compatibility
             payload.patient_ids = selectedPatientIds;
 
             fetch(`/api/drug-management/${selectedDrugCode}`, {
@@ -1623,11 +2101,16 @@
             if (e.target === this) closePatientModal();
         });
 
+        document.getElementById('dosageModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDosageModal();
+        });
+
         // ESC to close modal
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
                 closePatientModal();
+                closeDosageModal();
             }
         });
     </script>

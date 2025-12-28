@@ -16,8 +16,8 @@
 - `checked_items.sqlite3`: 긴급 약품 확인 상태 저장
 - `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장
 - `drug_memos.sqlite3`: 통합 메모 저장 (모든 보고서에서 공유)
-- `patients.sqlite3`: 환자 정보 저장 (약품-환자 연결용)
-- `drug_patient_map.sqlite3`: 약품-환자 매핑 저장 (many-to-many 관계)
+- `patients.sqlite3`: 환자 정보 저장 (환자명, 주민번호 앞자리, 방문주기_일)
+- `drug_patient_map.sqlite3`: 약품-환자 매핑 저장 (many-to-many 관계, 1회_처방량 포함)
 - `drug_flags.sqlite3`: 특별관리 플래그 저장 (별표 토글)
 - ⚠️ **DB 재생성 시 보존되는 데이터**: "DB 재생성" 버튼은 `recent_inventory`와 `processed_inventory`만 재생성하며, 사용자 설정 DB(`checked_items`, `drug_thresholds`, `drug_memos`, `patients`, `drug_patient_map`, `drug_flags`)는 영향받지 않음
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
@@ -56,6 +56,7 @@
 - **📅 최신 재고 자동 채택**: 각 약품별로 가장 최근 월의 재고 자동 선택
 - **➖ 음수 재고 지원**: 마이너스 재고 정확히 반영
 - **⚙️ 약품 개별 관리**: 통합 관리 페이지에서 재고 수정, 약품명 수정, 임계값 설정, 메모 관리, 환자 태그, 특별관리 플래그를 한 곳에서 관리
+- **📊 최소 재고 버퍼 계산**: 환자별 방문주기와 처방량 기반으로 포아송 이항분포를 적용하여 동시 방문 확률을 계산하고, 허용 리스크 수준에 따라 필요한 최소 재고 버퍼를 자동 산출
 
 #### 워크플로우 1: 단순 재고 관리 보고서
 - **🎯 사용자 정의 이동평균**: 1~12개월 중 선택 가능 (기본 3개월)
@@ -308,6 +309,7 @@ yak-jaego/
 ├── patients_db.py                 # patients.sqlite3 관리 모듈 (환자 정보)
 ├── drug_patient_map_db.py         # drug_patient_map.sqlite3 관리 모듈 (약품-환자 매핑)
 ├── drug_flags_db.py               # drug_flags.sqlite3 관리 모듈 (특별관리 플래그)
+├── buffer_calculator.py           # 최소 재고 버퍼 계산 모듈 (포아송 이항분포)
 ├── inventory_updater.py           # 재고 업데이트 모듈 (today 파일 → DB)
 ├── utils.py                       # 공통 유틸리티 함수 (Excel 파일 읽기 포함)
 ├── requirements.txt               # Python 의존성 목록
@@ -487,6 +489,28 @@ for month in months_reversed:
 - 다양한 Excel 형식 자동 감지 및 처리
 - UPSERT 연산으로 안전한 업데이트
 - 중복 실행해도 문제없음
+
+### buffer_calculator.py - 최소 재고 버퍼 계산
+
+#### 주요 기능:
+- **포아송 이항분포 기반 동시 방문 확률 계산**
+  - N명의 환자가 각각 p_i = 1/방문주기_일 확률로 특정 일에 방문
+  - 동시에 k명 이상 방문할 확률을 동적 프로그래밍으로 효율적 계산
+- **허용 리스크 수준별 버퍼 산출**
+  - `relaxed` (절약): 흔한 동시 방문만 대비
+  - `normal` (보통): 일반적인 동시 방문 대비
+  - `safe` (안전, 권장): 드문 동시 방문까지 대비
+  - `very_safe` (매우 안전): 매우 드문 동시 방문까지 대비
+  - Threshold 값: 3%, 0.3%, 0.03%, 0.003% (10x 간격)
+  - 10x 간격 선택 이유: 포아송 분포에서 연속된 k값(동시 방문자 수) 간 확률 비율이 일반적으로 5~20x 범위이므로, 10x 간격이 각 레벨마다 다른 버퍼 결과를 산출하기에 적절함
+- **최소 버퍼 계산 로직**
+  - 허용 리스크 이하가 되는 최소 동시 방문자 수(k) 결정
+  - 상위 k명의 처방량 합산으로 필요 버퍼 산출
+  - 환자별 처방량, 방문확률, 버퍼 포함 여부 상세 반환
+
+#### 데이터 요구사항:
+- `patients_db.sqlite3`: 환자의 `방문주기_일` 정보
+- `drug_patient_map.sqlite3`: 약품-환자 매핑 및 `1회_처방량` 정보
 
 ### utils.py - 공통 유틸리티 함수
 

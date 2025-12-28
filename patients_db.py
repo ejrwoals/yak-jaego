@@ -48,6 +48,12 @@ def init_db():
         # 검색용 인덱스
         cursor.execute(f'CREATE INDEX IF NOT EXISTS idx_patient_name ON {TABLE_NAME}(환자명)')
 
+        # 기존 테이블에 방문주기_일 컬럼이 없으면 추가 (마이그레이션)
+        cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+        columns = [col[1] for col in cursor.fetchall()]
+        if '방문주기_일' not in columns:
+            cursor.execute(f'ALTER TABLE {TABLE_NAME} ADD COLUMN 방문주기_일 INTEGER')
+
         conn.commit()
         conn.close()
         return True
@@ -80,7 +86,7 @@ def get_patient(환자ID):
         cursor = conn.cursor()
 
         cursor.execute(f'''
-            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시
+            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시, 방문주기_일
             FROM {TABLE_NAME} WHERE 환자ID = ?
         ''', (환자ID,))
         row = cursor.fetchone()
@@ -93,7 +99,8 @@ def get_patient(환자ID):
                 '주민번호_앞자리': row[2],
                 '메모': row[3],
                 '생성일시': row[4],
-                '수정일시': row[5]
+                '수정일시': row[5],
+                '방문주기_일': row[6]
             }
         return None
     except Exception as e:
@@ -117,7 +124,7 @@ def get_all_patients():
         cursor = conn.cursor()
 
         cursor.execute(f'''
-            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시
+            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시, 방문주기_일
             FROM {TABLE_NAME}
             ORDER BY 환자명 ASC
         ''')
@@ -129,7 +136,8 @@ def get_all_patients():
                 '주민번호_앞자리': row[2],
                 '메모': row[3],
                 '생성일시': row[4],
-                '수정일시': row[5]
+                '수정일시': row[5],
+                '방문주기_일': row[6]
             }
             for row in cursor.fetchall()
         ]
@@ -165,7 +173,7 @@ def search_patients(keyword, limit=20):
 
         search_pattern = f'%{keyword}%'
         cursor.execute(f'''
-            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시
+            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시, 방문주기_일
             FROM {TABLE_NAME}
             WHERE 환자명 LIKE ?
             ORDER BY 환자명 ASC
@@ -179,7 +187,8 @@ def search_patients(keyword, limit=20):
                 '주민번호_앞자리': row[2],
                 '메모': row[3],
                 '생성일시': row[4],
-                '수정일시': row[5]
+                '수정일시': row[5],
+                '방문주기_일': row[6]
             }
             for row in cursor.fetchall()
         ]
@@ -191,7 +200,7 @@ def search_patients(keyword, limit=20):
         return []
 
 
-def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID=None):
+def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID=None, 방문주기_일=None):
     """
     환자 생성/수정
 
@@ -200,6 +209,7 @@ def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID
         주민번호_앞자리 (str): 주민번호 앞 6자리 (선택)
         메모 (str): 환자 메모 (선택)
         환자ID (int): 수정 시 환자 ID (없으면 새로 생성)
+        방문주기_일 (int): 환자의 평균 방문 주기 (일 단위, 선택)
 
     Returns:
         dict: {'success': bool, 'message': str, 'patient_id': int, 'action': 'create'|'update'}
@@ -217,15 +227,16 @@ def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID
         환자명 = 환자명.strip()
         주민번호_앞자리 = 주민번호_앞자리.strip() if 주민번호_앞자리 else None
         메모 = 메모.strip() if 메모 else None
+        방문주기_일 = int(방문주기_일) if 방문주기_일 else None
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         if 환자ID:
             # UPDATE
             cursor.execute(f'''
                 UPDATE {TABLE_NAME}
-                SET 환자명 = ?, 주민번호_앞자리 = ?, 메모 = ?, 수정일시 = ?
+                SET 환자명 = ?, 주민번호_앞자리 = ?, 메모 = ?, 방문주기_일 = ?, 수정일시 = ?
                 WHERE 환자ID = ?
-            ''', (환자명, 주민번호_앞자리, 메모, now, 환자ID))
+            ''', (환자명, 주민번호_앞자리, 메모, 방문주기_일, now, 환자ID))
 
             if cursor.rowcount > 0:
                 conn.commit()
@@ -237,9 +248,9 @@ def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID
         else:
             # INSERT
             cursor.execute(f'''
-                INSERT INTO {TABLE_NAME} (환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (환자명, 주민번호_앞자리, 메모, now, now))
+                INSERT INTO {TABLE_NAME} (환자명, 주민번호_앞자리, 메모, 방문주기_일, 생성일시, 수정일시)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (환자명, 주민번호_앞자리, 메모, 방문주기_일, now, now))
 
             patient_id = cursor.lastrowid
             conn.commit()
@@ -339,7 +350,7 @@ def get_patient_by_name_and_birth(환자명, 주민번호_앞자리):
         cursor = conn.cursor()
 
         cursor.execute(f'''
-            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시
+            SELECT 환자ID, 환자명, 주민번호_앞자리, 메모, 생성일시, 수정일시, 방문주기_일
             FROM {TABLE_NAME}
             WHERE 환자명 = ? AND (주민번호_앞자리 = ? OR (주민번호_앞자리 IS NULL AND ? IS NULL))
         ''', (환자명, 주민번호_앞자리, 주민번호_앞자리))
@@ -353,7 +364,8 @@ def get_patient_by_name_and_birth(환자명, 주민번호_앞자리):
                 '주민번호_앞자리': row[2],
                 '메모': row[3],
                 '생성일시': row[4],
-                '수정일시': row[5]
+                '수정일시': row[5],
+                '방문주기_일': row[6]
             }
         return None
     except Exception as e:
