@@ -148,6 +148,47 @@ def get_drugs_for_patient(환자ID):
         return []
 
 
+def get_drugs_for_patient_with_dosage(환자ID):
+    """
+    특정 환자에 연결된 약품 목록과 처방량 조회
+
+    Args:
+        환자ID (int): 환자 ID
+
+    Returns:
+        list: [{'약품코드': str, '연결일시': str, '1회_처방량': int}, ...]
+    """
+    if not db_exists():
+        init_db()
+        return []
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f'''
+            SELECT 약품코드, 생성일시, "1회_처방량"
+            FROM {TABLE_NAME}
+            WHERE 환자ID = ?
+            ORDER BY 생성일시 DESC
+        ''', (환자ID,))
+
+        drugs = [
+            {
+                '약품코드': row[0],
+                '연결일시': row[1],
+                '1회_처방량': row[2] if row[2] else 1
+            }
+            for row in cursor.fetchall()
+        ]
+        conn.close()
+
+        return drugs
+    except Exception as e:
+        print(f"환자-약품 매핑(처방량 포함) 조회 실패: {e}")
+        return []
+
+
 def link_patient(약품코드, 환자ID, 처방량=1):
     """
     약품과 환자 연결

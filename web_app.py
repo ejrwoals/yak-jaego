@@ -1317,6 +1317,9 @@ def create_patient():
         if not 환자명:
             return jsonify({'status': 'error', 'message': '환자명은 필수입니다.'}), 400
 
+        if not 주민번호_앞자리:
+            return jsonify({'status': 'error', 'message': '주민번호 앞자리는 필수입니다.'}), 400
+
         result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모, 방문주기_일=방문주기_일)
 
         if result['success']:
@@ -1359,6 +1362,9 @@ def update_patient(patient_id):
 
         if not 환자명:
             return jsonify({'status': 'error', 'message': '환자명은 필수입니다.'}), 400
+
+        if not 주민번호_앞자리:
+            return jsonify({'status': 'error', 'message': '주민번호 앞자리는 필수입니다.'}), 400
 
         result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모, 환자ID=patient_id)
 
@@ -1464,6 +1470,195 @@ def unlink_drug_patient(drug_code, patient_id):
             return jsonify({'status': 'error', 'message': result['message']}), 404
 
     except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 환자 관리 페이지 (v3.16)
+# ============================================================
+
+@app.route('/patient/manage')
+def patient_manage_page():
+    """환자 관리 페이지"""
+    return render_template('patient_manage.html')
+
+
+@app.route('/api/patients-with-drugs', methods=['GET'])
+def get_patients_with_drugs():
+    """환자 목록 + 약품 수 + 부족 상태 조회"""
+    try:
+        patients = patients_db.get_all_patients()
+
+        result = []
+        for patient in patients:
+            patient_id = patient['환자ID']
+
+            # 연결된 약품 목록 조회 (처방량 포함)
+            drugs = drug_patient_map_db.get_drugs_for_patient_with_dosage(patient_id)
+            drug_count = len(drugs)
+
+            # 각 약품의 재고 상태 확인
+            shortage_count = 0
+            exact_count = 0
+            for drug in drugs:
+                drug_code = drug['약품코드']
+                dosage = drug.get('1회_처방량', 1)
+
+                # 재고 조회
+                inventory = inventory_db.get_inventory(drug_code)
+                if inventory:
+                    current_stock = inventory.get('현재_재고수량', 0)
+                    if current_stock < dosage:
+                        shortage_count += 1
+                    elif current_stock == dosage:
+                        exact_count += 1
+
+            result.append({
+                'patient_id': patient_id,
+                'patient_name': patient['환자명'],
+                'birth': patient.get('주민번호_앞자리', ''),
+                'memo': patient.get('메모', ''),
+                'visit_cycle': patient.get('방문주기_일'),
+                'drug_count': drug_count,
+                'shortage_count': shortage_count,
+                'exact_count': exact_count,
+                'has_shortage': shortage_count > 0,
+                'has_exact': exact_count > 0
+            })
+
+        # 정렬: 부족 약품 있는 환자 우선, 그 다음 부족 개수 내림차순
+        result.sort(key=lambda x: (-int(x['has_shortage']), -x['shortage_count'], x['patient_name']))
+
+        return jsonify({
+            'status': 'success',
+            'count': len(result),
+            'data': result
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient/<int:patient_id>/drugs-with-stock', methods=['GET'])
+def get_patient_drugs_with_stock(patient_id):
+    """환자별 약품 상세 (재고 포함)"""
+    try:
+        # 환자 확인
+        patient = patients_db.get_patient(patient_id)
+        if not patient:
+            return jsonify({'status': 'error', 'message': '환자를 찾을 수 없습니다.'}), 404
+
+        # 연결된 약품 목록 조회 (처방량 포함)
+        drugs = drug_patient_map_db.get_drugs_for_patient_with_dosage(patient_id)
+
+        result = []
+        for drug_mapping in drugs:
+            drug_code = drug_mapping['약품코드']
+            dosage = drug_mapping.get('1회_처방량', 1)
+
+            # 재고 정보 조회
+            inventory = inventory_db.get_inventory(drug_code)
+            if not inventory:
+                continue
+
+            current_stock = inventory.get('현재_재고수량', 0)
+
+            # 상태 판단: 부족 < 딱맞음 = 충분 >
+            if current_stock < dosage:
+                status = 'shortage'
+            elif current_stock == dosage:
+                status = 'exact'
+            else:
+                status = 'sufficient'
+
+            result.append({
+                'drug_code': drug_code,
+                'drug_name': inventory.get('약품명', ''),
+                'company': inventory.get('제약회사', ''),
+                'dosage': dosage,
+                'current_stock': current_stock,
+                'status': status,
+                'linked_at': drug_mapping.get('연결일시', '')
+            })
+
+        # 재고 상태 순서로 정렬 (부족 > 딱맞음 > 충분)
+        status_order = {'shortage': 0, 'exact': 1, 'sufficient': 2}
+        result.sort(key=lambda x: status_order.get(x['status'], 3))
+
+        return jsonify({
+            'status': 'success',
+            'patient': {
+                'id': patient_id,
+                'name': patient['환자명'],
+                'birth': patient.get('주민번호_앞자리', ''),
+                'memo': patient.get('메모', ''),
+                'visit_cycle': patient.get('방문주기_일')
+            },
+            'drug_count': len(result),
+            'shortage_count': len([d for d in result if d['status'] == 'shortage']),
+            'exact_count': len([d for d in result if d['status'] == 'exact']),
+            'drugs': result
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient/<int:patient_id>/link-drug', methods=['POST'])
+def link_drug_to_patient(patient_id):
+    """환자에 약품 연결 추가"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        dosage = data.get('dosage', 1)
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 필요합니다.'}), 400
+
+        # 환자 확인
+        patient = patients_db.get_patient(patient_id)
+        if not patient:
+            return jsonify({'status': 'error', 'message': '환자를 찾을 수 없습니다.'}), 404
+
+        # 약품 확인
+        inventory = inventory_db.get_inventory(drug_code)
+        if not inventory:
+            return jsonify({'status': 'error', 'message': '약품을 찾을 수 없습니다.'}), 404
+
+        # 연결
+        result = drug_patient_map_db.link_patient(drug_code, patient_id, dosage)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/patient/<int:patient_id>/unlink-drug/<drug_code>', methods=['DELETE'])
+def unlink_drug_from_patient(patient_id, drug_code):
+    """환자와 약품 연결 해제"""
+    try:
+        result = drug_patient_map_db.unlink_patient(drug_code, patient_id)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 404
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 

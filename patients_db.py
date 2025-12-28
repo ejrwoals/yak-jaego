@@ -220,6 +220,9 @@ def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID
     if not 환자명 or not 환자명.strip():
         return {'success': False, 'message': '환자명은 필수입니다.', 'patient_id': None, 'action': None}
 
+    if not 주민번호_앞자리 or not 주민번호_앞자리.strip():
+        return {'success': False, 'message': '주민번호 앞자리는 필수입니다.', 'patient_id': None, 'action': None}
+
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -258,8 +261,13 @@ def upsert_patient(환자명, 주민번호_앞자리=None, 메모=None, 환자ID
             return {'success': True, 'message': f'{환자명} 환자가 등록되었습니다.', 'patient_id': patient_id, 'action': 'create'}
 
     except sqlite3.IntegrityError:
+        conn.close()
         return {'success': False, 'message': '동일한 환자명과 주민번호 앞자리 조합이 이미 존재합니다.', 'patient_id': None, 'action': None}
     except Exception as e:
+        try:
+            conn.close()
+        except:
+            pass
         print(f"환자 저장 실패: {e}")
         return {'success': False, 'message': str(e), 'patient_id': None, 'action': None}
 

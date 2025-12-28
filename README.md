@@ -16,7 +16,7 @@
 - `checked_items.sqlite3`: 긴급 약품 확인 상태 저장
 - `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장
 - `drug_memos.sqlite3`: 통합 메모 저장 (모든 보고서에서 공유)
-- `patients.sqlite3`: 환자 정보 저장 (환자명, 주민번호 앞자리, 방문주기_일)
+- `patients.sqlite3`: 환자 정보 저장 (환자명, 주민번호 앞자리(필수, 6자리), 방문주기_일)
 - `drug_patient_map.sqlite3`: 약품-환자 매핑 저장 (many-to-many 관계, 1회_처방량 포함)
 - `drug_flags.sqlite3`: 특별관리 플래그 저장 (별표 토글)
 - ⚠️ **DB 재생성 시 보존되는 데이터**: "DB 재생성" 버튼은 `recent_inventory`와 `processed_inventory`만 재생성하며, 사용자 설정 DB(`checked_items`, `drug_thresholds`, `drug_memos`, `patients`, `drug_patient_map`, `drug_flags`)는 영향받지 않음
@@ -56,6 +56,7 @@
 - **📅 최신 재고 자동 채택**: 각 약품별로 가장 최근 월의 재고 자동 선택
 - **➖ 음수 재고 지원**: 마이너스 재고 정확히 반영
 - **⚙️ 약품 개별 관리**: 통합 관리 페이지에서 재고 수정, 약품명 수정, 임계값 설정, 메모 관리, 환자 태그, 특별관리 플래그를 한 곳에서 관리
+- **👥 환자 관리**: 환자 관리 페이지(`/patient/manage`)에서 환자별 약품 재고 상태를 한눈에 확인 (부족/딱맞음/충분 3단계 표시)
 - **📊 최소 재고 버퍼 계산**: 환자별 방문주기와 처방량 기반으로 포아송 이항분포를 적용하여 동시 방문 확률을 계산하고, 허용 리스크 수준에 따라 필요한 최소 재고 버퍼를 자동 산출
 
 #### 워크플로우 1: 단순 재고 관리 보고서
@@ -285,6 +286,7 @@ yak-jaego/
 ├── templates/                     # 웹 UI HTML 템플릿 폴더
 │   ├── index.html                 # 랜딩 페이지
 │   ├── drug_manage.html           # 약품 개별 관리 페이지 (통합 관리)
+│   ├── patient_manage.html        # 환자 관리 페이지 (환자별 약품 재고 상태)
 │   ├── workflow_simple.html       # 단순 재고 관리 워크플로우 페이지
 │   ├── workflow_timeseries.html   # 상세 재고 관리 워크플로우 페이지
 │   ├── workflow_order.html        # 주문 계산 워크플로우 페이지

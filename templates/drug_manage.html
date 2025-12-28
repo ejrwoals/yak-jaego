@@ -936,7 +936,16 @@
 
                 <!-- Editable fields (hidden until drug selected) -->
                 <div class="editable-fields-section" id="editableFieldsSection">
-                    <!-- 1. Drug Name Edit -->
+                    <!-- 1. Memo -->
+                    <div class="form-section" id="sectionMemo">
+                        <div class="form-section-title">📝 메모</div>
+                        <div class="current-value-display" id="currentMemo">현재 메모: 없음</div>
+                        <div class="form-group">
+                            <textarea id="inputMemo" placeholder="메모를 입력하세요..." oninput="checkChanges()"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 2. Drug Name Edit -->
                     <div class="form-section" id="sectionDrugName">
                         <div class="form-section-title">📦 약품명 수정</div>
                         <div class="current-value-display" id="currentDrugName">현재 약품명: -</div>
@@ -948,7 +957,7 @@
 
                     <!-- 2. Stock Edit -->
                     <div class="form-section" id="sectionStock">
-                        <div class="form-section-title">📊 재고 수정</div>
+                        <div class="form-section-title">🔢 재고 수정</div>
                         <div class="current-value-display" id="currentStock">현재 재고: -</div>
                         <div class="form-group">
                             <label>새 재고수량 (변경 시에만 입력)</label>
@@ -1042,15 +1051,6 @@
                                     재고 임계값에 적용하기
                                 </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- 6. Memo -->
-                    <div class="form-section" id="sectionMemo">
-                        <div class="form-section-title">📝 메모</div>
-                        <div class="current-value-display" id="currentMemo">현재 메모: 없음</div>
-                        <div class="form-group">
-                            <textarea id="inputMemo" placeholder="메모를 입력하세요..." oninput="checkChanges()"></textarea>
                         </div>
                     </div>
                 </div>
