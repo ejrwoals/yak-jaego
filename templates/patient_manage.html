@@ -48,21 +48,30 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            background: #e53e3e;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 0.95em;
+            font-weight: 600;
             cursor: pointer;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 14px;
             z-index: 1000;
         }
 
         .btn-shutdown:hover {
-            background: #c53030;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+        }
+
+        .btn-shutdown:active {
+            transform: translateY(0);
         }
 
         /* Stats Bar */
@@ -787,6 +796,27 @@
         </div>
     </div>
 
+    <!-- Confirm Drug Registration Modal -->
+    <div id="confirmDrugModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>💊 약품 등록</h3>
+                <span class="modal-close" onclick="closeConfirmDrugModal(false)">&times;</span>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+                <div style="font-size: 48px; margin-bottom: 16px;">💊</div>
+                <div style="font-size: 16px; color: #2d3748; line-height: 1.6;">
+                    등록한 <strong id="confirmPatientName"></strong> 환자의<br>
+                    사용 약품을 등록하시겠습니까?
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: center; gap: 12px;">
+                <button class="btn btn-secondary" onclick="closeConfirmDrugModal(false)" style="min-width: 100px;">나중에</button>
+                <button class="btn btn-primary" onclick="closeConfirmDrugModal(true)" style="min-width: 100px;">등록하기</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Dosage Modal -->
     <div id="dosageModal" class="modal">
         <div class="modal-content" style="max-width: 380px;">
@@ -825,6 +855,7 @@
         let patientDrugs = [];  // Current patient's drugs in modal
         let searchTimeout = null;
         let pendingDrug = null;  // For dosage modal
+        let pendingNewPatient = null;  // For confirm drug registration modal
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -1113,6 +1144,29 @@
             pendingDrug = null;
         }
 
+        // Confirm Drug Registration Modal
+        function openConfirmDrugModal(patientId, patientName) {
+            pendingNewPatient = { id: patientId, name: patientName };
+            document.getElementById('confirmPatientName').textContent = patientName;
+            document.getElementById('confirmDrugModal').classList.add('visible');
+        }
+
+        function closeConfirmDrugModal(shouldRegister) {
+            document.getElementById('confirmDrugModal').classList.remove('visible');
+
+            if (shouldRegister && pendingNewPatient) {
+                const patientId = pendingNewPatient.id;  // 먼저 저장
+                pendingNewPatient = null;
+                // loadPatients 완료 대기 후 관리 모달 열기
+                setTimeout(() => {
+                    openEditModal(patientId);
+                }, 100);
+            } else {
+                pendingNewPatient = null;
+                showStatus('저장되었습니다.', 'success');
+            }
+        }
+
         function confirmDosage() {
             if (!pendingDrug) return;
 
@@ -1252,7 +1306,13 @@
 
                 closePatientModal();
                 loadPatients();
-                showStatus('저장되었습니다.', 'success');
+
+                // 새 환자 생성 시 약품 등록 여부 확인
+                if (!isEditMode && patientId) {
+                    openConfirmDrugModal(patientId, name);
+                } else {
+                    showStatus('저장되었습니다.', 'success');
+                }
 
             } catch (error) {
                 showModalError('저장 실패: ' + error.message);
@@ -1328,7 +1388,13 @@
             if (e.key === 'Escape') {
                 closePatientModal();
                 closeDosageModal();
+                closeConfirmDrugModal(false);
             }
+        });
+
+        // Close confirm modal on outside click
+        document.getElementById('confirmDrugModal').addEventListener('click', function(e) {
+            if (e.target === this) closeConfirmDrugModal(false);
         });
     </script>
 </body>

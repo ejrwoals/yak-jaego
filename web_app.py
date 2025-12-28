@@ -1359,6 +1359,13 @@ def update_patient(patient_id):
         환자명 = data.get('name', '').strip()
         주민번호_앞자리 = data.get('birth', '').strip() if data.get('birth') else None
         메모 = data.get('memo', '').strip() if data.get('memo') else None
+        방문주기_일 = data.get('visit_cycle')
+
+        if 방문주기_일:
+            try:
+                방문주기_일 = int(방문주기_일)
+            except (ValueError, TypeError):
+                방문주기_일 = None
 
         if not 환자명:
             return jsonify({'status': 'error', 'message': '환자명은 필수입니다.'}), 400
@@ -1366,7 +1373,7 @@ def update_patient(patient_id):
         if not 주민번호_앞자리:
             return jsonify({'status': 'error', 'message': '주민번호 앞자리는 필수입니다.'}), 400
 
-        result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모, 환자ID=patient_id)
+        result = patients_db.upsert_patient(환자명, 주민번호_앞자리, 메모, 환자ID=patient_id, 방문주기_일=방문주기_일)
 
         if result['success']:
             return jsonify({
