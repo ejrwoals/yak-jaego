@@ -397,6 +397,81 @@ def generate_new_drugs_table_rows(df, col_map):
     return rows
 
 
+def generate_intermittent_table_rows(df, col_map, months=None):
+    """간헐적 사용 약품 테이블 행 HTML 생성 (인라인 차트 지원)"""
+    import json
+    import ast
+    import re
+
+    cm = col_map
+
+    def parse_list_string(x):
+        if isinstance(x, list):
+            return x
+        if pd.isna(x):
+            return []
+        try:
+            cleaned = re.sub(r'np\.(int64|float64)\(([^)]+)\)', r'\2', str(x))
+            return ast.literal_eval(cleaned)
+        except:
+            return []
+
+    rows = ""
+    for _, row in df.iterrows():
+        stock = row[cm['stock']]
+        ma12 = row[cm['ma12']]
+        drug_code = str(row['약품코드'])
+        drug_type = row.get('약품유형', '미분류')
+        type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
+
+        # 재고 색상: 0이하면 빨간색
+        stock_style = 'color: #c62828; font-weight: bold;' if stock <= 0 else ''
+
+        # 1년 MA 런웨이 계산
+        if ma12 > 0:
+            runway_12 = stock / ma12
+            runway_display = f"{runway_12:.2f}"
+            runway_style = 'color: #c62828; font-weight: bold;' if runway_12 < 1 else ''
+        else:
+            runway_12 = 999
+            runway_display = "재고만 있음"
+            runway_style = 'color: #888;'
+
+        # 인라인 차트용 데이터 생성
+        timeseries = parse_list_string(row.get('월별_조제수량_리스트', []))
+        ma3_list = parse_list_string(row.get('3개월_이동평균_리스트', []))
+
+        chart_data = {
+            'drug_name': row['약품명'] if row['약품명'] else "정보없음",
+            'drug_code': drug_code,
+            'timeseries': timeseries,
+            'ma3_list': ma3_list,
+            'months': months if months else [],
+            'stock': float(stock),
+            'ma12': float(ma12) if not pd.isna(ma12) else 0,
+            'ma3': 0,  # 간헐적 사용 약품은 3개월 MA가 0
+            'runway': runway_display,
+            'ma3_runway': '계산불가'
+        }
+        chart_data_json = html_escape(json.dumps(chart_data, ensure_ascii=False))
+
+        rows += f"""
+            <tr class="clickable-row" data-drug-code="{drug_code}"
+                data-chart-data='{chart_data_json}'
+                onclick="toggleIntermittentChart(this, '{drug_code}')"
+                title="클릭하여 트렌드 차트 보기">
+                <td>{row['약품명']}</td>
+                <td>{row['약품코드']}</td>
+                <td>{row['제약회사']}</td>
+                <td style="text-align: right; {stock_style}">{stock:.0f}</td>
+                <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
+                <td style="text-align: right;">{ma12:.1f}</td>
+                <td style="text-align: right; {runway_style}">{runway_display}</td>
+            </tr>
+"""
+    return rows
+
+
 def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1.0):
     """주문 보고서 HTML 생성 (재사용 가능한 함수)
 
@@ -437,23 +512,35 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
     # 신규 약품 분리 (시계열 데이터가 없는 약품) - 먼저 분리
     new_drugs_df = df[df['신규약품'] == True].copy() if '신규약품' in df.columns else pd.DataFrame()
-
-    # 음수 재고 약품 분리 (신규 약품 제외 - 신규 약품은 이동평균이 없어서 별도 처리)
-    zero_stock_df = df[df[cm['stock']] < 0].copy()
-    if '신규약품' in zero_stock_df.columns:
-        zero_stock_df = zero_stock_df[zero_stock_df['신규약품'] == False]
-    zero_stock_df = zero_stock_df.sort_values(cm['stock'], ascending=True)
-    zero_stock_count = len(zero_stock_df)
     new_drugs_count = len(new_drugs_df)
     if new_drugs_count > 0:
         new_drugs_df = new_drugs_df.sort_values('약품명', ascending=True)
 
-    # 음수 재고 및 신규 약품 제외한 정상 약품
+    # 간헐적 사용 약품 분리 (3개월 이동평균이 0인 약품, 신규 약품 제외)
+    # 3개월간 사용량이 없지만 오늘 사용된 약품 = 간헐적으로 사용되는 약품
+    intermittent_df = df[df[cm['ma3']] == 0].copy()
+    if '신규약품' in intermittent_df.columns:
+        intermittent_df = intermittent_df[intermittent_df['신규약품'] == False]
+    intermittent_df = intermittent_df.sort_values(cm['stock'], ascending=True)  # 재고 적은 순
+    intermittent_count = len(intermittent_df)
+
+    # 음수 재고 약품 분리 (신규 약품, 간헐적 사용 약품 제외)
+    zero_stock_df = df[df[cm['stock']] < 0].copy()
+    if '신규약품' in zero_stock_df.columns:
+        zero_stock_df = zero_stock_df[zero_stock_df['신규약품'] == False]
+    # 간헐적 사용 약품은 별도 모달에서 표시하므로 음수 재고에서 제외
+    zero_stock_df = zero_stock_df[zero_stock_df[cm['ma3']] != 0]
+    zero_stock_df = zero_stock_df.sort_values(cm['stock'], ascending=True)
+    zero_stock_count = len(zero_stock_df)
+
+    # 음수 재고, 신규 약품, 간헐적 사용 약품 제외한 정상 약품
     normal_df = df[df[cm['stock']] >= 0].copy()
     if '신규약품' in normal_df.columns:
         normal_df = normal_df[normal_df['신규약품'] == False]
+    # 간헐적 사용 약품은 별도 모달에서 표시
+    normal_df = normal_df[normal_df[cm['ma3']] != 0]
 
-    # 약품 유형별 분리 (재고 >= 0이고 신규 약품이 아닌 약품만, 음수 재고/신규 약품은 모달에서 별도 표시)
+    # 약품 유형별 분리 (재고 >= 0이고 신규/간헐적 약품이 아닌 약품만)
     dispense_df = normal_df[normal_df['약품유형'] == '전문약'].copy()
     sale_df = normal_df[normal_df['약품유형'] == '일반약'].copy()
     unclassified_df = normal_df[normal_df['약품유형'] == '미분류'].copy()
@@ -493,6 +580,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     sale_rows = generate_table_rows(sale_df, cm, months, runway_threshold, custom_thresholds, all_memos)
     zero_stock_rows = generate_zero_stock_table_rows(zero_stock_df, cm) if zero_stock_count > 0 else ""
     new_drugs_rows = generate_new_drugs_table_rows(new_drugs_df, cm) if new_drugs_count > 0 else ""
+    intermittent_rows = generate_intermittent_table_rows(intermittent_df, cm, months) if intermittent_count > 0 else ""
 
     # 음수 재고 경고 책갈피 HTML
     zero_stock_bookmark = f"""
@@ -512,7 +600,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 <span class="modal-close" onclick="closeZeroStockModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">재고가 0 미만인 약품입니다. 즉시 주문이 필요합니다.</p>
+                <p style="color: #666; margin-bottom: 15px;">💡 음수 재고는 실제 재고보다 더 많이 출고된 상태를 의미합니다. 재고 실사 또는 데이터 확인이 필요합니다.</p>
                 <table class="modal-table-zero-stock">
                     <thead>
                         <tr>
@@ -571,6 +659,46 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         </div>
     </div>
     """ if new_drugs_count > 0 else ""
+
+    # 간헐적 사용 약품 책갈피 HTML
+    intermittent_bookmark = f"""
+        <div class="alert-bookmark intermittent" onclick="openIntermittentModal()">
+            <span class="alert-icon">🔄</span>
+            <span class="alert-title">간헐적 사용</span>
+            <span class="alert-count">{intermittent_count}개</span>
+        </div>
+    """ if intermittent_count > 0 else ""
+
+    # 간헐적 사용 약품 모달 HTML
+    intermittent_modal = f"""
+    <div id="intermittentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #9b59b6;">
+                <h3>🔄 간헐적 사용 약품 ({intermittent_count}개)</h3>
+                <span class="modal-close" onclick="closeIntermittentModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; margin-bottom: 15px;">최근 3개월간 사용량이 없지만 오늘 사용된 약품입니다. 간헐적으로 사용되므로 재고 확보가 필요할 수 있습니다.</p>
+                <table class="modal-table-intermittent">
+                    <thead>
+                        <tr>
+                            <th>약품명</th>
+                            <th>약품코드</th>
+                            <th>제약회사</th>
+                            <th>현재 재고</th>
+                            <th>약품유형</th>
+                            <th>1년 이동평균</th>
+                            <th>런웨이 (개월)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {intermittent_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    """ if intermittent_count > 0 else ""
 
     # 개별 임계값 설정 약품 목록 생성 (상태 분류 포함)
     def get_threshold_status(stock, stock_th, runway, runway_th):
@@ -675,120 +803,90 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
     # 상태 카드 HTML 생성 함수
     def generate_status_card(drug):
-        """개별 상태 카드 HTML 생성 - 임계값 유형별 레이아웃"""
+        """개별 상태 카드 HTML 생성 - 게이지 스타일"""
         status = drug['status']
         status_class = status
 
-        # 약품명 (최대 18자)
-        name = drug['name'][:18] + '...' if len(drug['name']) > 18 else drug['name']
+        # 약품명 (최대 20자)
+        name = drug['name'][:20] + '...' if len(drug['name']) > 20 else drug['name']
 
         # 임계값 유형 판단
         has_stock_th = drug['stock_threshold'] is not None
         has_runway_th = drug['runway_threshold'] is not None
 
-        ratio = drug['ratio']
+        # 게이지 생성
+        gauges_html = ""
 
-        # 메인 정보 생성 (유형별)
-        if has_stock_th and has_runway_th:
-            # 둘 다 설정된 경우: 두 줄로 표시, 프로그레스 바 없음
+        if has_stock_th:
             stock_ratio = (drug['stock'] / drug['stock_threshold']) * 100 if drug['stock_threshold'] > 0 else 100
-            runway_ratio = (drug['runway'] / drug['runway_threshold']) * 100 if drug['runway_threshold'] > 0 else 100
-            main_html = f'''
-                <div class="ct-card-row">
-                    <span class="ct-row-icon">📦</span>
-                    <span class="ct-row-label">현재고:</span>
-                    <span class="ct-row-value">{drug['stock']:.0f}</span>
-                    <span class="ct-row-sep">/</span>
-                    <span class="ct-row-label">목표:</span>
-                    <span class="ct-row-value">{drug['stock_threshold']}개</span>
-                    <span class="ct-row-ratio">({stock_ratio:.0f}%)</span>
-                </div>
-                <div class="ct-card-row">
-                    <span class="ct-row-icon">⏱️</span>
-                    <span class="ct-row-label">런웨이:</span>
-                    <span class="ct-row-value">{drug['runway']:.1f}</span>
-                    <span class="ct-row-sep">/</span>
-                    <span class="ct-row-label">목표:</span>
-                    <span class="ct-row-value">{drug['runway_threshold']}개월</span>
-                    <span class="ct-row-ratio">({runway_ratio:.0f}%)</span>
-                </div>
-            '''
-            # 액션: 재고 기준 우선
-            if drug['order_qty'] and drug['order_qty'] > 0:
-                action_text = f"→ <strong>{drug['order_qty']}개</strong> 주문 권장"
-            else:
-                action_text = "✅ 재고 충분"
-            show_progress = False
-
-        elif has_stock_th:
-            # 재고 임계값만
-            main_html = f'''
-                <div class="ct-card-main">
-                    <span class="ct-main-icon">📦</span>
-                    <span class="ct-main-label">현재고:</span>
-                    <span class="ct-main-value">{drug['stock']:.0f}</span>
-                    <span class="ct-main-sep">/</span>
-                    <span class="ct-main-label">목표:</span>
-                    <span class="ct-main-value">{drug['stock_threshold']}개</span>
-                </div>
-            '''
-            if drug['order_qty'] and drug['order_qty'] > 0:
-                action_text = f"→ <strong>{drug['order_qty']}개</strong> 주문 권장"
-            else:
-                action_text = "✅ 재고 충분"
-            show_progress = True
-
-        elif has_runway_th:
-            # 런웨이 임계값만
-            main_html = f'''
-                <div class="ct-card-main">
-                    <span class="ct-main-icon">⏱️</span>
-                    <span class="ct-main-label">런웨이:</span>
-                    <span class="ct-main-value">{drug['runway']:.1f}</span>
-                    <span class="ct-main-sep">/</span>
-                    <span class="ct-main-label">목표:</span>
-                    <span class="ct-main-value">{drug['runway_threshold']}개월</span>
-                </div>
-            '''
-            # 런웨이 기준 액션 가이드 (수량 포함)
-            if drug.get('runway_gap') and drug.get('runway_order_qty'):
-                action_text = f"→ <strong>{drug['runway_gap']:.1f}개월분({drug['runway_order_qty']}개)</strong> 추가 확보 필요"
-            elif drug.get('runway_gap'):
-                action_text = f"→ <strong>{drug['runway_gap']:.1f}개월분</strong> 추가 확보 필요"
-            else:
-                action_text = "✅ 런웨이 충분"
-            show_progress = True
-
-        else:
-            # 임계값 없음 (예외)
-            main_html = f'<div class="ct-card-main">{drug["stock"]:.0f}개</div>'
-            action_text = "-"
-            show_progress = False
-
-        # 프로그레스 바 (단일 색상)
-        progress_html = ""
-        if show_progress:
-            progress_html = f'''
-                <div class="ct-card-progress">
-                    <div class="ct-progress-bar">
-                        <div class="ct-progress-fill" style="width: {min(ratio, 100)}%;"></div>
+            stock_color = '#38a169' if stock_ratio >= 100 else '#dd6b20' if stock_ratio >= 50 else '#e53e3e'
+            overflow_class = ' overflow' if stock_ratio > 100 else ''
+            # 100% 초과 시 목표 마커 위치 계산
+            target_pos = 100 / stock_ratio * 100 if stock_ratio > 100 else 100
+            gauges_html += f'''
+                <div class="ct-gauge{overflow_class}">
+                    <div class="ct-gauge-header">
+                        <span class="ct-gauge-label">📦 재고</span>
+                        <span class="ct-gauge-current">현재고: <strong>{drug['stock']:.0f}</strong></span>
                     </div>
-                    <span class="ct-progress-text">{ratio:.0f}%</span>
+                    <div class="ct-gauge-bar">
+                        <div class="ct-gauge-fill" style="width: {min(stock_ratio, 100)}%; background: {stock_color};">
+                            <span class="ct-gauge-percent">{stock_ratio:.0f}%</span>
+                        </div>
+                        <div class="ct-gauge-target" style="left: {target_pos}%;">
+                            <span class="ct-target-label">{drug['stock_threshold']}개</span>
+                        </div>
+                    </div>
                 </div>
             '''
+
+        if has_runway_th:
+            runway_ratio = (drug['runway'] / drug['runway_threshold']) * 100 if drug['runway_threshold'] > 0 else 100
+            runway_color = '#38a169' if runway_ratio >= 100 else '#dd6b20' if runway_ratio >= 50 else '#e53e3e'
+            overflow_class = ' overflow' if runway_ratio > 100 else ''
+            # 100% 초과 시 목표 마커 위치 계산
+            target_pos = 100 / runway_ratio * 100 if runway_ratio > 100 else 100
+            gauges_html += f'''
+                <div class="ct-gauge{overflow_class}">
+                    <div class="ct-gauge-header">
+                        <span class="ct-gauge-label">⏱️ 런웨이</span>
+                        <span class="ct-gauge-current">현재: <strong>{drug['runway']:.1f}</strong>개월</span>
+                    </div>
+                    <div class="ct-gauge-bar">
+                        <div class="ct-gauge-fill" style="width: {min(runway_ratio, 100)}%; background: {runway_color};">
+                            <span class="ct-gauge-percent">{runway_ratio:.0f}%</span>
+                        </div>
+                        <div class="ct-gauge-target" style="left: {target_pos}%;">
+                            <span class="ct-target-label">{drug['runway_threshold']}개월</span>
+                        </div>
+                    </div>
+                </div>
+            '''
+
+        # 액션 결정
+        if status == 'safe':
+            action_html = '<div class="ct-card-status safe">✅ 재고 충분</div>'
+        else:
+            if has_stock_th and drug['order_qty'] and drug['order_qty'] > 0:
+                action_html = f'<div class="ct-card-status warning">📦 <strong>{drug["order_qty"]}개</strong> 주문 권장</div>'
+            elif has_runway_th and drug.get('runway_order_qty'):
+                action_html = f'<div class="ct-card-status warning">⏱️ <strong>{drug["runway_order_qty"]}개</strong> 추가 확보</div>'
+            elif has_runway_th and drug.get('runway_gap'):
+                action_html = f'<div class="ct-card-status warning">⏱️ <strong>{drug["runway_gap"]:.1f}개월분</strong> 추가 필요</div>'
+            else:
+                action_html = '<div class="ct-card-status warning">⚠️ 확인 필요</div>'
 
         # 메모 표시 (있는 경우)
         memo_html = ""
         if drug.get('memo'):
-            memo_text = drug['memo'][:30] + '...' if len(drug['memo']) > 30 else drug['memo']
+            memo_text = drug['memo'][:25] + '...' if len(drug['memo']) > 25 else drug['memo']
             memo_html = f'<div class="ct-card-memo" title="{drug["memo"]}">📝 {memo_text}</div>'
 
         return f"""
             <div class="ct-status-card {status_class}">
                 <div class="ct-card-name" title="{drug['name']}">{name}</div>
-                {main_html}
-                {progress_html}
-                <div class="ct-card-action">{action_text}</div>
+                <div class="ct-gauges">{gauges_html}</div>
+                {action_html}
                 {memo_html}
             </div>
         """
@@ -821,14 +919,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             </tr>
 """
 
-    # 개별 설정 책갈피 HTML (주의 필요 개수 표시)
-    bookmark_count_text = f"{attention_count}개 주의" if attention_count > 0 else f"{custom_threshold_count}개"
-    custom_threshold_bookmark = f"""
-        <div class="alert-bookmark custom" onclick="openCustomThresholdModal()">
-            <span class="alert-icon">⚙️</span>
-            <span class="alert-title">개별 설정</span>
-            <span class="alert-count">{bookmark_count_text}</span>
-        </div>
+    # 개별 설정 버튼 HTML (테이블 상단에 표시)
+    attention_badge = f'<span class="ct-btn-attention">{attention_count}</span>' if attention_count > 0 else ''
+    custom_threshold_button = f"""
+        <button class="custom-threshold-btn" onclick="openCustomThresholdModal()">
+            ⚙️ 개별 임계값 설정 약품
+            <span class="ct-btn-count">{custom_threshold_count}개</span>
+            {attention_badge}
+        </button>
     """ if custom_threshold_count > 0 else ""
 
     # 상태 카드 섹션 HTML
@@ -868,34 +966,39 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     # 개별 설정 모달 HTML (상태 카드 섹션 + 테이블)
     custom_threshold_modal = f"""
     <div id="customThresholdModal" class="modal">
-        <div class="modal-content" style="max-width: 1200px;">
-            <div class="modal-header" style="background-color: #805ad5;">
+        <div class="modal-content" style="max-width: 1100px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
                 <h3>⚙️ 개별 임계값 설정 약품 (<span id="customThresholdModalCount">{custom_threshold_count}</span>개)</h3>
                 <span class="modal-close" onclick="closeCustomThresholdModal()">&times;</span>
             </div>
             <div class="modal-body">
                 {status_cards_section}
 
-                <!-- 전체 목록 테이블 -->
+                <!-- 전체 목록 테이블 (토글) -->
                 <div class="ct-table-section">
-                    <div class="ct-table-header">📋 전체 목록</div>
-                    <table class="modal-table-threshold">
-                        <thead>
-                            <tr>
-                                <th>약품명</th>
-                                <th>약품코드</th>
-                                <th>제약회사</th>
-                                <th>현재 재고</th>
-                                <th>약품유형</th>
-                                <th>재고 임계값</th>
-                                <th>런웨이 임계값</th>
-                                <th>메모</th>
-                            </tr>
-                        </thead>
-                        <tbody id="customThresholdTbody">
-                            {custom_threshold_rows}
-                        </tbody>
-                    </table>
+                    <div class="ct-table-header" onclick="toggleFullList()">
+                        <span>📋 전체 목록 ({custom_threshold_count}개)</span>
+                        <span class="ct-table-toggle" id="fullListToggle">▶</span>
+                    </div>
+                    <div class="ct-table-content" id="fullListContent" style="display: none;">
+                        <table class="modal-table-threshold">
+                            <thead>
+                                <tr>
+                                    <th>약품명</th>
+                                    <th>약품코드</th>
+                                    <th>제약회사</th>
+                                    <th>현재 재고</th>
+                                    <th>약품유형</th>
+                                    <th>재고 임계값</th>
+                                    <th>런웨이 임계값</th>
+                                    <th>메모</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customThresholdTbody">
+                                {custom_threshold_rows}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -924,6 +1027,293 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
+        }}
+        .header-top {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }}
+        .header-top h1 {{
+            margin: 0;
+        }}
+        .header-bottom {{
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }}
+        .header-bottom p {{
+            margin: 0;
+            opacity: 0.9;
+        }}
+        .help-btn {{
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.7);
+            background: transparent;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .help-btn:hover {{
+            background: rgba(255,255,255,0.2);
+            border-color: white;
+        }}
+        /* 도움말 모달 */
+        .help-modal {{
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            overflow-y: auto;
+        }}
+        .help-modal-content {{
+            background-color: #fff;
+            margin: 30px auto;
+            padding: 0;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }}
+        .help-modal-header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .help-modal-header h2 {{
+            margin: 0;
+            font-size: 22px;
+        }}
+        .help-modal-close {{
+            font-size: 28px;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }}
+        .help-modal-close:hover {{
+            opacity: 1;
+        }}
+        .help-modal-body {{
+            padding: 25px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }}
+        .help-section {{
+            margin-bottom: 25px;
+        }}
+        .help-section h3 {{
+            color: #2d3748;
+            font-size: 16px;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }}
+        .help-section p {{
+            color: #4a5568;
+            line-height: 1.6;
+            margin: 0 0 10px 0;
+        }}
+        .help-section ul {{
+            color: #4a5568;
+            line-height: 1.8;
+            margin: 0;
+            padding-left: 20px;
+        }}
+        .help-diagram {{
+            margin: 15px 0;
+        }}
+        .diagram-box {{
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'D2Coding', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre;
+            color: #2d3748;
+        }}
+        .help-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 13px;
+        }}
+        .help-table th, .help-table td {{
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .help-table th {{
+            background: #f7fafc;
+            color: #4a5568;
+            font-weight: 600;
+        }}
+        .help-table td {{
+            color: #2d3748;
+        }}
+        .badge-warning {{
+            background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+        }}
+        .badge-info {{
+            background: linear-gradient(135deg, #42a5f5 0%, #1565c0 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+        }}
+        .badge-intermittent {{
+            background: linear-gradient(135deg, #9b59b6 0%, #7d3c98 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+        }}
+        .badge-custom {{
+            background: linear-gradient(135deg, #805ad5 0%, #5b21b6 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+        }}
+        /* 집합 다이어그램 - 무채색 */
+        .category-diagram {{
+            margin: 20px 0;
+        }}
+        .set-outer {{
+            background: #fafafa;
+            border: 2px solid #9e9e9e;
+            border-radius: 16px;
+            padding: 12px;
+        }}
+        .set-label-outer {{
+            font-size: 12px;
+            font-weight: 600;
+            color: #424242;
+            margin-bottom: 10px;
+            text-align: center;
+        }}
+        .set-row {{
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }}
+        .set-new, .set-intermittent, .set-negative, .set-main {{
+            background: #fff;
+            border: 2px solid #757575;
+            border-radius: 8px;
+            padding: 8px 6px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }}
+        .set-new {{ flex: 0 0 75px; }}
+        .set-intermittent {{ flex: 0 0 65px; }}
+        .set-negative, .set-main {{ flex: 1; }}
+        .set-existing {{
+            flex: 1;
+            background: #f5f5f5;
+            border: 2px solid #bdbdbd;
+            border-radius: 12px;
+            padding: 10px;
+        }}
+        .set-label-existing {{
+            font-size: 10px;
+            font-weight: 600;
+            color: #616161;
+            margin-bottom: 8px;
+        }}
+        .set-normal {{
+            flex: 1;
+            background: #eeeeee;
+            border: 2px solid #bdbdbd;
+            border-radius: 10px;
+            padding: 8px;
+        }}
+        .set-label-normal {{
+            font-size: 9px;
+            font-weight: 600;
+            color: #616161;
+            margin-bottom: 6px;
+        }}
+        .set-icon {{
+            font-size: 16px;
+            margin-bottom: 2px;
+        }}
+        .set-title {{
+            font-size: 9px;
+            font-weight: 600;
+            color: #424242;
+            margin-bottom: 1px;
+        }}
+        .set-desc {{
+            font-size: 8px;
+            color: #757575;
+        }}
+        .diagram-overlay-note {{
+            margin-top: 12px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #553c9a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        /* 북마크 리스트 */
+        .bookmark-list {{
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }}
+        .bookmark-item {{
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 3px solid #e2e8f0;
+        }}
+        .bookmark-item:nth-child(1) {{ border-left-color: #c62828; }}
+        .bookmark-item:nth-child(2) {{ border-left-color: #1565c0; }}
+        .bookmark-item:nth-child(3) {{ border-left-color: #7d3c98; }}
+        .bookmark-item:nth-child(4) {{ border-left-color: #5b21b6; }}
+        .bookmark-condition {{
+            flex: 0 0 140px;
+            font-size: 12px;
+            color: #4a5568;
+            font-weight: 500;
+        }}
+        .bookmark-desc {{
+            flex: 1;
+            font-size: 12px;
+            color: #718096;
+            line-height: 1.4;
         }}
         /* 요약 대시보드 스타일 */
         .summary-dashboard {{
@@ -1131,14 +1521,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .alert-bookmark.info:hover {{
             box-shadow: -6px 6px 24px rgba(21, 101, 192, 0.4);
         }}
-        .alert-bookmark.custom {{
-            background: linear-gradient(135deg, rgba(128, 90, 213, 0.75) 0%, rgba(91, 33, 182, 0.85) 100%);
-            box-shadow: -4px 4px 20px rgba(91, 33, 182, 0.3);
+        .alert-bookmark.intermittent {{
+            background: linear-gradient(135deg, rgba(155, 89, 182, 0.75) 0%, rgba(125, 60, 152, 0.85) 100%);
+            box-shadow: -4px 4px 20px rgba(125, 60, 152, 0.3);
             color: white;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }}
-        .alert-bookmark.custom:hover {{
-            box-shadow: -6px 6px 24px rgba(91, 33, 182, 0.4);
+        .alert-bookmark.intermittent:hover {{
+            box-shadow: -6px 6px 24px rgba(125, 60, 152, 0.4);
         }}
 
         /* 모달 스타일 */
@@ -1218,6 +1608,37 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .modal-table-new-drugs td:nth-child(4) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
         .modal-table-new-drugs th:nth-child(5),
         .modal-table-new-drugs td:nth-child(5) {{ width: 10%; white-space: nowrap; }}  /* 약품유형 */
+        /* 간헐적 사용 모달 (7컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 1년이동평균, 런웨이 - 클릭시 인라인 차트 */
+        .modal-table-intermittent th:nth-child(1),
+        .modal-table-intermittent td:nth-child(1) {{ width: 30%; }}  /* 약품명 */
+        .modal-table-intermittent th:nth-child(2),
+        .modal-table-intermittent td:nth-child(2) {{ width: 12%; white-space: nowrap; }}  /* 약품코드 */
+        .modal-table-intermittent th:nth-child(3),
+        .modal-table-intermittent td:nth-child(3) {{ width: 14%; }}  /* 제약회사 */
+        .modal-table-intermittent th:nth-child(4),
+        .modal-table-intermittent td:nth-child(4) {{ width: 10%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
+        .modal-table-intermittent th:nth-child(5),
+        .modal-table-intermittent td:nth-child(5) {{ width: 10%; white-space: nowrap; }}  /* 약품유형 */
+        .modal-table-intermittent th:nth-child(6),
+        .modal-table-intermittent td:nth-child(6) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 1년 이동평균 */
+        .modal-table-intermittent th:nth-child(7),
+        .modal-table-intermittent td:nth-child(7) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 런웨이 */
+        .modal-table-intermittent .clickable-row {{
+            cursor: pointer;
+        }}
+        .modal-table-intermittent .clickable-row:hover {{
+            background-color: rgba(155, 89, 182, 0.1);
+        }}
+        .modal-table-intermittent .clickable-row.chart-expanded {{
+            background-color: rgba(155, 89, 182, 0.15) !important;
+            border-left: 3px solid #9b59b6;
+        }}
+        .modal-table-intermittent .intermittent-chart-row {{
+            background: #f8fafc;
+        }}
+        .modal-table-intermittent .intermittent-chart-row:hover {{
+            background: #f8fafc !important;
+        }}
         /* 개별 임계값 모달 (8컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 재고임계값, 런웨이임계값, 메모 */
         .modal-table-threshold th:nth-child(1),
         .modal-table-threshold td:nth-child(1) {{ width: 22%; }}  /* 약품명 */
@@ -1234,7 +1655,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .modal-table-threshold th:nth-child(7),
         .modal-table-threshold td:nth-child(7) {{ width: 14%; white-space: nowrap; text-align: center; }}  /* 런웨이 임계값 */
         .modal-table-threshold th:nth-child(8),
-        .modal-table-threshold td:nth-child(8) {{ width: 16%; word-break: break-word; }}  /* 메모 */
+        .modal-table-threshold td:nth-child(8) {{ width: 16%; word-break: break-word; white-space: normal; }}  /* 메모 */
 
         /* 상태 카드 섹션 스타일 */
         .ct-status-section {{
@@ -1245,140 +1666,171 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .ct-attention-header {{
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 14px;
-            font-size: 15px;
+            gap: 10px;
+            margin-bottom: 16px;
+            font-size: 16px;
             font-weight: 600;
             color: #c53030;
         }}
         .ct-attention-icon {{
-            font-size: 18px;
+            font-size: 20px;
         }}
         .ct-attention-count {{
             background: #fed7d7;
             color: #c53030;
-            padding: 3px 10px;
+            padding: 4px 12px;
             border-radius: 12px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
         }}
         .ct-cards-container {{
             display: flex;
             flex-wrap: wrap;
-            gap: 14px;
-            margin-bottom: 16px;
+            gap: 16px;
         }}
-        /* 개별 상태 카드 - 단순화된 디자인 */
+        /* 개별 상태 카드 - 게이지 스타일 */
         .ct-status-card {{
-            width: 317px;
+            width: 320px;
             background: #ffffff;
-            border-radius: 10px;
-            padding: 14px;
+            border-radius: 12px;
+            padding: 18px;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.2s ease;
         }}
         .ct-status-card:hover {{
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
         }}
-        /* 좌측 테두리만 상태 색상 */
-        .ct-status-card.urgent {{ border-left: 4px solid #e53e3e; }}
-        .ct-status-card.warning {{ border-left: 4px solid #dd6b20; }}
-        .ct-status-card.safe {{ border-left: 4px solid #38a169; }}
+        .ct-status-card.urgent {{ border-left: 5px solid #e53e3e; }}
+        .ct-status-card.warning {{ border-left: 5px solid #dd6b20; }}
+        .ct-status-card.safe {{ border-left: 5px solid #38a169; }}
 
         /* 약품명 */
         .ct-card-name {{
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 16px;
+            font-weight: 700;
             color: #1a202c;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }}
 
-        /* 메인 정보 (단일 행) */
-        .ct-card-main {{
+        /* 게이지 컨테이너 */
+        .ct-gauges {{
             display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 16px;
+        }}
+        .ct-gauge {{
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-bottom: 20px;
+        }}
+        .ct-gauge-header {{
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 4px;
+        }}
+        .ct-gauge-label {{
             font-size: 14px;
             color: #4a5568;
-            margin-bottom: 10px;
+            font-weight: 500;
         }}
-        .ct-main-icon {{ font-size: 14px; }}
-        .ct-main-label {{ color: #718096; font-size: 12px; }}
-        .ct-main-value {{ font-weight: 600; color: #2d3748; }}
-        .ct-main-sep {{ color: #a0aec0; }}
-
-        /* 메인 정보 (복수 행 - 둘 다 설정) */
-        .ct-card-row {{
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 3px;
-            font-size: 12px;
+        .ct-gauge-current {{
+            font-size: 14px;
+            color: #718096;
+        }}
+        .ct-gauge-current strong {{
+            font-weight: 700;
+            font-size: 16px;
+            color: #2d3748;
+        }}
+        .ct-gauge-bar {{
+            position: relative;
+            height: 18px;
+            background: #e2e8f0;
+            border-radius: 9px;
+            overflow: visible;
+            margin-top: 4px;
+        }}
+        .ct-gauge-fill {{
+            position: relative;
+            height: 100%;
+            border-radius: 9px;
+            transition: width 0.3s ease;
+            min-width: 45px;
+        }}
+        .ct-gauge-target {{
+            position: absolute;
+            top: -4px;
+            width: 3px;
+            height: 26px;
+            background: #2d3748;
+            border-radius: 2px;
+            transform: translateX(-50%);
+        }}
+        .ct-target-label {{
+            position: absolute;
+            top: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            font-weight: 600;
             color: #4a5568;
-            margin-bottom: 6px;
+            white-space: nowrap;
         }}
-        .ct-row-icon {{ font-size: 12px; }}
-        .ct-row-label {{ color: #718096; }}
-        .ct-row-value {{ font-weight: 600; color: #2d3748; }}
-        .ct-row-sep {{ color: #a0aec0; }}
-        .ct-row-ratio {{ color: #a0aec0; font-size: 11px; }}
+        .ct-gauge-percent {{
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }}
+        /* 100% 초과 시 오버플로우 표시 */
+        .ct-gauge.overflow .ct-gauge-bar {{
+            background: linear-gradient(90deg, #c6f6d5 0%, #9ae6b4 100%);
+        }}
+        .ct-gauge.overflow .ct-gauge-fill {{
+            box-shadow: 0 0 8px rgba(56, 161, 105, 0.5);
+        }}
+
+        /* 상태 표시 */
+        .ct-card-status {{
+            font-size: 15px;
+            font-weight: 500;
+            padding: 12px 14px;
+            border-radius: 8px;
+            text-align: center;
+        }}
+        .ct-card-status.safe {{
+            background: #f0fff4;
+            color: #276749;
+        }}
+        .ct-card-status.warning {{
+            background: #fffbeb;
+            color: #975a16;
+        }}
+        .ct-card-status strong {{
+            font-weight: 700;
+            font-size: 17px;
+        }}
 
         /* 메모 표시 */
         .ct-card-memo {{
-            font-size: 11px;
+            font-size: 13px;
             color: #718096;
-            margin-top: 8px;
-            padding: 6px 8px;
-            background: #f7fafc;
-            border-radius: 4px;
-            border-left: 2px solid #cbd5e0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }}
-        /* 프로그레스 바 - 단일 색상 */
-        .ct-card-progress {{
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-        }}
-        .ct-progress-bar {{
-            flex: 1;
-            height: 6px;
-            background: #e2e8f0;
-            border-radius: 3px;
-            overflow: hidden;
-        }}
-        .ct-progress-fill {{
-            height: 100%;
-            background: #4299e1;  /* 단일 파란색 */
-            border-radius: 3px;
-        }}
-        .ct-progress-text {{
-            font-size: 12px;
-            color: #718096;
-            min-width: 35px;
-        }}
-
-        /* 액션 가이드 */
-        .ct-card-action {{
-            font-size: 14px;
-            color: #1a202c;
-            font-weight: 400;
+            margin-top: 12px;
             padding: 10px 12px;
-            margin-top: 10px;
-            background: #fffbeb;
+            background: #f7fafc;
             border-radius: 6px;
-            border-left: 3px solid #d69e2e;
-        }}
-        .ct-card-action strong {{
-            font-weight: 700;
-            color: #b7791f;
+            border-left: 3px solid #a0aec0;
         }}
         /* 안전 섹션 (접기/펼치기) */
         .ct-safe-section {{
@@ -1429,14 +1881,39 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         /* 테이블 섹션 */
         .ct-table-section {{
             margin-top: 24px;
+            overflow-x: hidden;
         }}
         .ct-table-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             font-size: 15px;
             font-weight: 600;
             color: #4a5568;
-            margin-bottom: 14px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
+            padding: 12px 16px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .ct-table-header:hover {{
+            background: #edf2f7;
+        }}
+        .ct-table-toggle {{
+            font-size: 12px;
+            color: #718096;
+            transition: transform 0.2s ease;
+        }}
+        .ct-table-toggle.open {{
+            transform: rotate(90deg);
+        }}
+        .ct-table-content {{
+            margin-top: 12px;
+        }}
+        .modal-table-threshold {{
+            table-layout: fixed;
+            width: 100%;
         }}
         /* 테이블 상태 행 스타일 */
         .modal-table-threshold tr.status-urgent {{
@@ -1501,6 +1978,37 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             border-radius: 12px;
             font-size: 13px;
         }}
+        .custom-threshold-btn {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }}
+        .custom-threshold-btn:hover {{
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.6);
+        }}
+        .ct-btn-count {{
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }}
+        .ct-btn-attention {{
+            background: #e53e3e;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }}
         .tab-content {{
             display: none;
             background-color: #fff;
@@ -1526,16 +2034,17 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             text-align: left;
             font-weight: bold;
         }}
-        /* 컬럼 너비 지정 */
-        th:nth-child(1), td:nth-child(1) {{ width: 40%; }}  /* 약품명 */
-        th:nth-child(2), td:nth-child(2) {{ width: 7%; }}   /* 약품코드 */
-        th:nth-child(3), td:nth-child(3) {{ width: 9%; }}   /* 제약회사 */
-        th:nth-child(4), td:nth-child(4) {{ width: 5%; }}   /* 현재 재고 */
-        th:nth-child(5), td:nth-child(5) {{ width: 6%; }}   /* 1년 평균 */
-        th:nth-child(6), td:nth-child(6) {{ width: 7%; }}   /* 3개월 평균 */
-        th:nth-child(7), td:nth-child(7) {{ width: 7%; }}   /* 런웨이 */
-        th:nth-child(8), td:nth-child(8) {{ width: 7%; }}   /* 3-MA 런웨이 */
-        th:nth-child(9), td:nth-child(9) {{ width: 5%; }}   /* 트렌드 */
+        /* 컬럼 너비 지정 (10개 컬럼) */
+        th:nth-child(1), td:nth-child(1) {{ width: 50px; }}   /* 메모 */
+        th:nth-child(2), td:nth-child(2) {{ width: 28%; }}    /* 약품명 */
+        th:nth-child(3), td:nth-child(3) {{ width: 9%; }}     /* 약품코드 */
+        th:nth-child(4), td:nth-child(4) {{ width: 10%; }}    /* 제약회사 */
+        th:nth-child(5), td:nth-child(5) {{ width: 8%; }}     /* 현재 재고 */
+        th:nth-child(6), td:nth-child(6) {{ width: 9%; }}     /* 1년 평균 */
+        th:nth-child(7), td:nth-child(7) {{ width: 9%; }}     /* 3개월 평균 */
+        th:nth-child(8), td:nth-child(8) {{ width: 8%; }}     /* 런웨이 */
+        th:nth-child(9), td:nth-child(9) {{ width: 8%; }}     /* 3-MA 런웨이 */
+        th:nth-child(10), td:nth-child(10) {{ width: 50px; }} /* 트렌드 */
         td {{
             padding: 10px;
             border-bottom: 1px solid #ddd;
@@ -1881,14 +2390,20 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 </head>
 <body>
     <div class="header">
-        <h1>📦 약 주문 수량 산출 보고서</h1>
-        <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 강조 기준: 런웨이 {runway_threshold}개월 미만</p>
+        <div class="header-top">
+            <h1>📦 약 주문 수량 산출 보고서</h1>
+            <button class="help-btn" onclick="openHelpModal()" title="사용 설명서">?</button>
+        </div>
+        <div class="header-bottom">
+            <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 강조 기준: 런웨이 {runway_threshold}개월 미만</p>
+            {custom_threshold_button}
+        </div>
     </div>
 
     <div class="alert-sidebar">
         {zero_stock_bookmark}
         {new_drugs_bookmark}
-        {custom_threshold_bookmark}
+        {intermittent_bookmark}
     </div>
 
     <div class="tab-container">
@@ -1952,6 +2467,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
     {zero_stock_modal}
     {new_drugs_modal}
+    {intermittent_modal}
     {custom_threshold_modal}
 
     <!-- 메모 모달 -->
@@ -1967,6 +2483,114 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             <div class="memo-modal-footer">
                 <button class="memo-btn-cancel" onclick="closeMemoModal()">취소</button>
                 <button class="memo-btn-save" onclick="saveMemo()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 도움말 모달 -->
+    <div id="helpModal" class="help-modal">
+        <div class="help-modal-content">
+            <div class="help-modal-header">
+                <h2>📖 사용 설명서</h2>
+                <span class="help-modal-close" onclick="closeHelpModal()">&times;</span>
+            </div>
+            <div class="help-modal-body">
+                <section class="help-section">
+                    <h3>📦 보고서 개요</h3>
+                    <p>이 보고서는 <strong>오늘 사용된 약품</strong>만 표시합니다. 업로드한 파일(today.csv/xls/xlsx)에 포함된 약품들의 재고 상태와 주문 필요성을 분석합니다.</p>
+                </section>
+
+                <section class="help-section">
+                    <h3>📊 메인 테이블</h3>
+                    <ul>
+                        <li><strong>전문약/일반약 탭</strong>: 정상적으로 사용되는 약품 (3개월 이동평균 > 0, 재고 ≥ 0)</li>
+                        <li><strong>노란색 행</strong>: 런웨이가 임계값 미만인 긴급 주문 필요 약품</li>
+                        <li><strong>행 클릭</strong>: 트렌드 차트 + 주문량 계산기 확장</li>
+                        <li><strong>트렌드 아이콘</strong>: 📈 상승 (+15% 이상) | ➖ 유지 (±15%) | 📉 하락 (-15% 이상)</li>
+                    </ul>
+                </section>
+
+                <section class="help-section">
+                    <h3>🔖 우측 책갈피 분류 기준</h3>
+                    <p>오늘 사용된 약품은 아래 기준에 따라 분류되며, <strong>신규/간헐적/음수재고는 상호 배타적</strong>입니다.</p>
+                    <div class="category-diagram">
+                        <div class="set-outer">
+                            <div class="set-label-outer">📦 오늘 사용된 약품</div>
+                            <div class="set-row">
+                                <div class="set-new">
+                                    <div class="set-icon">🆕</div>
+                                    <div class="set-title">신규</div>
+                                    <div class="set-desc">시계열 없음</div>
+                                </div>
+                                <div class="set-existing">
+                                    <div class="set-label-existing">기존 약품</div>
+                                    <div class="set-row">
+                                        <div class="set-intermittent">
+                                            <div class="set-icon">🔄</div>
+                                            <div class="set-title">간헐적</div>
+                                            <div class="set-desc">3개월=0</div>
+                                        </div>
+                                        <div class="set-normal">
+                                            <div class="set-label-normal">정상 (3개월 > 0)</div>
+                                            <div class="set-row">
+                                                <div class="set-negative">
+                                                    <div class="set-icon">⚠️</div>
+                                                    <div class="set-title">음수</div>
+                                                    <div class="set-desc">&lt;0</div>
+                                                </div>
+                                                <div class="set-main">
+                                                    <div class="set-icon">📋</div>
+                                                    <div class="set-title">메인</div>
+                                                    <div class="set-desc">≥0</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="diagram-overlay-note">
+                            💡 <strong>개별 임계값 설정 약품</strong>은 위 분류와 별개로, 테이블 상단 버튼에서 확인
+                        </div>
+                    </div>
+                    <div class="bookmark-list">
+                        <div class="bookmark-item">
+                            <span class="badge-warning">⚠️ 음수 재고</span>
+                            <span class="bookmark-condition">재고 &lt; 0</span>
+                            <span class="bookmark-desc">비정상 상황 징후. 원인 확인 및 교정 필요</span>
+                        </div>
+                        <div class="bookmark-item">
+                            <span class="badge-info">🆕 신규 약품</span>
+                            <span class="bookmark-condition">시계열 데이터 없음</span>
+                            <span class="bookmark-desc">최근 데이터에 처음 등장한 약품. 런웨이 계산 불가</span>
+                        </div>
+                        <div class="bookmark-item">
+                            <span class="badge-intermittent">🔄 간헐적 사용</span>
+                            <span class="bookmark-condition">3개월 이동평균 = 0</span>
+                            <span class="bookmark-desc">최근 3개월간 미사용이나 오늘 사용됨. 주문 시기 놓치지 않도록 주의</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="help-section">
+                    <h3>🧮 런웨이(Runway) 계산</h3>
+                    <ul>
+                        <li><strong>런웨이</strong> = 현재 재고 ÷ 월평균 사용량</li>
+                        <li><strong>1년 이동평균 런웨이</strong>: 장기 트렌드 기반 (계절성 반영)</li>
+                        <li><strong>3개월 이동평균 런웨이</strong>: 단기 트렌드 기반 (최근 변화 반영)</li>
+                        <li><strong>"재고만 있음"</strong>: 이동평균이 0이라 런웨이 계산 불가 (사용량 없음)</li>
+                    </ul>
+                </section>
+
+                <section class="help-section">
+                    <h3>💡 팁</h3>
+                    <ul>
+                        <li>테이블 행 클릭 시 <strong>트렌드 차트</strong>와 <strong>주문량 계산기</strong>가 펼쳐집니다</li>
+                        <li><strong>메모 아이콘</strong>을 클릭하여 약품별 메모를 저장할 수 있습니다</li>
+                        <li>약품 관리 페이지에서 <strong>개별 임계값</strong>을 설정할 수 있습니다</li>
+                        <li>테이블 상단의 <strong>⚙️ 개별 임계값 설정 약품</strong> 버튼으로 설정된 약품 현황 확인</li>
+                    </ul>
+                </section>
             </div>
         </div>
     </div>
@@ -2006,6 +2630,173 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             document.getElementById('newDrugsModal').style.display = 'none';
         }}
 
+        // 간헐적 사용 모달 열기/닫기
+        function openIntermittentModal() {{
+            document.getElementById('intermittentModal').style.display = 'block';
+        }}
+        function closeIntermittentModal() {{
+            document.getElementById('intermittentModal').style.display = 'none';
+        }}
+
+        // 간헐적 사용 약품 인라인 차트 토글
+        function toggleIntermittentChart(row, drugCode) {{
+            const existingChartRow = row.nextElementSibling;
+
+            // 이미 차트가 열려있으면 닫기
+            if (existingChartRow && existingChartRow.classList.contains('intermittent-chart-row')) {{
+                existingChartRow.remove();
+                row.classList.remove('chart-expanded');
+                return;
+            }}
+
+            // 다른 열린 차트들 닫기 (모달 내에서만)
+            const modal = document.getElementById('intermittentModal');
+            modal.querySelectorAll('.intermittent-chart-row').forEach(el => el.remove());
+            modal.querySelectorAll('.chart-expanded').forEach(el => el.classList.remove('chart-expanded'));
+
+            // 차트 데이터 가져오기
+            const chartDataStr = row.getAttribute('data-chart-data');
+            if (!chartDataStr) {{
+                console.error('No chart data found');
+                return;
+            }}
+
+            const chartData = JSON.parse(chartDataStr);
+            const colSpan = row.cells.length;
+
+            // 차트 행 생성
+            const chartRow = document.createElement('tr');
+            chartRow.className = 'intermittent-chart-row';
+            chartRow.innerHTML = `
+                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #9b59b6; position: relative;">
+                    <button onclick="event.stopPropagation(); this.closest('tr').previousElementSibling.click();"
+                            style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #718096; z-index: 10;">&times;</button>
+
+                    <div style="display: flex; gap: 20px; align-items: stretch;">
+                        <!-- 차트 영역 (70%) -->
+                        <div style="flex: 7; min-width: 0;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;">📊 ${{chartData.drug_name}} 사용량 추이</h4>
+                            <div id="intermittent-chart-${{drugCode}}" style="width: 100%; height: 280px;"></div>
+                        </div>
+
+                        <!-- 정보 영역 (30%) -->
+                        <div style="flex: 3; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <h4 style="margin: 0 0 15px 0; color: #333; font-size: 14px;">📋 약품 정보</h4>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div style="padding: 10px; background: #f8fafc; border-radius: 6px;">
+                                    <div style="color: #718096; font-size: 11px; margin-bottom: 4px;">현재 재고</div>
+                                    <div style="font-size: 18px; font-weight: bold; color: ${{chartData.stock <= 0 ? '#e53e3e' : '#2d3748'}};">${{chartData.stock.toFixed(0)}}개</div>
+                                </div>
+                                <div style="padding: 10px; background: #f8fafc; border-radius: 6px;">
+                                    <div style="color: #718096; font-size: 11px; margin-bottom: 4px;">1년 이동평균</div>
+                                    <div style="font-size: 18px; font-weight: bold; color: #2d3748;">${{chartData.ma12.toFixed(1)}}</div>
+                                </div>
+                                <div style="padding: 10px; background: #f8fafc; border-radius: 6px;">
+                                    <div style="color: #718096; font-size: 11px; margin-bottom: 4px;">런웨이 (1년 MA 기준)</div>
+                                    <div style="font-size: 18px; font-weight: bold; color: ${{typeof chartData.runway === 'number' && chartData.runway < 1 ? '#e53e3e' : '#2d3748'}};">${{chartData.runway}}${{typeof chartData.runway === 'number' ? '개월' : ''}}</div>
+                                </div>
+                                <div style="padding: 10px; background: #fefcbf; border-radius: 6px; border: 1px solid #f6e05e;">
+                                    <div style="color: #744210; font-size: 11px;">💡 간헐적 사용 약품</div>
+                                    <div style="color: #744210; font-size: 12px; margin-top: 4px;">최근 3개월간 사용 기록이 없습니다. 필요시 재고 확보를 검토하세요.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            `;
+
+            row.after(chartRow);
+            row.classList.add('chart-expanded');
+
+            // 차트 렌더링 (메인 테이블과 동일한 함수 사용)
+            renderIntermittentChart(drugCode, chartData);
+        }}
+
+        // 간헐적 사용 약품 차트 렌더링
+        function renderIntermittentChart(drugCode, chartData) {{
+            const chartContainer = document.getElementById('intermittent-chart-' + drugCode);
+            if (!chartContainer) return;
+
+            const months = chartData.months || [];
+            const timeseries = chartData.timeseries || [];
+            const ma3List = chartData.ma3_list || [];
+            const currentStock = chartData.stock;
+
+            if (months.length === 0 || timeseries.length === 0) {{
+                chartContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #718096;">차트 데이터가 없습니다.</div>';
+                return;
+            }}
+
+            // 현재 재고 수평선 데이터
+            const stockLine = months.map(() => currentStock);
+
+            // 바 색상 (0인 달은 회색, 있는 달은 보라색)
+            const barColors = timeseries.map(v => v === 0 ? '#e2e8f0' : '#9b59b6');
+
+            // 막대 그래프 (월별 조제수량)
+            const barTrace = {{
+                x: months,
+                y: timeseries,
+                type: 'bar',
+                name: '월별 사용량',
+                marker: {{ color: barColors }},
+                hovertemplate: '%{{x}}<br>사용량: %{{y}}<extra></extra>'
+            }};
+
+            // 3개월 이동평균 라인
+            const ma3Trace = {{
+                x: months,
+                y: ma3List,
+                type: 'scatter',
+                mode: 'lines',
+                name: '3개월 이동평균',
+                line: {{ color: '#e67e22', width: 2, dash: 'solid' }},
+                hovertemplate: '%{{x}}<br>3개월 MA: %{{y:.1f}}<extra></extra>'
+            }};
+
+            // 현재 재고 수평선
+            const stockTrace = {{
+                x: months,
+                y: stockLine,
+                type: 'scatter',
+                mode: 'lines',
+                name: '현재 재고',
+                line: {{ color: '#38a169', width: 2, dash: 'dash' }},
+                hovertemplate: '현재 재고: %{{y}}<extra></extra>'
+            }};
+
+            const traces = [barTrace, ma3Trace, stockTrace];
+
+            const layout = {{
+                margin: {{ l: 50, r: 20, t: 10, b: 40 }},
+                xaxis: {{
+                    tickangle: -45,
+                    tickfont: {{ size: 10 }},
+                    showgrid: false
+                }},
+                yaxis: {{
+                    title: {{ text: '수량', font: {{ size: 11 }} }},
+                    gridcolor: '#e2e8f0',
+                    zeroline: true,
+                    zerolinecolor: '#cbd5e0'
+                }},
+                showlegend: true,
+                legend: {{
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1,
+                    font: {{ size: 10 }}
+                }},
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                hovermode: 'x unified'
+            }};
+
+            Plotly.newPlot(chartContainer, traces, layout, {{displayModeBar: false, responsive: true}});
+        }}
+
         // 개별 설정 모달 열기/닫기
         function openCustomThresholdModal() {{
             document.getElementById('customThresholdModal').style.display = 'block';
@@ -2013,6 +2804,40 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         function closeCustomThresholdModal() {{
             document.getElementById('customThresholdModal').style.display = 'none';
         }}
+        // 전체 목록 토글
+        function toggleFullList() {{
+            var content = document.getElementById('fullListContent');
+            var toggle = document.getElementById('fullListToggle');
+            if (content.style.display === 'none') {{
+                content.style.display = 'block';
+                toggle.textContent = '▼';
+                toggle.classList.add('open');
+            }} else {{
+                content.style.display = 'none';
+                toggle.textContent = '▶';
+                toggle.classList.remove('open');
+            }}
+        }}
+
+        // 도움말 모달 열기/닫기
+        function openHelpModal() {{
+            document.getElementById('helpModal').style.display = 'block';
+        }}
+        function closeHelpModal() {{
+            document.getElementById('helpModal').style.display = 'none';
+        }}
+        // ESC 키로 도움말 모달 닫기
+        document.addEventListener('keydown', function(e) {{
+            if (e.key === 'Escape') {{
+                closeHelpModal();
+            }}
+        }});
+        // 모달 외부 클릭 시 닫기
+        document.getElementById('helpModal')?.addEventListener('click', function(e) {{
+            if (e.target === this) {{
+                closeHelpModal();
+            }}
+        }});
 
         // 메모 모달 열기/닫기/저장
         var currentMemoDrugCode = null;
@@ -2439,22 +3264,22 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             Plotly.newPlot(chartContainer, traces, layout, {{displayModeBar: false, responsive: true}});
         }}
 
-        // ========== 페이지 로드 시 최신 임계값 동기화 (책갈피만 업데이트) ==========
+        // ========== 페이지 로드 시 최신 임계값 동기화 (버튼 업데이트) ==========
         window.addEventListener('DOMContentLoaded', function() {{
             fetch('/api/drug-thresholds')
                 .then(response => response.json())
                 .then(data => {{
                     if (data.status === 'success') {{
-                        // 책갈피 카운트 업데이트
-                        const countEl = document.querySelector('.alert-bookmark.custom .alert-count');
+                        // 버튼 카운트 업데이트
+                        const countEl = document.querySelector('.custom-threshold-btn .ct-btn-count');
                         if (countEl) {{
                             countEl.textContent = data.count + '개';
                         }}
 
-                        // 책갈피 표시/숨김
-                        const bookmark = document.querySelector('.alert-bookmark.custom');
-                        if (bookmark) {{
-                            bookmark.style.display = data.count > 0 ? 'flex' : 'none';
+                        // 버튼 표시/숨김
+                        const btn = document.querySelector('.custom-threshold-btn');
+                        if (btn) {{
+                            btn.style.display = data.count > 0 ? 'flex' : 'none';
                         }}
                     }}
                 }})
