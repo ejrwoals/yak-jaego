@@ -321,7 +321,7 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
             if th.get('런웨이_임계값') is not None:
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             tooltip_text = html_escape(' | '.join(tooltip_parts))
-            threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+            threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 메모 버튼 생성
         memo = memos.get(drug_code, '')
@@ -920,11 +920,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 """
 
     # 개별 설정 버튼 HTML (테이블 상단에 표시)
-    attention_badge = f'<span class="ct-btn-attention">{attention_count}</span>' if attention_count > 0 else ''
+    attention_badge = f'<span class="ct-btn-attention">⚠️ {attention_count}</span>' if attention_count > 0 else ''
     custom_threshold_button = f"""
         <button class="custom-threshold-btn" onclick="openCustomThresholdModal()">
             ⚙️ 개별 임계값 설정 약품
-            <span class="ct-btn-count">{custom_threshold_count}개</span>
             {attention_badge}
         </button>
     """ if custom_threshold_count > 0 else ""
@@ -1961,53 +1960,49 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             margin-bottom: -2px;
             font-weight: 600;
         }}
-        .tab-btn .count {{
-            background-color: #6c757d;
+        .urgent-badge {{
+            background-color: #f56565;
             color: white;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 12px;
             font-size: 13px;
-        }}
-        .tab-btn.active .count {{
-            background-color: #2c3e50;
-        }}
-        .tab-btn .urgent-count {{
-            background-color: #dd6b20;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 13px;
+            font-weight: 600;
         }}
         .custom-threshold-btn {{
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 14px;
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 6px;
+            gap: 10px;
+            padding: 10px 18px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #2d3748;
+            border: 1px solid rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
+            font-size: 14px;
+            font-weight: 600;
             transition: all 0.2s ease;
         }}
         .custom-threshold-btn:hover {{
-            background: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.6);
-        }}
-        .ct-btn-count {{
-            background: rgba(255, 255, 255, 0.2);
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 12px;
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(255, 255, 255, 1);
         }}
         .ct-btn-attention {{
-            background: #e53e3e;
+            background: #f56565;
             padding: 2px 8px;
             border-radius: 10px;
             font-size: 11px;
             font-weight: 600;
+            animation: pulse-attention 2s ease-in-out infinite;
+        }}
+        @keyframes pulse-attention {{
+            0%, 100% {{
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
+            }}
+            50% {{
+                transform: scale(1.1);
+                box-shadow: 0 0 0 8px rgba(245, 101, 101, 0);
+            }}
         }}
         .tab-content {{
             display: none;
@@ -2081,15 +2076,34 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             background-color: #edf2f7 !important;
         }}
 
-        /* 개별 임계값 표시 아이콘 */
+        /* 개별 임계값 표시 아이콘 - 클릭 가능한 툴팁 */
         .threshold-indicator {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             margin-right: 6px;
-            cursor: help;
+            cursor: pointer;
             font-size: 14px;
-            opacity: 0.8;
+            opacity: 0.85;
+            position: relative;
         }}
         .threshold-indicator:hover {{
             opacity: 1;
+        }}
+        /* Floating tooltip (body에 append) */
+        .threshold-tooltip-floating {{
+            position: fixed;
+            background: #2d3748;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            font-weight: normal;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            pointer-events: none;
         }}
 
         /* 메모 버튼 스타일 */
@@ -2409,14 +2423,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <div class="tab-container">
         <div class="tab-buttons">
             <button class="tab-btn active" onclick="switchTab('dispense')">
-                💊 전문약
-                <span class="count">{dispense_count}</span>
-                {f'<span class="urgent-count">긴급 {dispense_urgent}</span>' if dispense_urgent > 0 else ''}
+                전문약
+                {f'<span class="urgent-badge">⚠️ {dispense_urgent}</span>' if dispense_urgent > 0 else ''}
             </button>
             <button class="tab-btn" onclick="switchTab('sale')">
-                💊 일반약
-                <span class="count">{sale_count}</span>
-                {f'<span class="urgent-count">긴급 {sale_urgent}</span>' if sale_urgent > 0 else ''}
+                일반약
+                {f'<span class="urgent-badge">⚠️ {sale_urgent}</span>' if sale_urgent > 0 else ''}
             </button>
         </div>
 
@@ -2598,6 +2610,54 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <script>
         // 메모 데이터 (전역)
         var drugMemos = {memos_json};
+
+        // Floating 툴팁 요소 (body에 1개만 유지)
+        var floatingTooltip = null;
+        var activeIndicator = null;
+
+        function showThresholdTooltip(event, element) {{
+            // 같은 요소 클릭 시 토글
+            if (activeIndicator === element && floatingTooltip) {{
+                hideThresholdTooltip();
+                return;
+            }}
+
+            // 기존 툴팁 제거
+            hideThresholdTooltip();
+
+            // 새 툴팁 생성
+            var tooltipText = element.getAttribute('data-tooltip');
+            floatingTooltip = document.createElement('div');
+            floatingTooltip.className = 'threshold-tooltip-floating';
+            floatingTooltip.textContent = tooltipText;
+            document.body.appendChild(floatingTooltip);
+
+            // 위치 계산 (아이콘 아래에 표시)
+            var rect = element.getBoundingClientRect();
+            floatingTooltip.style.left = rect.left + 'px';
+            floatingTooltip.style.top = (rect.bottom + 8) + 'px';
+
+            activeIndicator = element;
+        }}
+
+        function hideThresholdTooltip() {{
+            if (floatingTooltip) {{
+                floatingTooltip.remove();
+                floatingTooltip = null;
+            }}
+            activeIndicator = null;
+        }}
+
+        // 문서 클릭 시 툴팁 닫기
+        document.addEventListener('click', function(e) {{
+            if (!e.target.closest('.threshold-indicator')) {{
+                hideThresholdTooltip();
+            }}
+        }});
+
+        // 스크롤 시 툴팁 닫기
+        window.addEventListener('scroll', hideThresholdTooltip, true);
+
         function switchTab(tabName) {{
             // 모든 탭 버튼 비활성화
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -3270,12 +3330,6 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 .then(response => response.json())
                 .then(data => {{
                     if (data.status === 'success') {{
-                        // 버튼 카운트 업데이트
-                        const countEl = document.querySelector('.custom-threshold-btn .ct-btn-count');
-                        if (countEl) {{
-                            countEl.textContent = data.count + '개';
-                        }}
-
                         // 버튼 표시/숨김
                         const btn = document.querySelector('.custom-threshold-btn');
                         if (btn) {{
