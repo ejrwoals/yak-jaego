@@ -429,7 +429,28 @@ def calculate_order():
                 month_date = start_date + relativedelta(months=i)
                 months.append(month_date.strftime('%Y-%m'))
 
-        html_content = generate_order_report_html(df_merged, col_map, months=months, runway_threshold=runway_threshold)
+        # 오늘의 매출 합계 계산 (조제금액, 총 판매금액)
+        # 마지막 행은 합계 행이므로 제외
+        today_sales = {'조제금액': 0, '판매금액': 0}
+        df_valid = df_today.iloc[:-1]
+        if '조제금액' in df_valid.columns:
+            try:
+                dispense_amounts = df_valid['조제금액'].apply(
+                    lambda x: float(str(x).replace(',', '').replace('-', '0') or 0) if pd.notna(x) else 0
+                )
+                today_sales['조제금액'] = int(dispense_amounts.sum())
+            except:
+                today_sales['조제금액'] = 0
+        if '총 판매금액' in df_valid.columns:
+            try:
+                sale_amounts = df_valid['총 판매금액'].apply(
+                    lambda x: float(str(x).replace(',', '').replace('-', '0') or 0) if pd.notna(x) else 0
+                )
+                today_sales['판매금액'] = int(sale_amounts.sum())
+            except:
+                today_sales['판매금액'] = 0
+
+        html_content = generate_order_report_html(df_merged, col_map, months=months, runway_threshold=runway_threshold, today_sales=today_sales)
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 

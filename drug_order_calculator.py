@@ -546,7 +546,7 @@ def generate_intermittent_table_rows(df, col_map, months=None):
     return rows
 
 
-def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1.0):
+def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1.0, today_sales=None):
     """주문 보고서 HTML 생성 (재사용 가능한 함수)
 
     Args:
@@ -557,6 +557,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                     'today_usage': '당일 소모수량'}
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
+        today_sales: 오늘의 매출 정보 딕셔너리 {'조제금액': int, '판매금액': int}
 
     Returns:
         str: HTML 문자열
@@ -1114,12 +1115,18 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         }}
         .header-bottom {{
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 20px;
+            gap: 8px 20px;
         }}
         .header-bottom p {{
             margin: 0;
             opacity: 0.9;
+        }}
+        .header-bottom .sales-info {{
+            width: 100%;
+            font-size: 0.9em;
+            opacity: 0.8;
         }}
         .help-btn {{
             width: 32px;
@@ -2486,6 +2493,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         <div class="header-bottom">
             <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 강조 기준: 런웨이 {runway_threshold}개월 미만</p>
             {custom_threshold_button}
+            {f'<p class="sales-info">오늘 전문약 조제금액: {today_sales["조제금액"]:,}원 | 일반약 판매금액: {today_sales["판매금액"]:,}원</p>' if today_sales else ''}
         </div>
     </div>
 
