@@ -320,11 +320,67 @@ def calculate_order():
         # 신규 약품 감지 (1년_이동평균이 NaN인 경우 = processed_inventory에 없는 약품)
         df_merged['신규약품'] = df_merged['1년_이동평균'].isna()
 
-        # 약품유형이 없는 경우 '미분류'로 처리
+        # 약품유형이 없는 경우 기본값 '미분류'로 설정
         df_merged['약품유형'] = df_merged['약품유형'].fillna('미분류')
+
+        # 신규 약품에 대해 today 파일의 조제수량/판매수량으로 약품유형 분류
+        if df_merged['신규약품'].any() and ('조제수량' in df_today.columns or '판매수량' in df_today.columns):
+            # today 파일에서 조제수량/판매수량 정보 추출
+            today_qty_info = {}
+            for _, row in df_today.iterrows():
+                code = str(row['약품코드'])
+                dispense = 0
+                sale = 0
+                if '조제수량' in df_today.columns:
+                    val = row['조제수량']
+                    if pd.notna(val):
+                        try:
+                            dispense = float(str(val).replace(',', '').replace('-', '0') or 0)
+                        except:
+                            dispense = 0
+                if '판매수량' in df_today.columns:
+                    val = row['판매수량']
+                    if pd.notna(val):
+                        try:
+                            sale = float(str(val).replace(',', '').replace('-', '0') or 0)
+                        except:
+                            sale = 0
+                today_qty_info[code] = {'조제수량': dispense, '판매수량': sale}
+
+            # 신규 약품의 약품유형 분류
+            for idx in df_merged[df_merged['신규약품'] & (df_merged['약품유형'] == '미분류')].index:
+                drug_code = str(df_merged.at[idx, '약품코드'])
+                if drug_code in today_qty_info:
+                    info = today_qty_info[drug_code]
+                    if info['조제수량'] > 0:
+                        df_merged.at[idx, '약품유형'] = '전문약'
+                    elif info['판매수량'] > 0:
+                        df_merged.at[idx, '약품유형'] = '일반약'
+
+        # 당일 소모 수량 컬럼 추가 (전문약: 조제수량, 일반약: 판매수량)
+        df_merged['당일_소모수량'] = 0
+        if '조제수량' in df_today.columns or '판매수량' in df_today.columns:
+            for idx, row in df_merged.iterrows():
+                drug_code = str(row['약품코드'])
+                if drug_code in today_qty_info:
+                    info = today_qty_info[drug_code]
+                    drug_type = row['약품유형']
+                    if drug_type == '전문약':
+                        df_merged.at[idx, '당일_소모수량'] = info['조제수량']
+                    elif drug_type == '일반약':
+                        df_merged.at[idx, '당일_소모수량'] = info['판매수량']
+                    else:
+                        # 미분류: 조제수량이 있으면 조제수량, 아니면 판매수량
+                        df_merged.at[idx, '당일_소모수량'] = info['조제수량'] if info['조제수량'] > 0 else info['판매수량']
+
         new_drug_count = df_merged['신규약품'].sum()
         if new_drug_count > 0:
-            print(f"🆕 신규 약품 {new_drug_count}개 감지 (시계열 데이터 없음)")
+            # 신규 약품 유형별 개수 계산
+            new_drugs = df_merged[df_merged['신규약품']]
+            new_dispense = len(new_drugs[new_drugs['약품유형'] == '전문약'])
+            new_sale = len(new_drugs[new_drugs['약품유형'] == '일반약'])
+            new_unclassified = len(new_drugs[new_drugs['약품유형'] == '미분류'])
+            print(f"🆕 신규 약품 {new_drug_count}개 감지 (전문약: {new_dispense}, 일반약: {new_sale}, 미분류: {new_unclassified})")
 
         # 런웨이 계산 (신규 약품은 999로 처리)
         df_merged['런웨이_1년평균'] = df_merged.apply(
@@ -359,7 +415,8 @@ def calculate_order():
             'ma3_runway': '런웨이_3개월평균',
             'stock': '현재_재고수량',
             'ma12': '1년_이동평균',
-            'ma3': '3개월_이동평균'
+            'ma3': '3개월_이동평균',
+            'today_usage': '당일_소모수량'
         }
 
         # months 생성 (차트용)

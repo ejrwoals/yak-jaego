@@ -122,14 +122,43 @@ def load_recent_inventory():
     df = df.dropna(subset=['약품코드'])
 
     # today.csv가 있으면 해당 약품들만 필터링
+    today_qty_info = None
     if today_drug_codes:
         original_count = len(df)
         df = df[df['약품코드'].isin(today_drug_codes)]
         print(f"✅ 오늘 나간 약품 {len(df)}개로 필터링 (전체 {original_count}개 중)")
+
+        # today 파일에서 조제수량/판매수량 정보 추출 (신규 약품 유형 분류용)
+        if today_df_temp is not None and ('조제수량' in today_df_temp.columns or '판매수량' in today_df_temp.columns):
+            today_qty_info = {}
+            for _, row in today_df_temp.iterrows():
+                code = str(row['약품코드']) if pd.notna(row['약품코드']) else None
+                if code is None:
+                    continue
+                # 약품코드 정규화
+                code = normalize_drug_code(code)
+                dispense = 0
+                sale = 0
+                if '조제수량' in today_df_temp.columns:
+                    val = row['조제수량']
+                    if pd.notna(val):
+                        try:
+                            dispense = float(str(val).replace(',', '').replace('-', '0') or 0)
+                        except:
+                            dispense = 0
+                if '판매수량' in today_df_temp.columns:
+                    val = row['판매수량']
+                    if pd.notna(val):
+                        try:
+                            sale = float(str(val).replace(',', '').replace('-', '0') or 0)
+                        except:
+                            sale = 0
+                today_qty_info[code] = {'조제수량': dispense, '판매수량': sale}
+            print(f"   📊 조제수량/판매수량 정보 추출 완료 (신규 약품 유형 분류용)")
     else:
         print(f"✅ {len(df)}개 약품의 최신 재고 데이터를 로드했습니다.")
 
-    return df
+    return df, today_qty_info
 
 
 def parse_list_column(series):
@@ -158,8 +187,14 @@ def parse_list_column(series):
     return series.apply(parse_and_mean)
 
 
-def merge_and_calculate(today_df, processed_df):
-    """데이터 병합 및 런웨이 계산"""
+def merge_and_calculate(today_df, processed_df, today_qty_info=None):
+    """데이터 병합 및 런웨이 계산
+
+    Args:
+        today_df: 오늘 나간 약품의 재고 데이터
+        processed_df: 시계열 통계 데이터
+        today_qty_info: today 파일의 조제수량/판매수량 정보 (신규 약품 유형 분류용)
+    """
     print("\n⚙️ Step 3: 데이터 병합 및 런웨이 계산")
     print("-" * 30)
 
@@ -177,12 +212,45 @@ def merge_and_calculate(today_df, processed_df):
 
     # 신규 약품 감지 (1년 이동평균이 NaN인 경우 = processed_inventory에 없는 약품)
     result_df['신규약품'] = result_df['1년 이동평균'].isna()
+
+    # 약품유형이 없는 경우 기본값 '미분류'로 설정
+    result_df['약품유형'] = result_df['약품유형'].fillna('미분류')
+
+    # 신규 약품에 대해 today 파일의 조제수량/판매수량으로 약품유형 분류
+    if result_df['신규약품'].any() and today_qty_info:
+        for idx in result_df[result_df['신규약품'] & (result_df['약품유형'] == '미분류')].index:
+            drug_code = str(result_df.at[idx, '약품코드'])
+            if drug_code in today_qty_info:
+                info = today_qty_info[drug_code]
+                if info['조제수량'] > 0:
+                    result_df.at[idx, '약품유형'] = '전문약'
+                elif info['판매수량'] > 0:
+                    result_df.at[idx, '약품유형'] = '일반약'
+
+    # 당일 소모 수량 컬럼 추가 (전문약: 조제수량, 일반약: 판매수량)
+    result_df['당일 소모수량'] = 0
+    if today_qty_info:
+        for idx, row in result_df.iterrows():
+            drug_code = str(row['약품코드'])
+            if drug_code in today_qty_info:
+                info = today_qty_info[drug_code]
+                drug_type = row['약품유형']
+                if drug_type == '전문약':
+                    result_df.at[idx, '당일 소모수량'] = info['조제수량']
+                elif drug_type == '일반약':
+                    result_df.at[idx, '당일 소모수량'] = info['판매수량']
+                else:
+                    # 미분류: 조제수량이 있으면 조제수량, 아니면 판매수량
+                    result_df.at[idx, '당일 소모수량'] = info['조제수량'] if info['조제수량'] > 0 else info['판매수량']
+
     new_drug_count = result_df['신규약품'].sum()
     if new_drug_count > 0:
-        print(f"🆕 신규 약품 {new_drug_count}개 감지 (시계열 데이터 없음)")
-
-    # 약품유형이 없는 경우 '미분류'로 표시
-    result_df['약품유형'] = result_df['약품유형'].fillna('미분류')
+        # 신규 약품 유형별 개수 계산
+        new_drugs = result_df[result_df['신규약품']]
+        new_dispense = len(new_drugs[new_drugs['약품유형'] == '전문약'])
+        new_sale = len(new_drugs[new_drugs['약품유형'] == '일반약'])
+        new_unclassified = len(new_drugs[new_drugs['약품유형'] == '미분류'])
+        print(f"🆕 신규 약품 {new_drug_count}개 감지 (전문약: {new_dispense}, 일반약: {new_sale}, 미분류: {new_unclassified})")
 
     # 런웨이 계산 (1년 이동평균 기반)
     result_df['런웨이'] = result_df['현재 재고수량'] / result_df['1년 이동평균']
@@ -211,7 +279,8 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         df: 데이터프레임
         col_map: 컬럼명 매핑 딕셔너리 (선택사항)
             기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
-                    'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
+                    'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균',
+                    'today_usage': '당일 소모수량'}
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
         custom_thresholds: 개별 임계값 딕셔너리 {약품코드: {...}}
@@ -227,7 +296,8 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         'ma3_runway': '3-MA 런웨이',
         'stock': '현재 재고수량',
         'ma12': '1년 이동평균',
-        'ma3': '3개월 이동평균'
+        'ma3': '3개월 이동평균',
+        'today_usage': '당일 소모수량'
     }
     cm = col_map if col_map else default_map
 
@@ -328,6 +398,11 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         memo_btn_class = "has-memo" if memo else ""
         memo_preview = html_escape(memo[:50] + '...' if len(memo) > 50 else memo) if memo else '메모 추가'
 
+        # 당일 소모수량 가져오기
+        today_usage_col = cm.get('today_usage', '당일 소모수량')
+        today_usage = row.get(today_usage_col, 0) if today_usage_col in row else 0
+        today_usage = today_usage if pd.notna(today_usage) else 0
+
         rows += f"""
             <tr class="{row_class}" data-drug-code="{drug_code}"
                 data-chart-data='{chart_data_json}'
@@ -345,10 +420,9 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
                 <td>{row['약품코드']}</td>
                 <td title="{html_escape(str(row['제약회사']))}">{row['제약회사']}</td>
                 <td>{row[cm['stock']]:.0f}</td>
-                <td>{row[cm['ma12']]:.1f}</td>
                 <td>{row[cm['ma3']]:.1f}</td>
-                <td class="{runway_class}">{runway_display}</td>
                 <td class="{ma3_runway_class}">{ma3_runway_display}</td>
+                <td>{int(today_usage):,}</td>
                 <td class="{trend_class}" style="text-align: center; font-size: 16px;">{trend_icon}</td>
             </tr>
 """
@@ -479,7 +553,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         df: 데이터프레임
         col_map: 컬럼명 매핑 딕셔너리 (선택사항)
             기본값: {'runway': '런웨이', 'ma3_runway': '3-MA 런웨이',
-                    'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균'}
+                    'stock': '현재 재고수량', 'ma12': '1년 이동평균', 'ma3': '3개월 이동평균',
+                    'today_usage': '당일 소모수량'}
         months: 월 리스트 (차트용)
         runway_threshold: 긴급 주문 기준 런웨이 (개월), 기본값 1.0
 
@@ -495,7 +570,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         'ma3_runway': '3-MA 런웨이',
         'stock': '현재 재고수량',
         'ma12': '1년 이동평균',
-        'ma3': '3개월 이동평균'
+        'ma3': '3개월 이동평균',
+        'today_usage': '당일 소모수량'
     }
     cm = col_map if col_map else default_map
 
@@ -2029,17 +2105,16 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             text-align: left;
             font-weight: bold;
         }}
-        /* 컬럼 너비 지정 (10개 컬럼) */
+        /* 컬럼 너비 지정 (9개 컬럼) */
         th:nth-child(1), td:nth-child(1) {{ width: 50px; }}   /* 메모 */
-        th:nth-child(2), td:nth-child(2) {{ width: 28%; }}    /* 약품명 */
+        th:nth-child(2), td:nth-child(2) {{ width: 30%; }}    /* 약품명 */
         th:nth-child(3), td:nth-child(3) {{ width: 9%; }}     /* 약품코드 */
         th:nth-child(4), td:nth-child(4) {{ width: 10%; }}    /* 제약회사 */
-        th:nth-child(5), td:nth-child(5) {{ width: 8%; }}     /* 현재 재고 */
-        th:nth-child(6), td:nth-child(6) {{ width: 9%; }}     /* 1년 평균 */
-        th:nth-child(7), td:nth-child(7) {{ width: 9%; }}     /* 3개월 평균 */
-        th:nth-child(8), td:nth-child(8) {{ width: 8%; }}     /* 런웨이 */
-        th:nth-child(9), td:nth-child(9) {{ width: 8%; }}     /* 3-MA 런웨이 */
-        th:nth-child(10), td:nth-child(10) {{ width: 50px; }} /* 트렌드 */
+        th:nth-child(5), td:nth-child(5) {{ width: 9%; }}     /* 현재 재고 */
+        th:nth-child(6), td:nth-child(6) {{ width: 10%; }}    /* 3개월 평균 */
+        th:nth-child(7), td:nth-child(7) {{ width: 9%; }}     /* 런웨이 (3개월) */
+        th:nth-child(8), td:nth-child(8) {{ width: 6%; }}     /* 당일 소모 */
+        th:nth-child(9), td:nth-child(9) {{ width: 80px; }}   /* 트렌드 */
         td {{
             padding: 10px;
             border-bottom: 1px solid #ddd;
@@ -2440,11 +2515,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                         <th>약품명</th>
                         <th>약품코드</th>
                         <th>제약회사</th>
-                        <th>현재 재고수량</th>
-                        <th>1년 이동평균</th>
+                        <th>📦 현재 재고</th>
                         <th>3개월 이동평균</th>
                         <th>런웨이 (개월)</th>
-                        <th>3-MA 런웨이 (개월)</th>
+                        <th>📅 당일 소모량</th>
                         <th>트렌드</th>
                     </tr>
                 </thead>
@@ -2462,11 +2536,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                         <th>약품명</th>
                         <th>약품코드</th>
                         <th>제약회사</th>
-                        <th>현재 재고수량</th>
-                        <th>1년 이동평균</th>
+                        <th>📦 현재 재고</th>
                         <th>3개월 이동평균</th>
                         <th>런웨이 (개월)</th>
-                        <th>3-MA 런웨이 (개월)</th>
+                        <th>📅 당일 소모량</th>
                         <th>트렌드</th>
                     </tr>
                 </thead>
@@ -3055,9 +3128,29 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
                     <!-- 좌측(60%): 차트 / 우측(40%): 주문량계산기 -->
                     <div style="display: flex; gap: 20px; align-items: stretch;">
-                        <!-- 좌측 섹션: 트렌드 차트 -->
+                        <!-- 좌측 섹션: 통계 카드 + 트렌드 차트 -->
                         <div style="flex: 6; min-width: 0;">
-                            <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 320px;"></div>
+                            <!-- 통계 카드 -->
+                            <div class="stats-cards" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                    <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">1년 이동평균</div>
+                                    <div style="font-size: 18px; font-weight: 600; color: #2d3748;">${{chartData.ma12.toFixed(1)}}<span style="font-size: 12px; color: #a0aec0;">/월</span></div>
+                                </div>
+                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                    <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">1년 런웨이</div>
+                                    <div style="font-size: 18px; font-weight: 600; color: ${{chartData.ma12 > 0 ? (chartData.stock / chartData.ma12 < 1 ? '#e53e3e' : '#2d3748') : '#a0aec0'}};">${{chartData.ma12 > 0 ? (chartData.stock / chartData.ma12).toFixed(2) : '-'}}<span style="font-size: 12px; color: #a0aec0;">개월</span></div>
+                                </div>
+                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid #4facfe; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                    <div style="font-size: 11px; color: #4facfe; margin-bottom: 4px;">3개월 이동평균</div>
+                                    <div style="font-size: 18px; font-weight: 600; color: #2d3748;">${{chartData.ma3.toFixed(1)}}<span style="font-size: 12px; color: #a0aec0;">/월</span></div>
+                                </div>
+                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid #4facfe; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                    <div style="font-size: 11px; color: #4facfe; margin-bottom: 4px;">3개월 런웨이</div>
+                                    <div style="font-size: 18px; font-weight: 600; color: ${{chartData.ma3 > 0 ? (chartData.stock / chartData.ma3 < 1 ? '#e53e3e' : '#2d3748') : '#a0aec0'}};">${{chartData.ma3 > 0 ? (chartData.stock / chartData.ma3).toFixed(2) : '-'}}<span style="font-size: 12px; color: #a0aec0;">개월</span></div>
+                                </div>
+                            </div>
+                            <!-- 차트 -->
+                            <div id="inline-chart-${{drugCode}}" style="width: 100%; height: 280px;"></div>
                         </div>
 
                         <!-- 주문량 계산기 (40%) -->
@@ -3398,14 +3491,14 @@ def run():
 
         # 데이터 로드
         processed_df = load_processed_data()
-        inventory_df = load_recent_inventory()
+        inventory_df, today_qty_info = load_recent_inventory()
 
         if inventory_df is None:
             print("\n❌ 재고 데이터를 로드할 수 없습니다.")
             return
 
-        # 병합 및 계산
-        result_df = merge_and_calculate(inventory_df, processed_df)
+        # 병합 및 계산 (today_qty_info를 전달하여 신규 약품 유형 분류)
+        result_df = merge_and_calculate(inventory_df, processed_df, today_qty_info)
 
         # months 생성 (차트용)
         months = []
