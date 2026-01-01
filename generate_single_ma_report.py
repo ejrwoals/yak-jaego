@@ -384,12 +384,27 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             /* 개별 임계값 표시 아이콘 */
             .threshold-indicator {{
                 margin-right: 6px;
-                cursor: help;
+                cursor: pointer;
                 font-size: 14px;
                 opacity: 0.8;
             }}
             .threshold-indicator:hover {{
                 opacity: 1;
+            }}
+            /* 개별 임계값 플로팅 툴팁 */
+            .threshold-tooltip-floating {{
+                position: fixed;
+                background: #2d3748;
+                color: white;
+                padding: 10px 14px;
+                border-radius: 8px;
+                font-size: 12px;
+                white-space: nowrap;
+                font-weight: normal;
+                line-height: 1.5;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 9999;
+                pointer-events: none;
             }}
             .checkbox-memo-container {{
                 display: flex;
@@ -1050,11 +1065,24 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         if len(company_display) > 12:
             company_display = company_display[:12] + "..."
 
+        # 개별 임계값 아이콘 (설정된 경우에만)
+        threshold_icon = ""
+        if drug_code in custom_thresholds:
+            th = custom_thresholds[drug_code]
+            tooltip_parts = []
+            if th.get('절대재고_임계값') is not None:
+                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+            if th.get('런웨이_임계값') is not None:
+                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+            if tooltip_parts:
+                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+
         html_content += f"""
                         <tr class="{runway_class} clickable-row tab-clickable-row" data-drug-code="{drug_code}"
                             data-chart-data='{chart_data_json}'
                             onclick="toggleInlineChart(this, '{drug_code}')">
-                            <td>{drug_name_display}</td>
+                            <td>{threshold_icon}{drug_name_display}</td>
                             <td>{company_display}</td>
                             <td>{drug_code}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
@@ -1072,6 +1100,54 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         </div>
 
         <script>
+            // 개별 임계값 툴팁 관련 변수
+            var floatingTooltip = null;
+            var activeIndicator = null;
+
+            // 개별 임계값 툴팁 표시
+            function showThresholdTooltip(event, element) {
+                // 같은 요소 클릭 시 토글
+                if (activeIndicator === element && floatingTooltip) {
+                    hideThresholdTooltip();
+                    return;
+                }
+
+                // 기존 툴팁 제거
+                hideThresholdTooltip();
+
+                // 새 툴팁 생성
+                var tooltipText = element.getAttribute('data-tooltip');
+                floatingTooltip = document.createElement('div');
+                floatingTooltip.className = 'threshold-tooltip-floating';
+                floatingTooltip.textContent = tooltipText;
+                document.body.appendChild(floatingTooltip);
+
+                // 위치 계산 (아이콘 아래에 표시)
+                var rect = element.getBoundingClientRect();
+                floatingTooltip.style.left = rect.left + 'px';
+                floatingTooltip.style.top = (rect.bottom + 8) + 'px';
+
+                activeIndicator = element;
+            }
+
+            function hideThresholdTooltip() {
+                if (floatingTooltip) {
+                    floatingTooltip.remove();
+                    floatingTooltip = null;
+                }
+                activeIndicator = null;
+            }
+
+            // 다른 곳 클릭 시 툴팁 숨김
+            document.addEventListener('click', function(event) {
+                if (activeIndicator && !event.target.classList.contains('threshold-indicator')) {
+                    hideThresholdTooltip();
+                }
+            });
+
+            // 스크롤 시 툴팁 닫기
+            window.addEventListener('scroll', hideThresholdTooltip, true);
+
             // 카테고리 모달 열기
             function openCategoryModal(modalId) {
                 const modal = document.getElementById(modalId);
@@ -1514,18 +1590,18 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                             <button onclick="closeInlineChart('${drugCode}')"
                                     style="background: none; border: none; font-size: 20px; cursor: pointer; color: #718096;">&times;</button>
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-                            <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; color: #666;">재고수량</div>
-                                <div style="font-size: 18px; font-weight: bold;">${chartData.stock.toLocaleString()}개</div>
+                        <div style="display: flex; gap: 12px; margin-bottom: 15px;">
+                            <div style="flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">재고수량</div>
+                                <div style="font-size: 18px; font-weight: 600; color: ${chartData.stock <= 0 ? '#e53e3e' : '#2d3748'};">${chartData.stock.toLocaleString()}<span style="font-size: 12px; color: #a0aec0;">개</span></div>
                             </div>
-                            <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; opacity: 0.9;">${chartData.ma_months}개월 이동평균</div>
-                                <div style="font-size: 18px; font-weight: bold;">${chartData.latest_ma !== null ? chartData.latest_ma.toFixed(1) : 'N/A'}개</div>
+                            <div style="flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">${chartData.ma_months}개월 이동평균</div>
+                                <div style="font-size: 18px; font-weight: 600; color: #2d3748;">${chartData.latest_ma !== null ? chartData.latest_ma.toFixed(1) : 'N/A'}<span style="font-size: 12px; color: #a0aec0;">/월</span></div>
                             </div>
-                            <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; text-align: center;">
-                                <div style="font-size: 12px; opacity: 0.9;">런웨이</div>
-                                <div style="font-size: 18px; font-weight: bold;">${chartData.runway}</div>
+                            <div style="flex: 1; background: #fff; border: 1px solid #4facfe; border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                <div style="font-size: 11px; color: #4facfe; margin-bottom: 4px;">런웨이</div>
+                                <div style="font-size: 18px; font-weight: 600; color: ${chartData.latest_ma > 0 && chartData.stock / chartData.latest_ma < 1 ? '#e53e3e' : '#2d3748'};">${chartData.runway}</div>
                             </div>
                         </div>
                         <div id="inline-chart-${drugCode}" style="width: 100%; height: 350px;"></div>
@@ -1544,6 +1620,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 if (!chartContainer) return;
 
                 const maClean = chartData.ma;
+
+                // 현재 재고 수평선 데이터
+                const currentStock = chartData.stock || 0;
+                const stockLine = chartData.months.map(() => currentStock);
 
                 // 최대값 찾기
                 const maxValue = Math.max(...chartData.timeseries);
@@ -1567,6 +1647,14 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                         name: chartData.ma_months + '개월 이동평균',
                         line: {color: '#4facfe', width: 3},
                         hovertemplate: chartData.ma_months + '개월 이동평균: %{y:,.2f}개<extra></extra>'
+                    },
+                    {
+                        x: chartData.months,
+                        y: stockLine,
+                        mode: 'lines',
+                        name: '현재 재고',
+                        line: {color: '#e53e3e', width: 2, dash: 'dash'},
+                        hovertemplate: '현재 재고: %{y:,.0f}개<extra></extra>'
                     }
                 ];
 
@@ -1601,24 +1689,40 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     });
                 }
 
-                const layout = {
-                    xaxis: { title: '월', type: 'category', showgrid: true, gridcolor: '#e2e8f0' },
-                    yaxis: { title: '조제수량', showgrid: true, gridcolor: '#e2e8f0' },
-                    height: 350,
-                    margin: { t: 30, b: 50, l: 60, r: 30 },
-                    hovermode: 'x unified',
-                    plot_bgcolor: 'white',
-                    paper_bgcolor: '#f8fafc',
-                    font: {size: 11},
-                    shapes: winterShapes,
-                    annotations: maxValue > 0 ? [{
+                // annotations 생성
+                const annotations = [];
+                if (maxValue > 0) {
+                    annotations.push({
                         x: maxMonth, y: maxValue,
                         text: '최대: ' + maxValue.toFixed(0),
                         showarrow: true, arrowhead: 2, arrowsize: 1, arrowwidth: 2, arrowcolor: 'red',
                         ax: 0, ay: -30,
                         bgcolor: 'rgba(255,255,255,0.9)', bordercolor: 'red', borderwidth: 1, borderpad: 3,
                         font: {color: 'red', size: 10, weight: 'bold'}
-                    }] : []
+                    });
+                }
+                // 현재 재고 annotation
+                annotations.push({
+                    x: chartData.months[chartData.months.length - 1],
+                    y: currentStock,
+                    text: '현재 재고: ' + currentStock.toLocaleString(),
+                    showarrow: false,
+                    xanchor: 'left',
+                    xshift: 10,
+                    font: {color: '#e53e3e', size: 10}
+                });
+
+                const layout = {
+                    xaxis: { title: '월', type: 'category', showgrid: true, gridcolor: '#e2e8f0' },
+                    yaxis: { title: '조제수량', showgrid: true, gridcolor: '#e2e8f0' },
+                    height: 350,
+                    margin: { t: 30, b: 50, l: 60, r: 100 },
+                    hovermode: 'x unified',
+                    plot_bgcolor: 'white',
+                    paper_bgcolor: '#f8fafc',
+                    font: {size: 11},
+                    shapes: winterShapes,
+                    annotations: annotations
                 };
 
                 Plotly.newPlot(chartContainer, traces, layout, {displayModeBar: false, responsive: true});
@@ -2004,7 +2108,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
-                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 인라인 차트용 데이터 생성
         chart_data = {
@@ -2166,7 +2270,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
-                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2308,7 +2412,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
-                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2456,7 +2560,7 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
-                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2599,7 +2703,7 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
-                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2906,7 +3010,7 @@ def generate_hidden_drugs_section(df, ma_months, months):
                 tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
-                threshold_icon = f'<span class="threshold-indicator" title="{tooltip_text}">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         html += f"""
                                 <tr class="hidden-row-item tab-clickable-row" data-drug-code="{drug_code}"

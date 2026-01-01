@@ -19,7 +19,6 @@ from flask import Flask, render_template, request, jsonify, send_file, redirect,
 import pandas as pd
 
 # 로컬 모듈 import
-from generate_report import create_and_save_report
 from generate_single_ma_report import create_and_save_report as create_simple_report
 from drug_order_calculator import run as run_order_calculator, generate_order_report_html
 import inventory_db
@@ -91,12 +90,6 @@ def index():
     return render_template('index.html', db_stats=result)
 
 
-@app.route('/workflow/timeseries')
-def workflow_timeseries():
-    """시계열 분석 워크플로우 선택 페이지"""
-    return render_template('workflow_timeseries.html')
-
-
 @app.route('/workflow/simple')
 def workflow_simple():
     """단순 재고 관리 보고서 워크플로우 페이지"""
@@ -107,67 +100,6 @@ def workflow_simple():
 def workflow_order():
     """주문 수량 산출 워크플로우 페이지"""
     return render_template('workflow_order.html')
-
-
-@app.route('/api/generate-report', methods=['POST'])
-def generate_report():
-    """시계열 분석 보고서 생성 API (상세 보고서 - Dual MA)"""
-    try:
-        data = request.get_json()
-        report_type = data.get('report_type')  # 'dispense' 또는 'sale'
-
-        if report_type not in ['dispense', 'sale']:
-            return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
-
-        # 약품 유형 결정
-        drug_type = '전문약' if report_type == 'dispense' else '일반약'
-
-        # processed_inventory DB에서 데이터 로드
-        df = processed_inventory_db.get_processed_data(drug_type=drug_type)
-
-        if df.empty:
-            return jsonify({'error': f'{drug_type} 데이터가 없습니다.'}), 404
-
-        # DB 메타데이터에서 월 정보 추출
-        data_period = processed_inventory_db.get_metadata()
-
-        if data_period:
-            # 메타데이터에서 정확한 월 범위 가져오기
-            start_month = data_period['start_month']
-            end_month = data_period['end_month']
-            total_months = data_period['total_months']
-
-            # 시작 월부터 종료 월까지 연속된 월 생성
-            from dateutil.relativedelta import relativedelta
-            start_date = datetime.strptime(start_month, '%Y-%m')
-            months = []
-            for i in range(total_months):
-                month_date = start_date + relativedelta(months=i)
-                months.append(month_date.strftime('%Y-%m'))
-        else:
-            # 메타데이터가 없는 경우 (fallback)
-            first_record = df.iloc[0]
-            num_months = len(first_record['월별_조제수량_리스트'])
-            months = [f"Month {i+1}" for i in range(num_months)]
-
-        # HTML 보고서 생성 (브라우저 자동 열기 비활성화)
-        report_path = create_and_save_report(df, months, mode=report_type, open_browser=False)
-
-        # 파일명만 추출
-        report_filename = os.path.basename(report_path)
-
-        return jsonify({
-            'success': True,
-            'report_path': report_path,
-            'report_filename': report_filename,
-            'drug_type': drug_type,
-            'drug_count': len(df)
-        })
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/generate/simple_report', methods=['POST'])
