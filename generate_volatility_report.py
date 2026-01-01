@@ -494,19 +494,23 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
 
         /* 메모 버튼 */
         .memo-btn {{
-            background: none;
-            border: none;
+            background: #f9fafb;
+            border: 2px solid #9ca3af;
             cursor: pointer;
             font-size: 1.1em;
             padding: 4px 6px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
+            border-radius: 6px;
+            transition: all 0.2s;
+            color: #6b7280;
         }}
         .memo-btn:hover {{
-            background-color: #f3f4f6;
+            background-color: #e5e7eb;
+            border-color: #6b7280;
         }}
         .memo-btn.has-memo {{
             color: #f59e0b;
+            border-color: #f59e0b;
+            background: #fffbeb;
         }}
 
         /* 사이드바 책갈피 */
@@ -521,7 +525,7 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
         }}
         .alert-bookmark {{
             position: relative;
-            right: -120px;
+            right: -70px;
             padding: 12px 16px;
             border-radius: 12px 0 0 12px;
             cursor: pointer;
