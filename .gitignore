@@ -2,6 +2,7 @@
 /trash
 /order_calc_reports
 /inventory_reports
+/volatility_reports
 /uploads
 
 *.csv
