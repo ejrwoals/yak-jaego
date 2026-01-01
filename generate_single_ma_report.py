@@ -999,6 +999,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 <table id="dataTable">
                     <thead>
                         <tr>
+                            <th style="width: 80px;">숨김</th>
                             <th>약품명</th>
                             <th>제약회사</th>
                             <th>약품코드</th>
@@ -1010,6 +1011,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     </thead>
                     <tbody>
     """
+
+    # 메인 테이블용 체크 상태 및 메모 로드
+    main_checked_codes = checked_items_db.get_checked_items()
+    main_memos = drug_memos_db.get_all_memos()
 
     # 데이터 행 추가 + 경량 스파크라인 생성
     for idx, row in df_sorted.iterrows():
@@ -1078,10 +1083,34 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
+        # 숨김 상태 확인
+        is_hidden = drug_code in main_checked_codes
+        hidden_class = "hidden" if is_hidden else ""
+        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_hidden else '<i class="bi bi-eye"></i>'
+        hidden_title = "숨김 해제" if is_hidden else "숨김 처리"
+
+        # 메모 확인
+        memo = main_memos.get(drug_code, "")
+        memo_btn_class = "has-memo" if memo else ""
+        memo_preview = html_escape(memo[:20] + "..." if len(memo) > 20 else memo) if memo else ""
+
         html_content += f"""
                         <tr class="{runway_class} clickable-row tab-clickable-row" data-drug-code="{drug_code}"
                             data-chart-data='{chart_data_json}'
                             onclick="toggleInlineChart(this, '{drug_code}')">
+                            <td style="text-align: center;" onclick="event.stopPropagation()">
+                                <div class="checkbox-memo-container">
+                                    <button class="visibility-btn {hidden_class}" data-drug-code="{drug_code}"
+                                            onclick="event.stopPropagation(); toggleVisibility(this, '{drug_code}')"
+                                            title="{hidden_title}">{hidden_icon}</button>
+                                    <button class="memo-btn {memo_btn_class}"
+                                            data-drug-code="{drug_code}"
+                                            onclick="event.stopPropagation(); openMemoModalGeneric('{drug_code}')"
+                                            title="{memo_preview if memo else '메모 추가'}">
+                                        ✎
+                                    </button>
+                                </div>
+                            </td>
                             <td>{threshold_icon}{drug_name_display}</td>
                             <td>{company_display}</td>
                             <td>{drug_code}</td>
@@ -1093,6 +1122,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         """
 
     # HTML 마무리
+    # 메모 데이터를 JSON으로 변환
+    main_memos_json = json.dumps(main_memos, ensure_ascii=False)
+
     html_content += """
                     </tbody>
                 </table>
@@ -1100,6 +1132,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         </div>
 
         <script>
+            // 전역 메모 데이터 (window 객체에 저장하여 중복 선언 방지)
+            window.drugMemos = window.drugMemos || """ + main_memos_json + """;
+
             // 개별 임계값 툴팁 관련 변수
             var floatingTooltip = null;
             var activeIndicator = null;
@@ -1734,8 +1769,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 const drugCodeElement = document.getElementById('memo-drug-code-generic');
                 const textarea = document.getElementById('memo-textarea-generic');
 
-                // 전역 메모 데이터에서 가져오기
-                const memo = typeof drugMemos !== 'undefined' ? (drugMemos[drugCode] || '') : '';
+                // 전역 메모 데이터에서 가져오기 (window 객체 또는 지역 변수)
+                const memos = window.drugMemos || (typeof drugMemos !== 'undefined' ? drugMemos : {});
+                const memo = memos[drugCode] || '';
 
                 drugCodeElement.textContent = drugCode;
                 textarea.value = memo;
@@ -1767,7 +1803,14 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        // 전역 메모 데이터 업데이트
+                        // 전역 메모 데이터 업데이트 (window 객체 및 지역 변수 모두)
+                        if (window.drugMemos) {
+                            if (memo) {
+                                window.drugMemos[drugCode] = memo;
+                            } else {
+                                delete window.drugMemos[drugCode];
+                            }
+                        }
                         if (typeof drugMemos !== 'undefined') {
                             if (memo) {
                                 drugMemos[drugCode] = memo;
