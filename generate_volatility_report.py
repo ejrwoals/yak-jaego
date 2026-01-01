@@ -188,13 +188,14 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
         threshold_mid: 중/저변동성 경계 (기본 0.3)
     """
     # 모드에 따른 설정
+    # 참고: DB에는 월별_조제수량_리스트 컬럼만 존재 (전문약/일반약 모두 동일 컬럼 사용)
     if mode == 'dispense':
         report_title = '전문약 고변동성 약품 보고서'
         quantity_col = '월별_조제수량_리스트'
         quantity_label = '조제수량'
     else:
         report_title = '일반약 고변동성 약품 보고서'
-        quantity_col = '월별_판매수량_리스트'
+        quantity_col = '월별_조제수량_리스트'  # 일반약도 동일 컬럼 사용
         quantity_label = '판매수량'
 
     # CV 및 통계 계산
@@ -206,6 +207,14 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
                 timeseries = json.loads(timeseries) if isinstance(timeseries, str) else []
             except:
                 timeseries = []
+
+        # 분석 기간에 맞게 timeseries 슬라이싱 (최근 N개월만 사용)
+        if len(timeseries) > len(months):
+            timeseries = timeseries[-len(months):]
+
+        # 분석 기간 내 사용 이력이 전혀 없는 약품은 제외
+        if sum(timeseries) == 0:
+            continue
 
         cv = calculate_cv(timeseries)
         stats = get_usage_stats(timeseries)
@@ -704,7 +713,7 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
 <body>
     <div class="container">
         <h1>{report_title}</h1>
-        <p class="subtitle">생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p class="subtitle">분석 기간: {months[0]} ~ {months[-1]} ({len(months)}개월) &nbsp;|&nbsp; 생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
 
         <div class="threshold-info">
             CV 임계값 설정 &nbsp;|&nbsp;

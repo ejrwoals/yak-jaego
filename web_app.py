@@ -187,6 +187,7 @@ def generate_volatility_report_route():
         mode = request.form.get('mode', 'dispense')
         threshold_high = float(request.form.get('threshold_high', 0.5))
         threshold_mid = float(request.form.get('threshold_mid', 0.3))
+        analysis_period = int(request.form.get('analysis_period', 0))  # 0 = 전체 기간
 
         if mode not in ['dispense', 'sale']:
             return jsonify({'status': 'error', 'message': '잘못된 보고서 유형입니다.'}), 400
@@ -220,6 +221,10 @@ def generate_volatility_report_route():
             first_record = df.iloc[0]
             num_months = len(first_record['월별_조제수량_리스트'])
             months = [f"Month {i+1}" for i in range(num_months)]
+
+        # 분석 기간 적용 (최근 N개월만 사용)
+        if analysis_period > 0 and len(months) > analysis_period:
+            months = months[-analysis_period:]
 
         # 보고서 생성
         from generate_volatility_report import create_and_save_report as create_volatility_report

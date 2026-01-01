@@ -530,6 +530,21 @@
 
             <div class="form-group">
                 <label>
+                    분석 기간
+                    <span class="tooltip" title="분석에 사용할 데이터 기간을 선택합니다.&#10;최근 N개월 데이터만 사용하여 변동성을 분석합니다.">ⓘ</span>
+                </label>
+                <select name="analysis_period" id="analysisPeriod" style="width: 100%; padding: 14px 18px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1em; background: #f7fafc; cursor: pointer; transition: all 0.3s;">
+                    <option value="0">전체 기간</option>
+                    <option value="3">최근 3개월</option>
+                    <option value="6">최근 6개월</option>
+                    <option value="9">최근 9개월</option>
+                    <option value="12" selected>최근 12개월</option>
+                    <option value="24">최근 24개월</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>
                     CV 임계값 설정
                     <span class="tooltip" title="변동성 분류 기준을 설정합니다.&#10;• 고변동성: CV > 고/중 경계&#10;• 중변동성: 중/저 경계 ≤ CV ≤ 고/중 경계&#10;• 저변동성: CV < 중/저 경계">ⓘ</span>
                 </label>
