@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고변동성 약품 보고서</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px;
+            max-width: 600px;
+            width: 100%;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .back-btn {
+            display: inline-block;
+            color: #4a5568;
+            text-decoration: none;
+            font-size: 0.95em;
+            margin-bottom: 25px;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: #2d3748;
+        }
+
+        h1 {
+            color: #2d3748;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 40px;
+            font-size: 1em;
+        }
+
+        .info-box {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .info-box-header {
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .info-box-header:hover {
+            background-color: #edf2f7;
+        }
+
+        .info-box-title {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .info-box-arrow {
+            transition: transform 0.3s;
+            color: #718096;
+        }
+
+        .info-box-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .info-box-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .info-box-content.open {
+            max-height: 300px;
+        }
+
+        .info-box-body {
+            padding: 0 20px 20px 20px;
+            color: #4a5568;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 30px;
+        }
+
+        .form-group > label {
+            display: block;
+            color: #2d3748;
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+        }
+
+        .tooltip {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            background: #cbd5e0;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 12px;
+            line-height: 18px;
+            cursor: help;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .radio-option {
+            flex: 1;
+            min-width: 160px;
+        }
+
+        .radio-option input[type="radio"] {
+            display: none;
+        }
+
+        .radio-option label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f7fafc;
+        }
+
+        .radio-option .radio-icon {
+            font-size: 1.4em;
+        }
+
+        .radio-option .radio-text {
+            text-align: left;
+        }
+
+        .radio-option .radio-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .radio-option .radio-desc {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+
+        .radio-option input[type="radio"]:checked + label {
+            border-color: #555;
+            background: #555;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .radio-option input[type="radio"]:checked + label .radio-desc {
+            opacity: 0.8;
+        }
+
+        .radio-option label:hover {
+            border-color: #cbd5e0;
+            background: #edf2f7;
+        }
+
+        .radio-option input[type="radio"]:checked + label:hover {
+            border-color: #555;
+            background: #555;
+        }
+
+        /* CV Slider Styles */
+        .cv-slider-container {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .cv-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .cv-label {
+            font-size: 0.9em;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 15px;
+        }
+
+        .cv-label.low {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .cv-label.mid {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .cv-label.high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .cv-bar {
+            position: relative;
+            height: 40px;
+            background: #e2e8f0;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .cv-segment {
+            height: 100%;
+            transition: width 0.1s ease;
+        }
+
+        .cv-segment.low {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+        }
+
+        .cv-segment.mid {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        .cv-segment.high {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+        }
+
+        .cv-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 24px;
+            height: 48px;
+            background: white;
+            border: 3px solid #555;
+            border-radius: 8px;
+            cursor: ew-resize;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: box-shadow 0.2s, transform 0.1s;
+        }
+
+        .cv-handle:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .cv-handle:active {
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+
+        .cv-handle::before {
+            content: '⋮';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #555;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .cv-scale {
+            position: relative;
+            height: 20px;
+            font-size: 0.85em;
+            color: #718096;
+            margin-bottom: 15px;
+        }
+
+        .cv-scale span {
+            position: absolute;
+            transform: translateX(-50%);
+        }
+
+        .cv-scale span:first-child {
+            left: 0;
+            transform: translateX(0);
+        }
+
+        .cv-scale span:last-child {
+            left: 100%;
+            transform: translateX(-100%);
+        }
+
+        .cv-values {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .cv-value-box {
+            text-align: center;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            min-width: 140px;
+        }
+
+        .cv-value-label {
+            display: block;
+            font-size: 0.8em;
+            color: #718096;
+            margin-bottom: 5px;
+        }
+
+        .cv-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .exit-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .exit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 14px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.95em;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            max-width: 320px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="toast-container" class="toast-container"></div>
+
+    <div class="container">
+        <a href="/" class="back-btn">← 메인으로 돌아가기</a>
+
+        <h1>📈 고변동성 약품 보고서</h1>
+        <p class="subtitle">월별 사용량 변동성 분석</p>
+
+        <div class="info-box">
+            <div class="info-box-header" onclick="toggleInfoBox()">
+                <span class="info-box-title">💡 이 보고서는?</span>
+                <span class="info-box-arrow" id="info-box-arrow">▼</span>
+            </div>
+            <div class="info-box-content" id="info-box-content">
+                <div class="info-box-body">
+                    월별 사용량의 <b>변동계수(CV)</b>를 분석하여 재고 관리가 어려운 약품을 식별합니다.<br><br>
+                    <b>CV (Coefficient of Variation)</b> = 표준편차 / 평균<br><br>
+                    • CV가 높을수록 사용량이 들쭉날쭉합니다<br>
+                    • 고변동성 약품은 안전재고를 더 많이 확보해야 합니다<br>
+                    • 산점도에서 우상단(고사용량 + 고변동성) 약품이 관리 우선순위가 높습니다
+                </div>
+            </div>
+        </div>
+
+        <form id="reportForm">
+            <div class="form-group">
+                <label>약품 유형 선택</label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="dispense" name="mode" value="dispense" checked>
+                        <label for="dispense">
+                            <span class="radio-icon">💊</span>
+                            <span class="radio-text">
+                                <div class="radio-title">전문약</div>
+                                <div class="radio-desc">조제수량 기준</div>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="sale" name="mode" value="sale">
+                        <label for="sale">
+                            <span class="radio-icon">🏥</span>
+                            <span class="radio-text">
+                                <div class="radio-title">일반약</div>
+                                <div class="radio-desc">판매수량 기준</div>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    CV 임계값 설정
+                    <span class="tooltip" title="변동성 분류 기준을 설정합니다.&#10;• 고변동성: CV > 고/중 경계&#10;• 중변동성: 중/저 경계 ≤ CV ≤ 고/중 경계&#10;• 저변동성: CV < 중/저 경계">ⓘ</span>
+                </label>
+                <div class="cv-slider-container">
+                    <div class="cv-labels">
+                        <span class="cv-label low">🟢 저변동성</span>
+                        <span class="cv-label mid">🟡 중변동성</span>
+                        <span class="cv-label high">🔴 고변동성</span>
+                    </div>
+                    <div class="cv-bar">
+                        <div class="cv-segment low" id="segment-low"></div>
+                        <div class="cv-segment mid" id="segment-mid"></div>
+                        <div class="cv-segment high" id="segment-high"></div>
+                        <div class="cv-handle" id="handle-mid" title="중/저 경계"></div>
+                        <div class="cv-handle" id="handle-high" title="고/중 경계"></div>
+                    </div>
+                    <div class="cv-scale">
+                        <span>0</span>
+                        <span id="scale-mid">0.3</span>
+                        <span id="scale-high">0.5</span>
+                        <span>1.0+</span>
+                    </div>
+                    <div class="cv-values">
+                        <div class="cv-value-box">
+                            <span class="cv-value-label">중/저 경계</span>
+                            <span class="cv-value" id="value-mid">0.30</span>
+                        </div>
+                        <div class="cv-value-box">
+                            <span class="cv-value-label">고/중 경계</span>
+                            <span class="cv-value" id="value-high">0.50</span>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="threshold_mid" id="threshold_mid" value="0.3">
+                <input type="hidden" name="threshold_high" id="threshold_high" value="0.5">
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                🚀 보고서 생성하기
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="color: #718096;">보고서를 생성하고 있습니다...</p>
+        </div>
+    </div>
+
+    <button class="exit-btn" onclick="exitApp()">
+        <span>🛑</span>
+        <span>종료</span>
+    </button>
+
+    <script>
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function toggleInfoBox() {
+            const content = document.getElementById('info-box-content');
+            const arrow = document.getElementById('info-box-arrow');
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        // CV Slider Logic
+        (function() {
+            const MAX_VALUE = 1.0;
+            const STEP = 0.05;
+            let midValue = 0.3;
+            let highValue = 0.5;
+
+            const bar = document.querySelector('.cv-bar');
+            const handleMid = document.getElementById('handle-mid');
+            const handleHigh = document.getElementById('handle-high');
+            const segmentLow = document.getElementById('segment-low');
+            const segmentMid = document.getElementById('segment-mid');
+            const segmentHigh = document.getElementById('segment-high');
+            const scaleMid = document.getElementById('scale-mid');
+            const scaleHigh = document.getElementById('scale-high');
+            const valueMid = document.getElementById('value-mid');
+            const valueHigh = document.getElementById('value-high');
+            const inputMid = document.getElementById('threshold_mid');
+            const inputHigh = document.getElementById('threshold_high');
+
+            function updateUI() {
+                const midPercent = (midValue / MAX_VALUE) * 100;
+                const highPercent = (highValue / MAX_VALUE) * 100;
+
+                // Update segments
+                segmentLow.style.width = midPercent + '%';
+                segmentMid.style.width = (highPercent - midPercent) + '%';
+                segmentHigh.style.width = (100 - highPercent) + '%';
+
+                // Update handles
+                handleMid.style.left = midPercent + '%';
+                handleHigh.style.left = highPercent + '%';
+
+                // Update scale labels
+                scaleMid.textContent = midValue.toFixed(2);
+                scaleHigh.textContent = highValue.toFixed(2);
+                scaleMid.style.left = midPercent + '%';
+                scaleHigh.style.left = highPercent + '%';
+
+                // Update value displays
+                valueMid.textContent = midValue.toFixed(2);
+                valueHigh.textContent = highValue.toFixed(2);
+
+                // Update hidden inputs
+                inputMid.value = midValue.toFixed(2);
+                inputHigh.value = highValue.toFixed(2);
+            }
+
+            function getValueFromPosition(clientX) {
+                const rect = bar.getBoundingClientRect();
+                const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                // Round to nearest step
+                return Math.round(percent * MAX_VALUE / STEP) * STEP;
+            }
+
+            function makeDraggable(handle, isMid) {
+                let isDragging = false;
+
+                function startDrag(e) {
+                    isDragging = true;
+                    e.preventDefault();
+                    document.body.style.cursor = 'ew-resize';
+                    document.body.style.userSelect = 'none';
+                }
+
+                function doDrag(e) {
+                    if (!isDragging) return;
+
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    let newValue = getValueFromPosition(clientX);
+
+                    if (isMid) {
+                        // Mid handle: min 0.05, max is highValue - 0.05
+                        newValue = Math.max(STEP, Math.min(newValue, highValue - STEP));
+                        midValue = newValue;
+                    } else {
+                        // High handle: min is midValue + 0.05, max is MAX_VALUE - 0.05
+                        newValue = Math.max(midValue + STEP, Math.min(newValue, MAX_VALUE - STEP));
+                        highValue = newValue;
+                    }
+
+                    updateUI();
+                }
+
+                function endDrag() {
+                    isDragging = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+
+                // Mouse events
+                handle.addEventListener('mousedown', startDrag);
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('mouseup', endDrag);
+
+                // Touch events
+                handle.addEventListener('touchstart', startDrag);
+                document.addEventListener('touchmove', doDrag);
+                document.addEventListener('touchend', endDrag);
+            }
+
+            // Initialize
+            makeDraggable(handleMid, true);
+            makeDraggable(handleHigh, false);
+            updateUI();
+        })();
+
+        // Form submission
+        document.getElementById('reportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ 생성 중...';
+            loading.classList.add('active');
+
+            const formData = new FormData(this);
+
+            fetch('/generate/volatility_report', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.open(data.report_url, '_blank');
+
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '🚀 보고서 생성하기';
+                    loading.classList.remove('active');
+
+                    showToast('✅ 보고서가 성공적으로 생성되었습니다!', 'success');
+                } else {
+                    throw new Error(data.message || '보고서 생성 실패');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('❌ 보고서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
+
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 보고서 생성하기';
+                loading.classList.remove('active');
+            });
+        });
+
+        function exitApp() {
+            if (confirm('정말로 앱을 종료하시겠습니까?')) {
+                fetch('/shutdown', {method: 'POST'})
+                    .then(() => {
+                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #555;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
+                    })
+                    .catch(() => {
+                        alert('종료 중 오류가 발생했습니다. 터미널에서 Ctrl+C를 눌러주세요.');
+                    });
+            }
+        }
+    </script>
+</body>
+</html>

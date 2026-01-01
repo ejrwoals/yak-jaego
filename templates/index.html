@@ -934,7 +934,7 @@
             <div class="tabs">
                 <button class="tab-button active" onclick="switchTab('timeseries')">
                     <span>📊</span>
-                    <span>재고 관리 보고서</span>
+                    <span>분석 보고서</span>
                 </button>
                 <button class="tab-button order-tab" onclick="switchTab('order')">
                     <span>📦</span>
@@ -942,7 +942,7 @@
                 </button>
             </div>
 
-            <!-- 재고 관리 보고서 탭 -->
+            <!-- 분석 보고서 탭 -->
             <div id="tab-timeseries" class="tab-content active">
                 <div class="workflow-content">
                     <div class="workflow-grid">
@@ -950,12 +950,8 @@
                         <div class="workflow-section section-new">
                             <h3>✨ 새로 생성하기</h3>
                             <div class="action-buttons">
-                                <a href="/workflow/simple" class="btn-new">
-                                    <span style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                                        <span>📊 재고 관리 보고서</span>
-                                        <span style="background: rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 12px; font-size: 0.75em;">권장</span>
-                                    </span>
-                                </a>
+                                <a href="/workflow/simple" class="btn-new">📊 재고 관리 보고서</a>
+                                <a href="/workflow/volatility" class="btn-new">📈 고변동성 약품 보고서</a>
                             </div>
                         </div>
 

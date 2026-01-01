@@ -102,6 +102,12 @@ def workflow_order():
     return render_template('workflow_order.html')
 
 
+@app.route('/workflow/volatility')
+def workflow_volatility():
+    """고변동성 약품 보고서 워크플로우 페이지"""
+    return render_template('workflow_volatility.html')
+
+
 @app.route('/generate/simple_report', methods=['POST'])
 def generate_simple_report_route():
     """단순 재고 관리 보고서 생성 API (Single MA)"""
@@ -166,6 +172,70 @@ def generate_simple_report_route():
             'drug_type': drug_type,
             'drug_count': len(df),
             'ma_months': ma_months
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/generate/volatility_report', methods=['POST'])
+def generate_volatility_report_route():
+    """고변동성 약품 보고서 생성 API"""
+    try:
+        mode = request.form.get('mode', 'dispense')
+        threshold_high = float(request.form.get('threshold_high', 0.5))
+        threshold_mid = float(request.form.get('threshold_mid', 0.3))
+
+        if mode not in ['dispense', 'sale']:
+            return jsonify({'status': 'error', 'message': '잘못된 보고서 유형입니다.'}), 400
+
+        if not (0 < threshold_mid < threshold_high < 1.5):
+            return jsonify({'status': 'error', 'message': 'CV 임계값 설정이 올바르지 않습니다.'}), 400
+
+        # 약품 유형 결정
+        drug_type = '전문약' if mode == 'dispense' else '일반약'
+
+        # processed_inventory DB에서 데이터 로드
+        df = processed_inventory_db.get_processed_data(drug_type=drug_type)
+
+        if df.empty:
+            return jsonify({'status': 'error', 'message': f'{drug_type} 데이터가 없습니다.'}), 404
+
+        # DB 메타데이터에서 월 정보 추출
+        data_period = processed_inventory_db.get_metadata()
+
+        if data_period:
+            start_month = data_period['start_month']
+            total_months = data_period['total_months']
+
+            from dateutil.relativedelta import relativedelta
+            start_date = datetime.strptime(start_month, '%Y-%m')
+            months = []
+            for i in range(total_months):
+                month_date = start_date + relativedelta(months=i)
+                months.append(month_date.strftime('%Y-%m'))
+        else:
+            first_record = df.iloc[0]
+            num_months = len(first_record['월별_조제수량_리스트'])
+            months = [f"Month {i+1}" for i in range(num_months)]
+
+        # 보고서 생성
+        from generate_volatility_report import create_and_save_report as create_volatility_report
+        report_path = create_volatility_report(df, months, mode=mode,
+                                                threshold_high=threshold_high,
+                                                threshold_mid=threshold_mid,
+                                                open_browser=False)
+
+        report_filename = os.path.basename(report_path)
+
+        return jsonify({
+            'status': 'success',
+            'report_url': f'/reports/{report_filename}',
+            'report_filename': report_filename,
+            'drug_type': drug_type,
+            'drug_count': len(df)
         })
 
     except Exception as e:
@@ -421,63 +491,71 @@ def list_reports(report_type):
     """보고서 목록 조회 API"""
     try:
         if report_type == 'timeseries':
-            report_dir = 'inventory_reports'
-            # 단순 보고서와 상세 보고서 모두 포함
-            file_prefixes = ['inventory_report_', 'simple_report_']
+            # 분석 보고서: inventory_reports + volatility_reports
+            report_dirs = [
+                ('inventory_reports', ['inventory_report_', 'simple_report_']),
+                ('volatility_reports', ['volatility_report_'])
+            ]
         elif report_type == 'order':
-            report_dir = 'order_calc_reports'
-            file_prefixes = ['order_calculator_report_']
+            report_dirs = [
+                ('order_calc_reports', ['order_calculator_report_'])
+            ]
         else:
             return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
 
-        # 디렉토리 확인
-        if not os.path.exists(report_dir):
-            return jsonify({'reports': []})
-
-        # HTML 파일만 필터링 (여러 prefix 지원)
-        files = [f for f in os.listdir(report_dir)
-                if any(f.startswith(prefix) for prefix in file_prefixes) and f.endswith('.html')]
-
         reports = []
-        for filename in files:
-            file_path = os.path.join(report_dir, filename)
 
-            # 파일 정보 추출
-            file_stat = os.stat(file_path)
-            created_time = datetime.fromtimestamp(file_stat.st_mtime)
+        for report_dir, file_prefixes in report_dirs:
+            # 디렉토리 확인
+            if not os.path.exists(report_dir):
+                continue
 
-            # 파일명에서 정보 추출
-            report_info = {
-                'filename': filename,
-                'created_at': created_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'timestamp': file_stat.st_mtime,
-                'size': file_stat.st_size
-            }
+            # HTML 파일만 필터링 (여러 prefix 지원)
+            files = [f for f in os.listdir(report_dir)
+                    if any(f.startswith(prefix) for prefix in file_prefixes) and f.endswith('.html')]
 
-            # 시계열 보고서의 경우 전문약/일반약 및 보고서 유형 구분
-            if report_type == 'timeseries':
-                if 'dispense' in filename:
-                    report_info['drug_type'] = '전문약'
-                elif 'sale' in filename:
-                    report_info['drug_type'] = '일반약'
-                else:
-                    report_info['drug_type'] = '미분류'
+            for filename in files:
+                file_path = os.path.join(report_dir, filename)
 
-                # 단순/상세 보고서 구분
-                if filename.startswith('simple_report_'):
-                    report_info['report_style'] = '단순'
-                    # 파일명에서 MA 개월 수 추출 (예: simple_report_dispense_3ma_20251119.html)
-                    try:
-                        ma_part = filename.split('_')[3]  # "3ma"
-                        ma_months = ma_part.replace('ma', '')
-                        report_info['ma_months'] = f'{ma_months}개월'
-                    except:
-                        report_info['ma_months'] = 'N/A'
-                else:
-                    report_info['report_style'] = '상세'
-                    report_info['ma_months'] = '1년+3개월'
+                # 파일 정보 추출
+                file_stat = os.stat(file_path)
+                created_time = datetime.fromtimestamp(file_stat.st_mtime)
 
-            reports.append(report_info)
+                # 파일명에서 정보 추출
+                report_info = {
+                    'filename': filename,
+                    'created_at': created_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'timestamp': file_stat.st_mtime,
+                    'size': file_stat.st_size
+                }
+
+                # 시계열 보고서의 경우 전문약/일반약 및 보고서 유형 구분
+                if report_type == 'timeseries':
+                    if 'dispense' in filename:
+                        report_info['drug_type'] = '전문약'
+                    elif 'sale' in filename:
+                        report_info['drug_type'] = '일반약'
+                    else:
+                        report_info['drug_type'] = '미분류'
+
+                    # 보고서 스타일 구분
+                    if filename.startswith('volatility_report_'):
+                        report_info['report_style'] = '고변동성'
+                        report_info['ma_months'] = 'CV분석'
+                    elif filename.startswith('simple_report_'):
+                        report_info['report_style'] = '재고관리'
+                        # 파일명에서 MA 개월 수 추출 (예: simple_report_dispense_3ma_20251119.html)
+                        try:
+                            ma_part = filename.split('_')[3]  # "3ma"
+                            ma_months = ma_part.replace('ma', '')
+                            report_info['ma_months'] = f'{ma_months}개월'
+                        except:
+                            report_info['ma_months'] = 'N/A'
+                    else:
+                        report_info['report_style'] = '상세'
+                        report_info['ma_months'] = '1년+3개월'
+
+                reports.append(report_info)
 
         # 최신순 정렬
         reports.sort(key=lambda x: x['timestamp'], reverse=True)
@@ -498,6 +576,12 @@ def serve_report(filename):
     # 시계열 보고서 (inventory_reports 디렉토리)
     if filename.startswith('inventory_report_') or filename.startswith('simple_report_'):
         file_path = os.path.join(os.getcwd(), 'inventory_reports', filename)
+        if os.path.exists(file_path):
+            return send_file(file_path, mimetype='text/html')
+
+    # 고변동성 보고서 (volatility_reports 디렉토리)
+    elif filename.startswith('volatility_report_'):
+        file_path = os.path.join(os.getcwd(), 'volatility_reports', filename)
         if os.path.exists(file_path):
             return send_file(file_path, mimetype='text/html')
 
