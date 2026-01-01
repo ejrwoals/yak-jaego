@@ -131,26 +131,30 @@ def is_recently_appeared(timeseries_data, recent_months=RECENT_MONTHS_SAFETY):
     return any(v and v > 0 for v in recent_data)
 
 
-def should_be_sporadic(timeseries_data):
+def classify_drug(timeseries_data):
     """
-    단발성 여부 판단 (가중 등장률 + 최근 등장 안전 장치)
+    약품 분류: regular(정규), sporadic(단발성), new(신규)
+
+    분류 기준:
+    - 가중 등장률 ≥ 20% → regular (정규)
+    - 가중 등장률 < 20% + 최근 2개월 내 등장 → new (신규)
+    - 가중 등장률 < 20% + 최근 2개월 내 등장 없음 → sporadic (단발성)
 
     Returns:
-        bool: True = 단발성, False = 정규
+        str: 'regular', 'sporadic', 'new'
     """
-    # 1. 가중 등장률 계산
     weighted_rate = get_weighted_appearance_rate(timeseries_data)
 
-    # 2. 가중 등장률이 충분하면 정규
+    # 가중 등장률이 충분하면 정규
     if weighted_rate >= MIN_APPEARANCE_RATE:
-        return False
+        return 'regular'
 
-    # 3. 가중 등장률이 낮아도 최근 N개월 내 등장했으면 정규 (안전 장치)
+    # 가중 등장률이 낮지만 최근 등장했으면 신규
     if is_recently_appeared(timeseries_data, RECENT_MONTHS_SAFETY):
-        return False
+        return 'new'
 
-    # 4. 둘 다 해당 안 되면 단발성
-    return True
+    # 둘 다 아니면 단발성
+    return 'sporadic'
 
 
 def get_usage_stats(timeseries_data):
@@ -228,18 +232,21 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
     # CV 기준 내림차순 정렬 (None은 맨 뒤)
     drugs_data.sort(key=lambda x: (x['cv'] is None, -(x['cv'] or 0)))
 
-    # 등장률 계산 및 단발성/정규 약품 분류
+    # 등장률 계산 및 3분류 (정규/단발성/신규)
     for drug in drugs_data:
         drug['appearance_rate'] = get_appearance_rate(drug['timeseries'])
         drug['weighted_appearance_rate'] = get_weighted_appearance_rate(drug['timeseries'])
         # 등장 횟수 계산
         drug['appearance_count'] = sum(1 for v in drug['timeseries'] if v and v > 0)
-        # 단발성 여부 판단 (가중 등장률 + 최근 등장 안전 장치)
-        drug['is_sporadic'] = should_be_sporadic(drug['timeseries'])
+        # 약품 분류 (regular/sporadic/new)
+        drug['drug_category'] = classify_drug(drug['timeseries'])
 
-    sporadic_drugs = [d for d in drugs_data if d['is_sporadic']]
-    regular_drugs = [d for d in drugs_data if not d['is_sporadic']]
+    # 3가지 카테고리로 분류
+    sporadic_drugs = [d for d in drugs_data if d['drug_category'] == 'sporadic']
+    new_drugs = [d for d in drugs_data if d['drug_category'] == 'new']
+    regular_drugs = [d for d in drugs_data if d['drug_category'] == 'regular']
     sporadic_count = len(sporadic_drugs)
+    new_drugs_count = len(new_drugs)
 
     # 그룹별 카운트 (정규 약품만)
     high_count = sum(1 for d in regular_drugs if d['volatility_group'] == 'high')
@@ -533,6 +540,15 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
         .alert-bookmark.sporadic:hover {{
             box-shadow: -6px 6px 24px rgba(91, 33, 182, 0.4);
         }}
+        .alert-bookmark.new-drug {{
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.75) 0%, rgba(5, 150, 105, 0.85) 100%);
+            box-shadow: -4px 4px 20px rgba(5, 150, 105, 0.3);
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }}
+        .alert-bookmark.new-drug:hover {{
+            box-shadow: -6px 6px 24px rgba(5, 150, 105, 0.4);
+        }}
         .alert-icon {{
             font-size: 1.5em;
         }}
@@ -626,6 +642,52 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
         }}
         .modal-table .inline-chart-row td {{
             padding: 20px;
+        }}
+
+        /* 툴팁 */
+        .help-icon {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            font-size: 11px;
+            cursor: help;
+            margin-left: 4px;
+            position: relative;
+        }}
+        .help-icon:hover .tooltip {{
+            display: block;
+        }}
+        .tooltip {{
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a202c;
+            color: white;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: normal;
+            white-space: nowrap;
+            z-index: 1001;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            text-align: left;
+            line-height: 1.5;
+        }}
+        .tooltip::after {{
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1a202c;
         }}
 
         /* 반응형 */
@@ -734,6 +796,7 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
                         data-chart-data='{html_escape(chart_data)}'
                         data-cv="{drug['cv'] or 0}"
                         data-mean="{drug['mean_usage']}"
+                        data-weighted-rate="{drug['weighted_appearance_rate']}"
                         onclick="toggleInlineChart(this, '{html_escape(drug['drug_code'])}')">
                         <td style="text-align: center;">
                             <button class="memo-btn {memo_class}" onclick="event.stopPropagation(); openMemo('{html_escape(drug['drug_code'])}')">
@@ -772,33 +835,89 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
             'N/A'
         )
 
+        weighted_rate_display = f"{drug['weighted_appearance_rate'] * 100:.1f}%"
         sporadic_rows += f"""
                         <tr class="clickable-row"
                             data-drug-code="{html_escape(drug['drug_code'])}"
                             data-chart-data='{html_escape(chart_data)}'
                             data-cv="{drug['cv'] or 0}"
                             data-mean="{drug['mean_usage']}"
+                            data-weighted-rate="{drug['weighted_appearance_rate']}"
                             onclick="toggleSporadicInlineChart(this, '{html_escape(drug['drug_code'])}')">
                             <td>{html_escape(drug['drug_name'])}</td>
                             <td>{html_escape(drug['company'])}</td>
                             <td style="text-align: right;">{cv_display}</td>
                             <td style="text-align: right;">{drug['mean_usage']:.1f}</td>
                             <td class="range-cell">{range_display}</td>
-                            <td style="text-align: center;">{drug['appearance_count']}회</td>
+                            <td style="text-align: center;">{weighted_rate_display}</td>
                             <td>{sparkline}</td>
                         </tr>
 """
 
-    # 사이드바 책갈피 HTML
-    sporadic_bookmark = f"""
-    <div class="alert-sidebar">
+    # 신규 약품 테이블 행 생성 (단발성과 동일한 구조)
+    new_drugs_rows = ""
+    for drug in new_drugs:
+        cv_display = f"{drug['cv_percent']}%" if drug['cv_percent'] is not None else 'N/A'
+        range_display = f"{drug['min_usage']:.0f} ~ {drug['max_usage']:.0f}"
+
+        # 스파크라인 생성
+        sparkline = create_sparkline_svg(drug['timeseries'], drug['ma_data'], 3)
+
+        # 차트 데이터 JSON (인라인 차트용)
+        chart_data = create_chart_data_json(
+            months,
+            drug['timeseries'],
+            drug['ma_data'],
+            drug['mean_usage'],
+            drug['drug_name'],
+            drug['drug_code'],
+            3,
+            drug['stock'],
+            'N/A'
+        )
+
+        weighted_rate_display = f"{drug['weighted_appearance_rate'] * 100:.1f}%"
+        new_drugs_rows += f"""
+                        <tr class="clickable-row"
+                            data-drug-code="{html_escape(drug['drug_code'])}"
+                            data-chart-data='{html_escape(chart_data)}'
+                            data-cv="{drug['cv'] or 0}"
+                            data-mean="{drug['mean_usage']}"
+                            data-weighted-rate="{drug['weighted_appearance_rate']}"
+                            onclick="toggleNewDrugsInlineChart(this, '{html_escape(drug['drug_code'])}')">
+                            <td>{html_escape(drug['drug_name'])}</td>
+                            <td>{html_escape(drug['company'])}</td>
+                            <td style="text-align: right;">{cv_display}</td>
+                            <td style="text-align: right;">{drug['mean_usage']:.1f}</td>
+                            <td class="range-cell">{range_display}</td>
+                            <td style="text-align: center;">{weighted_rate_display}</td>
+                            <td>{sparkline}</td>
+                        </tr>
+"""
+
+    # 사이드바 책갈피 HTML (단발성 + 신규 약품)
+    sporadic_bookmark_item = f"""
         <div class="alert-bookmark sporadic" onclick="openSporadicModal()">
             <span class="alert-icon">📌</span>
             <span class="alert-title">단발성 약품</span>
             <span class="alert-count">{sporadic_count}개</span>
         </div>
-    </div>
 """ if sporadic_count > 0 else ""
+
+    new_drugs_bookmark_item = f"""
+        <div class="alert-bookmark new-drug" onclick="openNewDrugsModal()">
+            <span class="alert-icon">🆕</span>
+            <span class="alert-title">신규 약품</span>
+            <span class="alert-count">{new_drugs_count}개</span>
+        </div>
+""" if new_drugs_count > 0 else ""
+
+    sidebar_bookmark = f"""
+    <div class="alert-sidebar">
+        {sporadic_bookmark_item}
+        {new_drugs_bookmark_item}
+    </div>
+""" if sporadic_count > 0 or new_drugs_count > 0 else ""
 
     # 단발성 약품 모달 HTML
     total_months = len(months) if months else 0
@@ -822,7 +941,10 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
                             <th style="text-align: right;">CV (%)</th>
                             <th style="text-align: right;">평균 {quantity_label}</th>
                             <th>{quantity_label} 범위</th>
-                            <th style="text-align: center;">등장횟수</th>
+                            <th style="text-align: center;">
+                                가중 등장률
+                                <span class="help-icon">?<span class="tooltip">최근 달에 높은 가중치 부여<br>최근 = 1.0, 과거 = 0.1<br>선형 감소 방식</span></span>
+                            </th>
                             <th>트렌드</th>
                         </tr>
                     </thead>
@@ -835,14 +957,52 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
     </div>
 """ if sporadic_count > 0 else ""
 
+    # 신규 약품 모달 HTML
+    new_drugs_modal = f"""
+    <div id="newDrugsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #10b981;">
+                <h3>🆕 신규 약품 ({new_drugs_count}개)</h3>
+                <span class="modal-close" onclick="closeNewDrugsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="modal-info">
+                    가중 등장률 20% 미만이지만 최근 {RECENT_MONTHS_SAFETY}개월 내 사용이 시작된 약품입니다.<br>
+                    <small style="color: #888;">※ 변동성 분석 대상에서는 제외되지만, 최근 도입된 약품으로 별도 관리됩니다.</small>
+                </p>
+                <table class="modal-table" id="new-drugs-table">
+                    <thead>
+                        <tr>
+                            <th>약품명</th>
+                            <th>제약회사</th>
+                            <th style="text-align: right;">CV (%)</th>
+                            <th style="text-align: right;">평균 {quantity_label}</th>
+                            <th>{quantity_label} 범위</th>
+                            <th style="text-align: center;">
+                                가중 등장률
+                                <span class="help-icon">?<span class="tooltip">최근 달에 높은 가중치 부여<br>최근 = 1.0, 과거 = 0.1<br>선형 감소 방식</span></span>
+                            </th>
+                            <th>트렌드</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {new_drugs_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+""" if new_drugs_count > 0 else ""
+
     html_content += f"""
                 </tbody>
             </table>
         </div>
     </div>
 
-    {sporadic_bookmark}
+    {sidebar_bookmark}
     {sporadic_modal}
+    {new_drugs_modal}
 
     <script>
         // 산점도 데이터
@@ -991,6 +1151,7 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
             const chartData = JSON.parse(row.dataset.chartData);
             const cv = parseFloat(row.dataset.cv);
             const mean = parseFloat(row.dataset.mean);
+            const weightedRate = parseFloat(row.dataset.weightedRate);
 
             const chartRow = document.createElement('tr');
             chartRow.className = 'inline-chart-row';
@@ -1000,6 +1161,10 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
                         <div class="stat-card">
                             <div class="label">CV (변동계수)</div>
                             <div class="value">${{(cv * 100).toFixed(1)}}%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">가중 등장률</div>
+                            <div class="value">${{(weightedRate * 100).toFixed(1)}}%</div>
                         </div>
                         <div class="stat-card">
                             <div class="label">평균 사용량</div>
@@ -1101,6 +1266,7 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
             const chartData = JSON.parse(row.dataset.chartData);
             const cv = parseFloat(row.dataset.cv);
             const mean = parseFloat(row.dataset.mean);
+            const weightedRate = parseFloat(row.dataset.weightedRate);
 
             const chartRow = document.createElement('tr');
             chartRow.className = 'inline-chart-row';
@@ -1110,6 +1276,10 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
                         <div class="stat-card">
                             <div class="label">CV (변동계수)</div>
                             <div class="value">${{(cv * 100).toFixed(1)}}%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">가중 등장률</div>
+                            <div class="value">${{(weightedRate * 100).toFixed(1)}}%</div>
                         </div>
                         <div class="stat-card">
                             <div class="label">평균 사용량</div>
@@ -1177,11 +1347,125 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
             Plotly.newPlot(`sporadic-inline-chart-${{drugCode}}`, traces, layout, {{responsive: true}});
         }}
 
+        // 신규 약품 모달 열기/닫기
+        function openNewDrugsModal() {{
+            document.getElementById('newDrugsModal').style.display = 'block';
+        }}
+
+        function closeNewDrugsModal() {{
+            document.getElementById('newDrugsModal').style.display = 'none';
+        }}
+
+        // 신규 약품 모달 인라인 차트 토글
+        function toggleNewDrugsInlineChart(row, drugCode) {{
+            // 기존 차트 행 닫기
+            const existingChart = document.querySelector('#new-drugs-table .inline-chart-row');
+            if (existingChart) {{
+                const prevRow = existingChart.previousElementSibling;
+                if (prevRow) prevRow.classList.remove('expanded');
+                existingChart.remove();
+
+                // 같은 행 클릭 시 닫기만
+                if (prevRow && prevRow.dataset.drugCode === drugCode) {{
+                    return;
+                }}
+            }}
+
+            row.classList.add('expanded');
+
+            const chartData = JSON.parse(row.dataset.chartData);
+            const cv = parseFloat(row.dataset.cv);
+            const mean = parseFloat(row.dataset.mean);
+            const weightedRate = parseFloat(row.dataset.weightedRate);
+
+            const chartRow = document.createElement('tr');
+            chartRow.className = 'inline-chart-row';
+            chartRow.innerHTML = `
+                <td colspan="7">
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <div class="label">CV (변동계수)</div>
+                            <div class="value">${{(cv * 100).toFixed(1)}}%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">가중 등장률</div>
+                            <div class="value">${{(weightedRate * 100).toFixed(1)}}%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">평균 사용량</div>
+                            <div class="value">${{mean.toFixed(1)}}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">현재 재고</div>
+                            <div class="value">${{chartData.stock}}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">3개월 이동평균</div>
+                            <div class="value">${{chartData.latest_ma ? chartData.latest_ma.toFixed(1) : 'N/A'}}</div>
+                        </div>
+                    </div>
+                    <div id="new-drugs-inline-chart-${{drugCode}}" style="width: 100%; height: 300px;"></div>
+                </td>
+            `;
+
+            row.after(chartRow);
+
+            // Plotly 차트 렌더링
+            renderNewDrugsInlineChart(drugCode, chartData);
+        }}
+
+        function renderNewDrugsInlineChart(drugCode, chartData) {{
+            const traces = [
+                {{
+                    x: chartData.months,
+                    y: chartData.timeseries,
+                    mode: 'lines+markers',
+                    name: '실제 사용량',
+                    line: {{ color: 'black', width: 2, dash: 'dot' }},
+                    marker: {{ size: 6, color: 'black' }}
+                }},
+                {{
+                    x: chartData.months,
+                    y: chartData.ma.filter(v => v !== null),
+                    mode: 'lines',
+                    name: '3개월 이동평균',
+                    line: {{ color: '#10b981', width: 3 }}
+                }}
+            ];
+
+            // 현재 재고 수평선 추가
+            if (chartData.stock > 0) {{
+                traces.push({{
+                    x: chartData.months,
+                    y: Array(chartData.months.length).fill(chartData.stock),
+                    mode: 'lines',
+                    name: '현재 재고',
+                    line: {{ color: '#e53e3e', width: 2, dash: 'dash' }}
+                }});
+            }}
+
+            const layout = {{
+                title: chartData.drug_name,
+                xaxis: {{ title: '월', tickangle: -45 }},
+                yaxis: {{ title: '수량' }},
+                showlegend: true,
+                legend: {{ x: 0, y: 1.15, orientation: 'h' }},
+                margin: {{ t: 60, b: 80 }},
+                hovermode: 'x unified'
+            }};
+
+            Plotly.newPlot(`new-drugs-inline-chart-${{drugCode}}`, traces, layout, {{responsive: true}});
+        }}
+
         // 모달 외부 클릭 시 닫기
         window.onclick = function(event) {{
             var sporadicModal = document.getElementById('sporadicModal');
+            var newDrugsModal = document.getElementById('newDrugsModal');
             if (event.target == sporadicModal) {{
                 sporadicModal.style.display = 'none';
+            }}
+            if (event.target == newDrugsModal) {{
+                newDrugsModal.style.display = 'none';
             }}
         }}
     </script>
