@@ -275,6 +275,7 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
 
     # 메모 데이터 로드
     all_memos = drug_memos_db.get_all_memos()
+    memos_json = json.dumps(all_memos, ensure_ascii=False)
 
     # HTML 생성
     html_content = f"""<!DOCTYPE html>
@@ -1014,6 +1015,9 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
     {new_drugs_modal}
 
     <script>
+        // 메모 데이터
+        const allMemos = {memos_json};
+
         // 산점도 데이터
         const scatterData = {scatter_json};
         const thresholdHigh = {threshold_high};
@@ -1241,9 +1245,65 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
             Plotly.newPlot(`inline-chart-${{drugCode}}`, traces, layout, {{responsive: true}});
         }}
 
-        // 메모 열기 (실제 구현은 modal 필요)
+        // 메모 모달 열기
         function openMemo(drugCode) {{
-            alert('메모 기능은 약품 관리 페이지에서 이용하세요.\\n약품코드: ' + drugCode);
+            const modal = document.getElementById('memoModal');
+            const drugCodeElement = document.getElementById('memoDrugCode');
+            const textarea = document.getElementById('memoTextarea');
+
+            drugCodeElement.textContent = drugCode;
+            textarea.setAttribute('data-drug-code', drugCode);
+
+            // 기존 메모 로드
+            const existingMemo = allMemos[drugCode] || '';
+            textarea.value = existingMemo;
+
+            modal.style.display = 'flex';
+        }}
+
+        // 메모 모달 닫기
+        function closeMemoModal() {{
+            document.getElementById('memoModal').style.display = 'none';
+        }}
+
+        // 메모 저장
+        function saveMemo() {{
+            const textarea = document.getElementById('memoTextarea');
+            const drugCode = textarea.getAttribute('data-drug-code');
+            const memo = textarea.value;
+
+            fetch('/api/update_memo', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ drug_code: drugCode, memo: memo }})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.status === 'success') {{
+                    // 전역 메모 데이터 업데이트
+                    allMemos[drugCode] = memo;
+
+                    // 메모 버튼 스타일 업데이트
+                    const memoBtn = document.querySelector(`.memo-btn[onclick*="${{drugCode}}"]`);
+                    if (memoBtn) {{
+                        if (memo && memo.trim()) {{
+                            memoBtn.classList.add('has-memo');
+                            memoBtn.title = memo.substring(0, 50) + (memo.length > 50 ? '...' : '');
+                        }} else {{
+                            memoBtn.classList.remove('has-memo');
+                            memoBtn.title = '메모 추가';
+                        }}
+                    }}
+
+                    closeMemoModal();
+                }} else {{
+                    alert('메모 저장 실패: ' + (data.message || '알 수 없는 오류'));
+                }}
+            }})
+            .catch(error => {{
+                console.error('Error:', error);
+                alert('메모 저장 중 오류가 발생했습니다.');
+            }});
         }}
 
         // 단발성 약품 모달 열기/닫기
@@ -1470,14 +1530,31 @@ def generate_html_report(df, months, mode='dispense', threshold_high=0.5, thresh
         window.onclick = function(event) {{
             var sporadicModal = document.getElementById('sporadicModal');
             var newDrugsModal = document.getElementById('newDrugsModal');
+            var memoModal = document.getElementById('memoModal');
             if (event.target == sporadicModal) {{
                 sporadicModal.style.display = 'none';
             }}
             if (event.target == newDrugsModal) {{
                 newDrugsModal.style.display = 'none';
             }}
+            if (event.target == memoModal) {{
+                memoModal.style.display = 'none';
+            }}
         }}
     </script>
+
+    <!-- 메모 모달 -->
+    <div id="memoModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+            <h3 style="margin: 0 0 20px 0; color: #2d3748;">메모 작성</h3>
+            <p style="margin: 0 0 15px 0; color: #718096; font-size: 14px;">약품코드: <span id="memoDrugCode" style="font-weight: bold; color: #4a5568;"></span></p>
+            <textarea id="memoTextarea" style="width: 100%; height: 150px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box;" placeholder="메모를 입력하세요..."></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button onclick="closeMemoModal()" style="padding: 10px 20px; border: 2px solid #cbd5e0; background: white; border-radius: 8px; cursor: pointer; font-size: 14px;">취소</button>
+                <button onclick="saveMemo()" style="padding: 10px 20px; border: none; background: #4b5563; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold;">저장</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 """
