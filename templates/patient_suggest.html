@@ -507,6 +507,95 @@
             color: #9ca3af;
         }
 
+        /* 건너뛴 약품 섹션 */
+        .skipped-drugs-section {
+            margin-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 24px;
+        }
+
+        .skipped-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 12px;
+            background: #fef3c7;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .skipped-section-header:hover {
+            background: #fde68a;
+        }
+
+        .skipped-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #92400e;
+        }
+
+        .skipped-section-count {
+            background: #fbbf24;
+            color: #78350f;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .skipped-drugs-list {
+            display: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .skipped-drugs-list.visible {
+            display: block;
+        }
+
+        .skipped-drug-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .skipped-drug-item:last-child {
+            border-bottom: none;
+        }
+
+        .skipped-drug-item:hover {
+            background: #fef3c7;
+        }
+
+        .skipped-drug-info {
+            flex: 1;
+        }
+
+        .skipped-drug-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .skipped-drug-code {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .skipped-drug-badge {
+            background: #fbbf24;
+            color: #78350f;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
         /* 완료 상태 */
         .complete-state {
             text-align: center;
@@ -687,6 +776,15 @@
             <div class="loading">로딩 중...</div>
         </div>
 
+        <!-- 건너뛴 약품 섹션 -->
+        <div class="skipped-drugs-section" id="skippedDrugsSection" style="display: none;">
+            <div class="skipped-section-header" onclick="toggleSkippedDrugs()">
+                <span class="skipped-section-title">📋 건너뛴 약품</span>
+                <span class="skipped-section-count" id="skippedDrugsCount">0개</span>
+            </div>
+            <div class="skipped-drugs-list" id="skippedDrugsList"></div>
+        </div>
+
         <!-- 신규 약품 섹션 -->
         <div class="new-drugs-section" id="newDrugsSection" style="display: none;">
             <div class="section-header" onclick="toggleNewDrugs()">
@@ -751,6 +849,7 @@
                         await loadStats();
                         await loadNextSuggestion();
                         await loadNewDrugs();
+                        await loadSkippedDrugs();
                     } else {
                         showInactiveState(data.data);
                     }
@@ -1152,6 +1251,7 @@
                 if (data.status === 'success') {
                     await loadStats();
                     await loadNextSuggestion();
+                    await loadSkippedDrugs();
                 } else {
                     alert(data.message || '등록에 실패했습니다.');
                     btn.disabled = false;
@@ -1182,6 +1282,7 @@
 
                 if (data.status === 'success') {
                     await loadNextSuggestion();
+                    await loadSkippedDrugs();
                 } else {
                     alert(data.message || '건너뛰기에 실패했습니다.');
                 }
@@ -1235,6 +1336,64 @@
         function toggleNewDrugs() {
             const list = document.getElementById('newDrugsList');
             list.classList.toggle('visible');
+        }
+
+        // 건너뛴 약품 로드
+        async function loadSkippedDrugs() {
+            try {
+                const response = await fetch('/api/suggestion/skipped');
+                const data = await response.json();
+
+                if (data.status === 'success' && data.data.length > 0) {
+                    document.getElementById('skippedDrugsSection').style.display = 'block';
+                    document.getElementById('skippedDrugsCount').textContent = `${data.count}개`;
+
+                    const list = document.getElementById('skippedDrugsList');
+                    list.innerHTML = data.data.map(drug => `
+                        <div class="skipped-drug-item" onclick="loadSkippedDrug('${escapeHtml(drug.drug_code)}')">
+                            <div class="skipped-drug-info">
+                                <div class="skipped-drug-name">${escapeHtml(drug.drug_name)}</div>
+                                <div class="skipped-drug-code">${escapeHtml(drug.drug_code)} | ${escapeHtml(drug.company)}</div>
+                            </div>
+                            <div class="skipped-drug-badge">${drug.skip_count}회</div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('skippedDrugsSection').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('건너뛴 약품 로드 실패:', error);
+            }
+        }
+
+        // 건너뛴 약품 토글
+        function toggleSkippedDrugs() {
+            const list = document.getElementById('skippedDrugsList');
+            list.classList.toggle('visible');
+        }
+
+        // 건너뛴 약품 선택 시 메인 카드로 표시
+        async function loadSkippedDrug(drugCode) {
+            try {
+                const response = await fetch(`/api/suggestion/drug/${drugCode}`);
+                const data = await response.json();
+
+                if (data.status === 'success' && data.data) {
+                    currentSuggestion = data.data;
+                    renderSuggestionCard(data.data);
+
+                    // 건너뛴 약품 리스트 접기
+                    document.getElementById('skippedDrugsList').classList.remove('visible');
+
+                    // 스크롤 상단으로
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    alert('약품 정보를 불러올 수 없습니다.');
+                }
+            } catch (error) {
+                console.error('약품 로드 실패:', error);
+                alert('약품 정보를 불러오는 중 오류가 발생했습니다.');
+            }
         }
 
         // HTML 이스케이프

@@ -362,6 +362,109 @@ def get_new_drugs_list():
     return result
 
 
+def get_skipped_drugs_list():
+    """
+    건너뛴 약품 목록 반환
+
+    Returns:
+        list[dict]: 약품 정보 목록
+    """
+    skip_counts = suggestion_db.get_all_skips()
+
+    if not skip_counts:
+        return []
+
+    result = []
+    for 약품코드, skip_count in skip_counts.items():
+        # processed에서 약품명, 제약회사 조회
+        processed = processed_inventory_db.get_drug_by_code(약품코드)
+
+        if processed:
+            result.append({
+                'drug_code': 약품코드,
+                'drug_name': processed.get('약품명', ''),
+                'company': processed.get('제약회사', ''),
+                'skip_count': skip_count
+            })
+
+    # 건너뛰기 횟수 순으로 정렬 (적은 순)
+    result.sort(key=lambda x: x['skip_count'])
+
+    return result
+
+
+def get_drug_suggestion(약품코드):
+    """
+    특정 약품의 제안 상세 정보 반환 (get_next_suggestion과 동일 형태)
+
+    Args:
+        약품코드 (str): 약품 코드
+
+    Returns:
+        dict 또는 None: 제안 정보
+    """
+    # 상세 정보 조회
+    periodicity = drug_periodicity_db.get_periodicity(약품코드)
+    processed = processed_inventory_db.get_drug_by_code(약품코드)
+    inventory = inventory_db.get_inventory(약품코드)
+
+    if not processed:
+        return None
+
+    # 약품명, 제약회사 조회
+    drug_name = processed.get('약품명', '')
+    company = processed.get('제약회사', '')
+    drug_type = processed.get('약품유형', '')
+
+    # 현재 재고
+    current_stock = 0
+    if inventory:
+        current_stock = inventory.get('현재_재고수량', 0) or 0
+
+    # 월별 사용량
+    monthly_usage = []
+    usage_json = processed.get('월별_조제수량_리스트', '[]')
+    try:
+        if isinstance(usage_json, str):
+            monthly_usage = json.loads(usage_json)
+        else:
+            monthly_usage = usage_json
+    except:
+        monthly_usage = []
+
+    # 건너뛰기 횟수
+    skip_count = suggestion_db.get_skip_count(약품코드)
+
+    # 등록된 환자 수
+    registered_count = drug_patient_map_db.get_patient_count_for_drug(약품코드)
+
+    # 유사도 계산
+    centroid = calculate_centroid()
+    fv = drug_periodicity_db.get_feature_vector(약품코드)
+    if centroid is not None and fv:
+        similarity = cosine_sim(centroid, fv)
+    else:
+        similarity = periodicity['periodicity_score'] / 100 if periodicity else 0
+
+    return {
+        'drug_code': 약품코드,
+        'drug_name': drug_name,
+        'company': company,
+        'drug_type': drug_type,
+        'similarity': round(similarity * 100, 1),
+        'periodicity_score': periodicity['periodicity_score'] if periodicity else 0,
+        'avg_interval': periodicity['avg_interval'] if periodicity else None,
+        'interval_cv': periodicity['interval_cv'] if periodicity else None,
+        'height_cv': periodicity['height_cv'] if periodicity else None,
+        'peak_count': periodicity['peak_count'] if periodicity else 0,
+        'current_stock': current_stock,
+        'monthly_usage': monthly_usage,
+        'skip_count': skip_count,
+        'registered_count': registered_count,
+        'remaining_count': 0  # 개별 조회 시에는 의미 없음
+    }
+
+
 def get_suggestion_stats():
     """
     제안 관련 통계 반환

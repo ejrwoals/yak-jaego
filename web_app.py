@@ -2029,6 +2029,37 @@ def get_suggestion_stats():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/suggestion/skipped', methods=['GET'])
+def get_skipped_drugs():
+    """건너뛴 약품 목록 조회"""
+    try:
+        drugs = suggestion_engine.get_skipped_drugs_list()
+        return jsonify({
+            'status': 'success',
+            'data': drugs,
+            'count': len(drugs)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/suggestion/drug/<drug_code>', methods=['GET'])
+def get_drug_suggestion(drug_code):
+    """특정 약품의 제안 상세 정보 조회"""
+    try:
+        suggestion = suggestion_engine.get_drug_suggestion(drug_code)
+        if suggestion:
+            return jsonify({'status': 'success', 'data': suggestion})
+        else:
+            return jsonify({'status': 'error', 'message': '약품을 찾을 수 없습니다.'}), 404
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
     """Flask 앱 종료 API"""
