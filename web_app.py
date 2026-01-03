@@ -31,6 +31,8 @@ import patients_db
 import drug_patient_map_db
 import drug_flags_db
 import buffer_calculator
+import suggestion_engine
+import suggestion_db
 from utils import read_today_file
 
 app = Flask(__name__)
@@ -1901,6 +1903,129 @@ def rename_drug(drug_code):
             return jsonify({'status': 'error', 'message': result['message']}), 400
 
     except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
+# 환자-약품 매칭 제안 API (v3.17)
+# ============================================================
+
+@app.route('/patient/suggest')
+def patient_suggest_page():
+    """환자-약품 매칭 제안 페이지"""
+    return render_template('patient_suggest.html')
+
+
+@app.route('/api/suggestion/status', methods=['GET'])
+def get_suggestion_status():
+    """제안 기능 활성화 상태 조회"""
+    try:
+        result = suggestion_engine.get_activation_status()
+        return jsonify({'status': 'success', 'data': result})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/suggestion/next', methods=['GET'])
+def get_next_suggestion():
+    """다음 제안 약품 조회"""
+    try:
+        suggestion = suggestion_engine.get_next_suggestion()
+        if suggestion:
+            return jsonify({'status': 'success', 'data': suggestion})
+        else:
+            return jsonify({
+                'status': 'success',
+                'data': None,
+                'message': '제안할 약품이 없습니다.'
+            })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/suggestion/register', methods=['POST'])
+def register_suggestion():
+    """제안된 약품을 환자에게 등록"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        patient_id = data.get('patient_id')
+        dosage = data.get('dosage', 1)
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
+        if not patient_id:
+            return jsonify({'status': 'error', 'message': '환자ID가 없습니다.'}), 400
+
+        result = suggestion_engine.register_drug_for_suggestion(drug_code, patient_id, dosage)
+
+        if result['success']:
+            return jsonify({'status': 'success', 'message': result['message']})
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 400
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/suggestion/skip', methods=['POST'])
+def skip_suggestion():
+    """제안 건너뛰기"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 없습니다.'}), 400
+
+        result = suggestion_engine.skip_suggestion(drug_code)
+
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'skip_count': result['skip_count']
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 500
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/suggestion/new-drugs', methods=['GET'])
+def get_new_drugs():
+    """신규 약품 목록 (주기성 분석 불가)"""
+    try:
+        drugs = suggestion_engine.get_new_drugs_list()
+        return jsonify({
+            'status': 'success',
+            'count': len(drugs),
+            'data': drugs
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/suggestion/stats', methods=['GET'])
+def get_suggestion_stats():
+    """제안 관련 통계 조회"""
+    try:
+        stats = suggestion_engine.get_suggestion_stats()
+        return jsonify({'status': 'success', 'data': stats})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 

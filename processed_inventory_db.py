@@ -212,6 +212,52 @@ def get_processed_data(drug_type=None):
         return pd.DataFrame()
 
 
+def get_drug_by_code(drug_code):
+    """
+    특정 약품코드로 단일 약품 데이터 조회
+
+    Args:
+        drug_code (str): 약품 코드
+
+    Returns:
+        dict 또는 None: 약품 데이터 딕셔너리
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f'''
+            SELECT 약품코드, 약품명, 제약회사, 약품유형, "1년_이동평균",
+                   최종_재고수량, 런웨이, 월별_조제수량_리스트,
+                   "3개월_이동평균_리스트", 최종_업데이트일시
+            FROM {TABLE_NAME}
+            WHERE 약품코드 = ?
+        ''', (str(drug_code),))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        return {
+            '약품코드': row[0],
+            '약품명': row[1],
+            '제약회사': row[2],
+            '약품유형': row[3],
+            '1년_이동평균': row[4],
+            '최종_재고수량': row[5],
+            '런웨이': row[6],
+            '월별_조제수량_리스트': row[7],
+            '3개월_이동평균_리스트': row[8],
+            '최종_업데이트일시': row[9]
+        }
+
+    except Exception as e:
+        print(f"❌ 약품 조회 실패 ({drug_code}): {e}")
+        return None
+
+
 def get_statistics():
     """
     DB 통계 반환

@@ -283,6 +283,20 @@
             background: #f56565;
         }
 
+        .btn-suggest {
+            background: linear-gradient(135deg, #f6e05e 0%, #ecc94b 100%);
+            color: #744210;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-suggest:hover {
+            background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(236, 201, 75, 0.4);
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -697,6 +711,7 @@
                 <button class="filter-btn" data-filter="shortage" onclick="setFilter('shortage')">&#9888;&#65039; 부족</button>
                 <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">&#9989; 정상</button>
             </div>
+            <a href="/patient/suggest" class="btn btn-suggest" id="suggestLink" style="display: none; white-space: nowrap; text-decoration: none;">&#128161; 약품 추천</a>
             <button class="btn btn-primary" onclick="openPatientModal()" style="white-space: nowrap;">+ 새 환자</button>
         </div>
 
@@ -860,7 +875,22 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             loadPatients();
+            checkSuggestionStatus();
         });
+
+        // Check if suggestion feature is active
+        function checkSuggestionStatus() {
+            fetch('/api/suggestion/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success' && data.data.active) {
+                        document.getElementById('suggestLink').style.display = 'inline-flex';
+                    }
+                })
+                .catch(error => {
+                    console.log('Suggestion status check failed:', error);
+                });
+        }
 
         function loadPatients() {
             fetch('/api/patients-with-drugs')

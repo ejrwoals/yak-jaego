@@ -16,6 +16,8 @@ import sys
 from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
 import inventory_db
 import processed_inventory_db
+import periodicity_calculator
+import drug_periodicity_db
 
 
 def main():
@@ -108,6 +110,14 @@ def main():
     inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
     inventory_data['약품유형'] = '일반약'
     inventory_db.upsert_inventory(inventory_data, show_summary=True)
+
+    # Step 4.5: 주기성 지표 계산
+    print("\n🔄 Step 4.5: 주기성 지표 계산")
+    print("-" * 60)
+    print("   기존 주기성 데이터 초기화 중...")
+    drug_periodicity_db.clear_all()
+    result = periodicity_calculator.calculate_all_periodicity(show_progress=True)
+    print(f"   ✅ 주기성 계산 완료: {result['calculated']}/{result['total']}개")
 
     # Step 5: 최종 통계 출력
     print("\n" + "=" * 60)
