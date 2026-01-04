@@ -1128,6 +1128,250 @@
             font-size: 11px;
         }
 
+        /* 토스트 알림 */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #1f2937;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 500;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+
+        /* 약품에 환자 추가 모달 */
+        .drug-patients-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 350;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .drug-patients-modal.visible {
+            display: flex;
+        }
+
+        .drug-patients-content {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .drug-patients-header {
+            margin-bottom: 16px;
+        }
+
+        .drug-patients-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .drug-patients-subtitle {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        /* 등록된 환자 섹션 */
+        .registered-patients-section {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .registered-patients-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .registered-patients-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .registered-patients-count {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .registered-patients-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+
+        .registered-patient-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .registered-patient-tag .check {
+            color: #f59e0b;
+        }
+
+        .registered-patients-empty {
+            font-size: 12px;
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        /* 환자 검색 박스 */
+        .patient-search-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .patient-search-box input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .patient-search-box input:focus {
+            outline: none;
+            border-color: #48bb78;
+        }
+
+        .patient-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+        }
+
+        .patient-search-results.visible {
+            display: block;
+        }
+
+        .patient-search-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.2s;
+        }
+
+        .patient-search-item:last-child {
+            border-bottom: none;
+        }
+
+        .patient-search-item:hover {
+            background: #f0fdf4;
+        }
+
+        .patient-search-item.already-registered {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f8fafc;
+        }
+
+        .patient-search-item.already-registered:hover {
+            background: #f8fafc;
+        }
+
+        .patient-search-item .name {
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .patient-search-item .birth {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .patient-search-item.new-patient {
+            background: #fef3c7;
+            color: #92400e;
+            font-weight: 500;
+        }
+
+        .patient-search-item.new-patient:hover {
+            background: #fde68a;
+        }
+
+        /* 환자 처방량 입력 영역 */
+        .patient-dosage-area {
+            background: #f0fdf4;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 2px solid #48bb78;
+        }
+
+        .selected-patient-info {
+            margin-bottom: 12px;
+        }
+
+        .selected-patient-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .selected-patient-birth {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .drug-patients-footer {
+            display: flex;
+            justify-content: flex-end;
+        }
+
         /* 반응형 */
         @media (max-width: 600px) {
             .metrics-grid {
@@ -1283,6 +1527,9 @@
         </div>
     </div>
 
+    <!-- 토스트 알림 -->
+    <div class="toast" id="toast"></div>
+
     <!-- 환자 약품 등록 모달 (검색 기반) -->
     <div class="patient-drugs-modal" id="patientDrugsModal">
         <div class="patient-drugs-content">
@@ -1335,6 +1582,53 @@
         </div>
     </div>
 
+    <!-- 약품에 환자 추가 모달 -->
+    <div class="drug-patients-modal" id="drugPatientsModal">
+        <div class="drug-patients-content">
+            <div class="drug-patients-header">
+                <div class="drug-patients-title" id="drugPatientsModalTitle">약품에 환자 추가</div>
+                <div class="drug-patients-subtitle" id="drugPatientsModalSubtitle">환자를 검색하여 등록하세요</div>
+            </div>
+
+            <!-- 이미 등록된 환자 목록 -->
+            <div class="registered-patients-section" id="registeredPatientsSection">
+                <div class="registered-patients-header">
+                    <span class="registered-patients-label">등록된 환자</span>
+                    <span class="registered-patients-count" id="registeredPatientsCount">0명</span>
+                </div>
+                <div class="registered-patients-list" id="registeredPatientsList">
+                    <!-- 등록된 환자 태그들 -->
+                </div>
+            </div>
+
+            <!-- 환자 검색 입력 -->
+            <div class="patient-search-box">
+                <input type="text" id="modalPatientSearchInput" placeholder="환자명으로 검색..." autocomplete="off" oninput="onModalPatientSearchInput()" onfocus="showModalPatientResults()">
+                <div class="patient-search-results" id="modalPatientSearchResults"></div>
+            </div>
+
+            <!-- 처방량 입력 영역 (선택 후 표시) -->
+            <div class="patient-dosage-area" id="patientDosageArea" style="display: none;">
+                <div class="selected-patient-info" id="selectedPatientInfo">
+                    <div class="selected-patient-name" id="selectedPatientName">-</div>
+                    <div class="selected-patient-birth" id="selectedPatientBirth">-</div>
+                </div>
+                <div class="dosage-form-row">
+                    <label for="modalPatientDosage">1회 처방량</label>
+                    <input type="number" id="modalPatientDosage" value="1" min="1">
+                </div>
+                <div class="dosage-buttons">
+                    <button class="btn btn-secondary" onclick="cancelPatientSelection()">취소</button>
+                    <button class="btn btn-primary" onclick="registerDrugPatient()">등록</button>
+                </div>
+            </div>
+
+            <div class="drug-patients-footer">
+                <button class="btn btn-secondary" onclick="closeDrugPatientsModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 전역 변수
         let currentSuggestion = null;
@@ -1346,6 +1640,8 @@
         let selectedDrugForPatient = null;  // 환자에게 등록할 선택된 약품
         let drugSearchTimeout = null;  // 검색 디바운스용
         let patientRegisteredDrugs = [];  // 환자에게 이미 등록된 약품 코드 목록
+        let drugRegisteredPatients = [];  // 약품에 이미 등록된 환자 ID 목록
+        let selectedPatientForDrug = null;  // 약품에 등록할 선택된 환자
 
         // 페이지 로드 시
         document.addEventListener('DOMContentLoaded', async function() {
@@ -1826,19 +2122,252 @@
             document.getElementById('successModal').classList.remove('visible');
         }
 
-        // 이 약품에 다른 환자 추가
-        function addAnotherPatient() {
+        // 이 약품에 다른 환자 추가 (모달 열기)
+        async function addAnotherPatient() {
+            if (!lastRegistration) return;
+
             closeSuccessModal();
 
-            // 환자 선택만 초기화하고 같은 약품 유지
-            clearPatientSelection();
+            const drugName = lastRegistration.drug.drug_name;
+            const drugCode = lastRegistration.drug.drug_code;
 
-            // 버튼 상태 복원
-            const btn = document.getElementById('registerBtn');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = '등록하기';
+            // 모달 타이틀 업데이트
+            document.getElementById('drugPatientsModalTitle').textContent = '약품에 환자 추가';
+            document.getElementById('drugPatientsModalSubtitle').textContent = drugName;
+
+            // 초기화
+            document.getElementById('modalPatientSearchInput').value = '';
+            document.getElementById('modalPatientSearchResults').classList.remove('visible');
+            document.getElementById('patientDosageArea').style.display = 'none';
+            selectedPatientForDrug = null;
+
+            // 등록된 환자 섹션 초기화 (로딩 표시)
+            document.getElementById('registeredPatientsList').innerHTML =
+                '<span class="registered-patients-empty">로딩 중...</span>';
+            document.getElementById('registeredPatientsCount').textContent = '-';
+
+            // 모달 표시
+            document.getElementById('drugPatientsModal').classList.add('visible');
+
+            // 약품에 등록된 환자 목록 로드
+            await loadDrugRegisteredPatients(drugCode);
+
+            // 검색창에 포커스
+            setTimeout(() => {
+                document.getElementById('modalPatientSearchInput').focus();
+            }, 100);
+        }
+
+        // 약품에 등록된 환자 목록 로드
+        async function loadDrugRegisteredPatients(drugCode) {
+            try {
+                const response = await fetch(`/api/drug/${drugCode}/patients`);
+                const data = await response.json();
+
+                if (data.status === 'success' && data.data) {
+                    // API 응답: data.data (환자 목록)
+                    drugRegisteredPatients = data.data.map(p => p.환자ID);
+                    renderRegisteredPatients(data.data);
+                } else {
+                    drugRegisteredPatients = [];
+                    renderRegisteredPatients([]);
+                }
+            } catch (error) {
+                console.error('등록된 환자 로드 실패:', error);
+                drugRegisteredPatients = [];
+                renderRegisteredPatients([]);
             }
+        }
+
+        // 등록된 환자 태그 렌더링
+        function renderRegisteredPatients(patientsList) {
+            const list = document.getElementById('registeredPatientsList');
+            const countEl = document.getElementById('registeredPatientsCount');
+
+            if (!patientsList || patientsList.length === 0) {
+                list.innerHTML = '<span class="registered-patients-empty">등록된 환자가 없습니다</span>';
+                countEl.textContent = '0명';
+                return;
+            }
+
+            countEl.textContent = `${patientsList.length}명`;
+            list.innerHTML = patientsList.map(patient => `
+                <span class="registered-patient-tag">
+                    <span class="check">✓</span>
+                    ${escapeHtml(patient.환자명)}
+                </span>
+            `).join('');
+        }
+
+        // 모달 내 환자 검색 입력 핸들러
+        function onModalPatientSearchInput() {
+            filterModalPatients();
+        }
+
+        // 모달 환자 검색 결과 표시
+        function showModalPatientResults() {
+            filterModalPatients();
+        }
+
+        // 환자 필터링 및 결과 렌더링
+        function filterModalPatients() {
+            const input = document.getElementById('modalPatientSearchInput');
+            const query = input.value.trim().toLowerCase();
+            const resultsDiv = document.getElementById('modalPatientSearchResults');
+
+            // 처방량 입력 영역 숨김
+            document.getElementById('patientDosageArea').style.display = 'none';
+            selectedPatientForDrug = null;
+
+            let filtered = patients;
+            if (query.length > 0) {
+                filtered = patients.filter(p =>
+                    p.환자명.toLowerCase().includes(query) ||
+                    (p.주민번호_앞자리 && p.주민번호_앞자리.includes(query))
+                );
+            }
+
+            let html = '';
+
+            // 기존 환자 목록
+            if (filtered.length > 0) {
+                html = filtered.map(p => {
+                    const isRegistered = drugRegisteredPatients.includes(p.환자ID);
+                    const registeredClass = isRegistered ? ' already-registered' : '';
+                    const onclick = isRegistered ? '' : `onclick="selectPatientForDrug(${p.환자ID}, '${escapeHtml(p.환자명)}', '${p.주민번호_앞자리 || ''}')"`;
+
+                    return `
+                        <div class="patient-search-item${registeredClass}" ${onclick}>
+                            <div class="name">${escapeHtml(p.환자명)}${isRegistered ? ' (등록됨)' : ''}</div>
+                            <div class="birth">${p.주민번호_앞자리 || ''}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // 새 환자 등록 옵션
+            if (query.length > 0) {
+                html += `
+                    <div class="patient-search-item new-patient" onclick="openNewPatientModalFromDrug('${escapeHtml(query)}')">
+                        + "${escapeHtml(query)}" 새로 등록
+                    </div>
+                `;
+            }
+
+            if (!html) {
+                html = '<div class="patient-search-item" style="cursor: default; color: #9ca3af;">환자명을 입력하세요</div>';
+            }
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.classList.add('visible');
+        }
+
+        // 약품에 등록할 환자 선택
+        function selectPatientForDrug(patientId, name, birth) {
+            selectedPatientForDrug = {
+                id: patientId,
+                name: name,
+                birth: birth
+            };
+
+            // 검색 결과 숨김
+            document.getElementById('modalPatientSearchResults').classList.remove('visible');
+
+            // 선택된 환자 정보 표시
+            document.getElementById('selectedPatientName').textContent = name;
+            document.getElementById('selectedPatientBirth').textContent = birth || '-';
+
+            // 처방량 초기화
+            document.getElementById('modalPatientDosage').value = 1;
+
+            // 처방량 입력 영역 표시
+            document.getElementById('patientDosageArea').style.display = 'block';
+
+            // 처방량 입력에 포커스
+            setTimeout(() => {
+                document.getElementById('modalPatientDosage').focus();
+                document.getElementById('modalPatientDosage').select();
+            }, 100);
+        }
+
+        // 환자 선택 취소
+        function cancelPatientSelection() {
+            selectedPatientForDrug = null;
+            document.getElementById('patientDosageArea').style.display = 'none';
+            document.getElementById('modalPatientSearchInput').value = '';
+            document.getElementById('modalPatientSearchInput').focus();
+        }
+
+        // 약품에 환자 등록
+        async function registerDrugPatient() {
+            if (!selectedPatientForDrug || !lastRegistration) return;
+
+            const dosage = parseInt(document.getElementById('modalPatientDosage').value) || 1;
+            const drugCode = lastRegistration.drug.drug_code;
+
+            try {
+                const response = await fetch(`/api/patient/${selectedPatientForDrug.id}/link-drug`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drug_code: drugCode,
+                        dosage: dosage
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // 등록 성공 - 토스트 알림
+                    showToast(`✓ ${selectedPatientForDrug.name} 등록 완료`);
+
+                    // 초기화
+                    document.getElementById('modalPatientSearchInput').value = '';
+                    document.getElementById('modalPatientSearchResults').classList.remove('visible');
+                    document.getElementById('patientDosageArea').style.display = 'none';
+                    selectedPatientForDrug = null;
+
+                    // 검색창에 포커스
+                    document.getElementById('modalPatientSearchInput').focus();
+
+                    // 등록된 환자 목록 갱신
+                    await loadDrugRegisteredPatients(drugCode);
+
+                    // 통계 갱신
+                    await loadStats();
+                } else {
+                    alert(data.message || '등록에 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('환자 등록 실패:', error);
+                alert('등록 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 약품에서 신규 환자 등록 모달 열기
+        function openNewPatientModalFromDrug(name) {
+            pendingNewPatientName = name;
+            document.getElementById('newPatientName').textContent = name;
+            document.getElementById('newPatientBirth').value = '';
+            document.getElementById('newPatientModal').classList.add('visible');
+
+            // 검색 결과 숨김
+            document.getElementById('modalPatientSearchResults').classList.remove('visible');
+
+            // 포커스
+            setTimeout(() => {
+                document.getElementById('newPatientBirth').focus();
+            }, 100);
+        }
+
+        // 약품 환자 모달 닫기 (다음 제안으로 이동)
+        async function closeDrugPatientsModal() {
+            document.getElementById('drugPatientsModal').classList.remove('visible');
+            selectedPatientForDrug = null;
+            drugRegisteredPatients = [];
+
+            // 다음 제안 카드로 이동
+            await loadNextSuggestion();
         }
 
         // 환자의 다른 약품 등록 모달 열기
@@ -2008,8 +2537,8 @@
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    // 등록 성공 - 모달 초기화하고 계속 검색 가능
-                    alert(`${selectedDrugForPatient.drug_name} 등록 완료!`);
+                    // 등록 성공 - 토스트 알림 (alert 대신)
+                    showToast(`✓ ${selectedDrugForPatient.drug_name} 등록 완료`);
 
                     // 검색창 초기화
                     document.getElementById('drugSearchInput').value = '';
@@ -2047,11 +2576,14 @@
             document.getElementById('drugSearchInput').focus();
         }
 
-        // 환자 약품 모달 닫기
-        function closePatientDrugsModal() {
+        // 환자 약품 모달 닫기 (다음 제안으로 이동)
+        async function closePatientDrugsModal() {
             document.getElementById('patientDrugsModal').classList.remove('visible');
             selectedDrugForPatient = null;
             patientRegisteredDrugs = [];
+
+            // 다음 제안 카드로 이동
+            await loadNextSuggestion();
         }
 
         // 환자의 등록된 약품 목록 로드
@@ -2061,7 +2593,8 @@
                 const data = await response.json();
 
                 if (data.status === 'success' && data.drugs) {
-                    patientRegisteredDrugs = data.drugs.map(d => d.약품코드);
+                    // API 응답 필드: drug_code, drug_name
+                    patientRegisteredDrugs = data.drugs.map(d => d.drug_code);
                     renderRegisteredDrugs(data.drugs);
                 } else {
                     patientRegisteredDrugs = [];
@@ -2086,10 +2619,11 @@
             }
 
             countEl.textContent = `${drugs.length}개`;
+            // API 응답 필드: drug_name
             list.innerHTML = drugs.map(drug => `
                 <span class="registered-drug-tag">
                     <span class="check">✓</span>
-                    ${escapeHtml(drug.약품명).substring(0, 15)}${drug.약품명.length > 15 ? '...' : ''}
+                    ${escapeHtml(drug.drug_name).substring(0, 15)}${drug.drug_name.length > 15 ? '...' : ''}
                 </span>
             `).join('');
         }
@@ -2239,6 +2773,21 @@
             return div.innerHTML;
         }
 
+        // 토스트 알림 표시
+        function showToast(message, type = 'success', duration = 2000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+
+            // 표시
+            setTimeout(() => toast.classList.add('visible'), 10);
+
+            // 자동 숨김
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, duration);
+        }
+
         // Info Box 토글
         function toggleInfoBox() {
             const content = document.getElementById('info-box-content');
@@ -2280,11 +2829,31 @@
             }
         });
 
+        // 약품 환자 모달 외부 클릭 시 닫기
+        document.getElementById('drugPatientsModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDrugPatientsModal();
+            }
+        });
+
+        // 약품 환자 모달 내 검색 결과 외부 클릭 시 닫기
+        document.getElementById('drugPatientsModal').addEventListener('click', function(e) {
+            const searchBox = document.querySelector('.patient-search-box');
+            const resultsDiv = document.getElementById('modalPatientSearchResults');
+            if (searchBox && !searchBox.contains(e.target) && resultsDiv.classList.contains('visible')) {
+                resultsDiv.classList.remove('visible');
+            }
+        });
+
         // ESC 키로 모달 닫기
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                // 환자 약품 모달이 열려있으면 먼저 닫기
-                if (document.getElementById('patientDrugsModal').classList.contains('visible')) {
+                // 약품 환자 모달이 열려있으면 먼저 닫기
+                if (document.getElementById('drugPatientsModal').classList.contains('visible')) {
+                    closeDrugPatientsModal();
+                }
+                // 환자 약품 모달이 열려있으면 닫기
+                else if (document.getElementById('patientDrugsModal').classList.contains('visible')) {
                     closePatientDrugsModal();
                 }
                 // 등록 완료 모달이 열려있으면 닫기

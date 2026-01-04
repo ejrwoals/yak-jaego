@@ -1281,15 +1281,30 @@ def get_managed_drugs():
     try:
         # 각 DB에서 설정된 약품코드 수집
         drug_codes = set()
+        drug_timestamps = {}  # 약품코드 -> 가장 이른 타임스탬프
 
-        # 1. 메모가 있는 약품
-        memos = drug_memos_db.get_all_memos()
-        drug_codes.update(memos.keys())
+        # 1. 메모가 있는 약품 (타임스탬프 포함)
+        memos_with_details = drug_memos_db.get_all_memos_with_details()
+        memos = {}
+        for m in memos_with_details:
+            code = m['약품코드']
+            memos[code] = m['메모']
+            drug_codes.add(code)
+            ts = m.get('작성일시')
+            if ts:
+                if code not in drug_timestamps or ts < drug_timestamps[code]:
+                    drug_timestamps[code] = ts
 
-        # 2. 임계값이 설정된 약품
+        # 2. 임계값이 설정된 약품 (타임스탬프 포함)
         thresholds_df = drug_thresholds_db.get_all_thresholds()
         if not thresholds_df.empty:
             drug_codes.update(thresholds_df['약품코드'].tolist())
+            for _, row in thresholds_df.iterrows():
+                code = row['약품코드']
+                ts = row.get('생성일시')
+                if ts:
+                    if code not in drug_timestamps or ts < drug_timestamps[code]:
+                        drug_timestamps[code] = ts
 
         # 3. 특별관리 플래그가 설정된 약품
         flagged = drug_flags_db.get_flagged_drugs()
@@ -1338,7 +1353,8 @@ def get_managed_drugs():
                 'has_memo': bool(memo),
                 'memo_preview': memo[:50] + '...' if len(memo) > 50 else memo,
                 'special_flag': flag,
-                'patients': patients
+                'patients': patients,
+                'created_at': drug_timestamps.get(drug_code)
             })
 
         # 약품명 기준 정렬
@@ -1631,7 +1647,8 @@ def get_patients_with_drugs():
                 'shortage_count': shortage_count,
                 'exact_count': exact_count,
                 'has_shortage': shortage_count > 0,
-                'has_exact': exact_count > 0
+                'has_exact': exact_count > 0,
+                'created_at': patient.get('생성일시')
             })
 
         # 정렬: 부족 약품 있는 환자 우선, 그 다음 부족 개수 내림차순

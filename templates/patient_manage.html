@@ -74,19 +74,37 @@
             transform: translateY(0);
         }
 
-        /* Stats Bar */
-        .stats-bar {
+        /* Header Row (Stats + Actions) */
+        .header-row {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
             gap: 15px;
-            padding: 15px;
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-            border-radius: 12px;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 15px;
+            padding: 12px 16px;
+            background: #f1f5f9;
+            border-radius: 10px;
+            flex-wrap: wrap;
+            border: 1px solid #e2e8f0;
+            flex: 1;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
         .stat-item {
-            color: white;
+            color: #475569;
             font-size: 14px;
             display: flex;
             align-items: center;
@@ -96,6 +114,7 @@
         .stat-value {
             font-weight: bold;
             font-size: 16px;
+            color: #1e293b;
         }
 
         /* Search & Filter */
@@ -106,7 +125,7 @@
         .search-filter-bar {
             display: flex;
             gap: 15px;
-            align-items: stretch;
+            align-items: center;
             flex-wrap: wrap;
         }
 
@@ -130,25 +149,57 @@
         }
 
         .filter-btn {
-            padding: 10px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            background: white;
+            padding: 6px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 20px;
+            background: #f9fafb;
             cursor: pointer;
-            font-size: 14px;
-            color: #4a5568;
+            font-size: 13px;
+            font-weight: 500;
+            color: #6b7280;
             transition: all 0.2s;
         }
 
         .filter-btn:hover {
-            border-color: #48bb78;
-            color: #48bb78;
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            color: #374151;
         }
 
         .filter-btn.active {
-            background: #48bb78;
-            border-color: #48bb78;
-            color: white;
+            background: #ecfdf5;
+            border-color: #34d399;
+            color: #059669;
+        }
+
+        .sort-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            padding-left: 10px;
+            border-left: 1px solid #e2e8f0;
+        }
+
+        .sort-btn {
+            padding: 5px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            color: #9ca3af;
+            transition: all 0.2s;
+        }
+
+        .sort-btn:hover {
+            color: #6b7280;
+            border-color: #d1d5db;
+        }
+
+        .sort-btn.active {
+            background: #f9fafb;
+            border-color: #9ca3af;
+            color: #374151;
         }
 
         /* Patient Card List */
@@ -687,18 +738,24 @@
 
         <div id="statusMessage" class="status-message"></div>
 
-        <div class="stats-bar" id="statsBar">
-            <div class="stat-item">
-                <span>전체 환자:</span>
-                <span class="stat-value" id="statTotal">0</span>명
+        <div class="header-row">
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item">
+                    <span>전체 환자:</span>
+                    <span class="stat-value" id="statTotal">0</span>명
+                </div>
+                <div class="stat-item">
+                    <span>&#9888;&#65039; 부족 있음:</span>
+                    <span class="stat-value" id="statShortage">0</span>명
+                </div>
+                <div class="stat-item">
+                    <span>&#9989; 정상:</span>
+                    <span class="stat-value" id="statNormal">0</span>명
+                </div>
             </div>
-            <div class="stat-item">
-                <span>&#9888;&#65039; 부족 있음:</span>
-                <span class="stat-value" id="statShortage">0</span>명
-            </div>
-            <div class="stat-item">
-                <span>&#9989; 정상:</span>
-                <span class="stat-value" id="statNormal">0</span>명
+            <div class="header-actions">
+                <a href="/patient/suggest" class="btn btn-suggest" id="suggestLink" style="display: none; text-decoration: none;">&#128161; 약품 추천</a>
+                <button class="btn btn-primary" onclick="openPatientModal()">+ 새 환자</button>
             </div>
         </div>
 
@@ -708,11 +765,13 @@
                    oninput="filterPatients()">
             <div class="filter-buttons">
                 <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
-                <button class="filter-btn" data-filter="shortage" onclick="setFilter('shortage')">&#9888;&#65039; 부족</button>
-                <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">&#9989; 정상</button>
+                <button class="filter-btn" data-filter="shortage" onclick="setFilter('shortage')">⚠️ 부족</button>
+                <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">✅ 정상</button>
             </div>
-            <a href="/patient/suggest" class="btn btn-suggest" id="suggestLink" style="display: none; white-space: nowrap; text-decoration: none;">&#128161; 약품 추천</a>
-            <button class="btn btn-primary" onclick="openPatientModal()" style="white-space: nowrap;">+ 새 환자</button>
+            <div class="sort-buttons">
+                <button class="sort-btn active" data-sort="recent" onclick="setSort('recent')">최근추가순</button>
+                <button class="sort-btn" data-sort="name" onclick="setSort('name')">가나다순</button>
+            </div>
         </div>
 
         <div class="patient-list" id="patientList">
@@ -865,6 +924,7 @@
     <script>
         let allPatients = [];
         let currentFilter = 'all';
+        let currentSort = 'recent';
         let currentPatientId = null;
         let isEditMode = false;
         let patientDrugs = [];  // Current patient's drugs in modal
@@ -968,7 +1028,7 @@
 
         function filterPatients() {
             const query = document.getElementById('searchInput').value.toLowerCase();
-            let filtered = allPatients;
+            let filtered = [...allPatients];  // 복사본 사용
 
             // Apply search
             if (query) {
@@ -985,6 +1045,13 @@
                 filtered = filtered.filter(p => !p.has_shortage || p.drug_count === 0);
             }
 
+            // Apply sort
+            if (currentSort === 'name') {
+                filtered.sort((a, b) => a.patient_name.localeCompare(b.patient_name, 'ko'));
+            } else if (currentSort === 'recent') {
+                filtered.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+            }
+
             renderPatients(filtered);
         }
 
@@ -994,6 +1061,17 @@
             // Update button states
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+
+            filterPatients();
+        }
+
+        function setSort(sort) {
+            currentSort = sort;
+
+            // Update button states
+            document.querySelectorAll('.sort-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.sort === sort);
             });
 
             filterPatients();
