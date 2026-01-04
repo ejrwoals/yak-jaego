@@ -418,8 +418,8 @@
 
         .exit-btn {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
+            top: 20px;
+            left: 20px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -428,16 +428,22 @@
             color: white;
             border: none;
             border-radius: 25px;
-            font-size: 1em;
+            font-size: 0.95em;
             font-weight: 600;
             cursor: pointer;
             box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s ease;
+            z-index: 1000;
         }
 
         .exit-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+        }
+
+        .exit-btn:active {
+            transform: translateY(0);
         }
 
         /* Toast */
@@ -593,10 +599,7 @@
         </div>
     </div>
 
-    <button class="exit-btn" onclick="exitApp()">
-        <span>🛑</span>
-        <span>종료</span>
-    </button>
+    <button class="exit-btn" onclick="exitApp()">⏻ 종료</button>
 
     <script>
         function showToast(message, type = 'success') {
