@@ -3,6 +3,7 @@
 /order_calc_reports
 /inventory_reports
 /volatility_reports
+/periodicity_reports
 /uploads
 
 *.csv
