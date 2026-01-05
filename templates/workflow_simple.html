@@ -134,42 +134,192 @@
             background: #555;
         }
 
-        .select-wrapper {
+        /* Custom Dropdown Styles */
+        .custom-dropdown {
             position: relative;
+            width: 100%;
         }
 
-        select {
+        .custom-dropdown-selected {
             width: 100%;
-            padding: 15px;
+            padding: 15px 40px 15px 15px;
             border: 2px solid #e2e8f0;
             border-radius: 10px;
             font-size: 1em;
             background: white;
             cursor: pointer;
-            appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
             transition: all 0.3s;
+            position: relative;
         }
 
-        select:hover {
+        .custom-dropdown-selected:hover {
             border-color: #cbd5e0;
         }
 
-        select:focus {
-            outline: none;
+        .custom-dropdown-selected.open {
             border-color: #555;
             box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+            border-radius: 10px 10px 0 0;
         }
 
-        .select-wrapper::after {
+        .custom-dropdown-selected::after {
             content: '▼';
             position: absolute;
             right: 15px;
             top: 50%;
             transform: translateY(-50%);
-            pointer-events: none;
             color: #718096;
+            font-size: 0.8em;
+            transition: transform 0.3s;
+        }
+
+        .custom-dropdown-selected.open::after {
+            transform: translateY(-50%) rotate(180deg);
+        }
+
+        .custom-dropdown-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #555;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.3s ease, opacity 0.2s ease;
+            z-index: 100;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .custom-dropdown-options.open {
+            max-height: 300px;
+            overflow-y: auto;
+            opacity: 1;
+        }
+
+        .custom-dropdown-option {
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .custom-dropdown-option:hover {
+            background: #f7fafc;
+        }
+
+        .custom-dropdown-option.selected {
+            background: #edf2f7;
+            font-weight: 600;
+        }
+
+        .custom-dropdown-option.selected::before {
+            content: '✓';
+            color: #555;
+            font-weight: bold;
+        }
+
+        .custom-dropdown-option:last-child {
+            border-radius: 0 0 8px 8px;
+        }
+
+        /* Custom Confirm Modal Styles */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirm-modal-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.2s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .confirm-modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+
+        .confirm-modal-buttons .btn-cancel {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .confirm-modal-buttons .btn-cancel:hover {
+            background: #cbd5e0;
+        }
+
+        .confirm-modal-buttons .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .confirm-modal-buttons .btn-danger:hover {
+            background: #e53e3e;
         }
 
         .tooltip {
@@ -561,7 +711,7 @@
     <div class="toast-container" id="toast-container"></div>
 
     <div class="container">
-        <a href="/" class="back-btn">← 메인으로 돌아가기</a>
+        <a href="/" class="back-btn">← 홈으로 돌아가기</a>
 
         <h1>📊 재고 분석 보고서</h1>
 
@@ -613,18 +763,22 @@
                     이동평균 개월 수
                     <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.&#10;• 3개월: 단기 트렌드 (권장)&#10;• 6개월: 중기 트렌드&#10;• 12개월: 장기 트렌드">ⓘ</span>
                 </label>
-                <div class="select-wrapper">
-                    <select name="ma_months" id="ma_months">
-                        <option value="1">1개월 (매우 단기)</option>
-                        <option value="2">2개월 (단기)</option>
-                        <option value="3" selected>3개월 (권장 - 단기 트렌드)</option>
-                        <option value="4">4개월</option>
-                        <option value="5">5개월</option>
-                        <option value="6">6개월 (중기 트렌드)</option>
-                        <option value="9">9개월</option>
-                        <option value="12">12개월 (장기 트렌드)</option>
-                    </select>
+                <div class="custom-dropdown" id="maMonthsDropdown">
+                    <div class="custom-dropdown-selected" onclick="toggleDropdown('maMonthsDropdown')">
+                        3개월 (권장 - 단기 트렌드)
+                    </div>
+                    <div class="custom-dropdown-options">
+                        <div class="custom-dropdown-option" data-value="1">1개월 (매우 단기)</div>
+                        <div class="custom-dropdown-option" data-value="2">2개월 (단기)</div>
+                        <div class="custom-dropdown-option selected" data-value="3">3개월 (권장 - 단기 트렌드)</div>
+                        <div class="custom-dropdown-option" data-value="4">4개월</div>
+                        <div class="custom-dropdown-option" data-value="5">5개월</div>
+                        <div class="custom-dropdown-option" data-value="6">6개월 (중기 트렌드)</div>
+                        <div class="custom-dropdown-option" data-value="9">9개월</div>
+                        <div class="custom-dropdown-option" data-value="12">12개월 (장기 트렌드)</div>
+                    </div>
                 </div>
+                <input type="hidden" name="ma_months" id="ma_months" value="3">
             </div>
 
             <div class="form-group">
@@ -681,7 +835,125 @@
 
     <button class="exit-btn" onclick="exitApp()">⏻ 종료</button>
 
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon" id="confirmModalIcon">⏻</div>
+            <div class="confirm-modal-title" id="confirmModalTitle">애플리케이션 종료</div>
+            <div class="confirm-modal-message" id="confirmModalMessage">정말 애플리케이션을 종료하시겠습니까?</div>
+            <div class="confirm-modal-buttons">
+                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
+                <button class="btn-danger" id="confirmModalBtn" onclick="closeConfirmModal(true)">종료</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Custom Confirm Modal
+        let confirmCallback = null;
+
+        function showConfirmModal(options) {
+            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+
+            document.getElementById('confirmModalIcon').textContent = icon;
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').innerHTML = message;
+
+            const confirmBtn = document.getElementById('confirmModalBtn');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+
+            document.getElementById('confirmModal').classList.add('visible');
+
+            return new Promise(resolve => {
+                confirmCallback = resolve;
+            });
+        }
+
+        function closeConfirmModal(result) {
+            document.getElementById('confirmModal').classList.remove('visible');
+            if (confirmCallback) {
+                confirmCallback(result);
+                confirmCallback = null;
+            }
+        }
+
+        // Custom Dropdown
+        function toggleDropdown(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            const selected = dropdown.querySelector('.custom-dropdown-selected');
+            const options = dropdown.querySelector('.custom-dropdown-options');
+
+            // 다른 드롭다운 닫기
+            document.querySelectorAll('.custom-dropdown').forEach(dd => {
+                if (dd.id !== dropdownId) {
+                    dd.querySelector('.custom-dropdown-selected').classList.remove('open');
+                    dd.querySelector('.custom-dropdown-options').classList.remove('open');
+                }
+            });
+
+            selected.classList.toggle('open');
+            options.classList.toggle('open');
+        }
+
+        // 드롭다운 옵션 클릭 이벤트
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.custom-dropdown-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const dropdown = this.closest('.custom-dropdown');
+                    const selected = dropdown.querySelector('.custom-dropdown-selected');
+                    const options = dropdown.querySelector('.custom-dropdown-options');
+                    const hiddenInput = dropdown.nextElementSibling;
+
+                    // 모든 옵션에서 selected 클래스 제거
+                    dropdown.querySelectorAll('.custom-dropdown-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+
+                    // 선택된 옵션에 selected 클래스 추가
+                    this.classList.add('selected');
+
+                    // 선택된 텍스트 업데이트
+                    selected.textContent = this.textContent;
+
+                    // hidden input 값 업데이트
+                    if (hiddenInput && hiddenInput.type === 'hidden') {
+                        hiddenInput.value = this.dataset.value;
+                    }
+
+                    // 드롭다운 닫기
+                    selected.classList.remove('open');
+                    options.classList.remove('open');
+                });
+            });
+        });
+
+        // 외부 클릭 시 드롭다운 닫기
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.custom-dropdown')) {
+                document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
+                    dropdown.querySelector('.custom-dropdown-selected').classList.remove('open');
+                    dropdown.querySelector('.custom-dropdown-options').classList.remove('open');
+                });
+            }
+        });
+
+        // ESC 키로 모달/드롭다운 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                // 확인 모달 닫기
+                if (document.getElementById('confirmModal').classList.contains('visible')) {
+                    closeConfirmModal(false);
+                    return;
+                }
+                // 드롭다운 닫기
+                document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
+                    dropdown.querySelector('.custom-dropdown-selected').classList.remove('open');
+                    dropdown.querySelector('.custom-dropdown-options').classList.remove('open');
+                });
+            }
+        });
+
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -751,14 +1023,21 @@
             });
         });
 
-        function exitApp() {
-            if (confirm('정말로 앱을 종료하시겠습니까?')) {
+        async function exitApp() {
+            const confirmed = await showConfirmModal({
+                icon: '⏻',
+                title: '애플리케이션 종료',
+                message: '정말 애플리케이션을 종료하시겠습니까?',
+                confirmText: '종료',
+                isDanger: true
+            });
+            if (confirmed) {
                 fetch('/shutdown', {method: 'POST'})
                     .then(() => {
-                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: white;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
+                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #2d3748;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
                     })
                     .catch(() => {
-                        alert('종료 중 오류가 발생했습니다. 터미널에서 Ctrl+C를 눌러주세요.');
+                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #2d3748;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
                     });
             }
         }

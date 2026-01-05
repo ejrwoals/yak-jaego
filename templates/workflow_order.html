@@ -396,6 +396,100 @@
         .toast.error {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
+
+        /* Custom Confirm Modal Styles */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirm-modal-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: confirmModalSlideIn 0.2s ease;
+        }
+
+        @keyframes confirmModalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .confirm-modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+
+        .confirm-modal-buttons .btn-cancel {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .confirm-modal-buttons .btn-cancel:hover {
+            background: #cbd5e0;
+        }
+
+        .confirm-modal-buttons .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .confirm-modal-buttons .btn-danger:hover {
+            background: #e53e3e;
+        }
     </style>
 </head>
 <body>
@@ -465,7 +559,55 @@
 
     <button class="btn-shutdown" onclick="shutdownServer()">⏻ 종료</button>
 
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon" id="confirmModalIcon">⏻</div>
+            <div class="confirm-modal-title" id="confirmModalTitle">애플리케이션 종료</div>
+            <div class="confirm-modal-message" id="confirmModalMessage">정말 애플리케이션을 종료하시겠습니까?</div>
+            <div class="confirm-modal-buttons">
+                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
+                <button class="btn-danger" id="confirmModalBtn" onclick="closeConfirmModal(true)">종료</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Custom Confirm Modal
+        let confirmCallback = null;
+
+        function showConfirmModal(options) {
+            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+
+            document.getElementById('confirmModalIcon').textContent = icon;
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').innerHTML = message;
+
+            const confirmBtn = document.getElementById('confirmModalBtn');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+
+            document.getElementById('confirmModal').classList.add('visible');
+
+            return new Promise(resolve => {
+                confirmCallback = resolve;
+            });
+        }
+
+        function closeConfirmModal(result) {
+            document.getElementById('confirmModal').classList.remove('visible');
+            if (confirmCallback) {
+                confirmCallback(result);
+                confirmCallback = null;
+            }
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('confirmModal').classList.contains('visible')) {
+                closeConfirmModal(false);
+            }
+        });
         // ========== 토스트 알림 ==========
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -674,7 +816,14 @@
 
         // 서버 종료
         async function shutdownServer() {
-            if (!confirm('정말 애플리케이션을 종료하시겠습니까?')) {
+            const confirmed = await showConfirmModal({
+                icon: '⏻',
+                title: '애플리케이션 종료',
+                message: '정말 애플리케이션을 종료하시겠습니까?',
+                confirmText: '종료',
+                isDanger: true
+            });
+            if (!confirmed) {
                 return;
             }
 
@@ -686,12 +835,7 @@
                     }
                 });
 
-                if (response.ok) {
-                    alert('애플리케이션이 종료됩니다. 이 창을 닫아주세요.');
-                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
-                } else {
-                    alert('종료 요청에 실패했습니다.');
-                }
+                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
             } catch (error) {
                 console.log('서버 종료됨');
                 document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';

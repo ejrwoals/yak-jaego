@@ -372,6 +372,86 @@
             box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         }
 
+        /* Modal shake animation */
+        @keyframes modalShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .mini-modal-content.shake {
+            animation: modalShake 0.4s ease-in-out;
+        }
+
+        /* Custom Confirm Modal */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirm-modal-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.2s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .confirm-modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-modal-buttons .btn {
+            min-width: 100px;
+        }
+
         .mini-modal-title {
             font-size: 18px;
             font-weight: 600;
@@ -1463,6 +1543,19 @@
         </div>
     </div>
 
+    <!-- Custom Confirm Modal -->
+    <div id="confirmCloseModal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon">⚠️</div>
+            <div class="confirm-modal-title">작성 중인 내용이 있습니다</div>
+            <div class="confirm-modal-message">정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.</div>
+            <div class="confirm-modal-buttons">
+                <button class="btn btn-secondary" onclick="confirmClose()">닫기</button>
+                <button class="btn btn-primary" onclick="cancelCloseConfirm()">계속 작성</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 신규 환자 등록 모달 -->
     <div class="mini-modal" id="newPatientModal">
         <div class="mini-modal-content">
@@ -1957,7 +2050,57 @@
         // 신규 환자 모달 닫기
         function closeNewPatientModal() {
             document.getElementById('newPatientModal').classList.remove('visible');
+            document.getElementById('newPatientBirth').value = '';
             pendingNewPatientName = null;
+        }
+
+        // 모달 내용 확인 함수
+        function hasNewPatientModalContent() {
+            const birth = document.getElementById('newPatientBirth').value.trim();
+            return birth !== '';
+        }
+
+        // 모달 흔들림 애니메이션
+        function shakeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            const content = modal.querySelector('.mini-modal-content');
+            if (content) {
+                content.classList.add('shake');
+                setTimeout(() => {
+                    content.classList.remove('shake');
+                }, 400);
+            }
+        }
+
+        // 커스텀 확인 모달 상태
+        let pendingCloseAction = null;
+
+        function showCloseConfirm(closeCallback) {
+            pendingCloseAction = closeCallback;
+            document.getElementById('confirmCloseModal').classList.add('visible');
+        }
+
+        function cancelCloseConfirm() {
+            document.getElementById('confirmCloseModal').classList.remove('visible');
+            pendingCloseAction = null;
+        }
+
+        function confirmClose() {
+            document.getElementById('confirmCloseModal').classList.remove('visible');
+            if (pendingCloseAction) {
+                pendingCloseAction();
+                pendingCloseAction = null;
+            }
+        }
+
+        // 확인 후 모달 닫기
+        function tryCloseNewPatientModal() {
+            if (hasNewPatientModalContent()) {
+                shakeModal('newPatientModal');
+                showCloseConfirm(closeNewPatientModal);
+            } else {
+                closeNewPatientModal();
+            }
         }
 
         // 신규 환자 생성
@@ -2724,7 +2867,6 @@
                                 <div class="skipped-drug-name">${escapeHtml(drug.drug_name)}</div>
                                 <div class="skipped-drug-code">${escapeHtml(drug.drug_code)} | ${escapeHtml(drug.company)}</div>
                             </div>
-                            <div class="skipped-drug-badge">${drug.skip_count}회</div>
                         </div>
                     `).join('');
                 } else {
@@ -2811,7 +2953,7 @@
         // 신규 환자 모달 외부 클릭 시 닫기
         document.getElementById('newPatientModal').addEventListener('click', function(e) {
             if (e.target === this) {
-                closeNewPatientModal();
+                tryCloseNewPatientModal();
             }
         });
 
@@ -2848,6 +2990,11 @@
         // ESC 키로 모달 닫기
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
+                // 커스텀 확인 모달이 열려있으면 취소
+                if (document.getElementById('confirmCloseModal').classList.contains('visible')) {
+                    cancelCloseConfirm();
+                    return;
+                }
                 // 약품 환자 모달이 열려있으면 먼저 닫기
                 if (document.getElementById('drugPatientsModal').classList.contains('visible')) {
                     closeDrugPatientsModal();
@@ -2862,7 +3009,7 @@
                 }
                 // 신규 환자 모달이 열려있으면 닫기
                 else if (document.getElementById('newPatientModal').classList.contains('visible')) {
-                    closeNewPatientModal();
+                    tryCloseNewPatientModal();
                 }
             }
         });

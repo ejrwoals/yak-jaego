@@ -866,6 +866,109 @@
         .btn-shutdown:active {
             transform: translateY(0);
         }
+
+        /* Custom Confirm Modal */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirm-modal-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.2s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .confirm-modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            min-width: 80px;
+            transition: all 0.2s;
+        }
+
+        .confirm-modal-buttons .btn-cancel {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .confirm-modal-buttons .btn-cancel:hover {
+            background: #cbd5e0;
+        }
+
+        .confirm-modal-buttons .btn-confirm {
+            background: #48bb78;
+            color: white;
+        }
+
+        .confirm-modal-buttons .btn-confirm:hover {
+            background: #38a169;
+        }
+
+        .confirm-modal-buttons .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .confirm-modal-buttons .btn-danger:hover {
+            background: #e53e3e;
+        }
     </style>
 </head>
 <body>
@@ -1004,7 +1107,56 @@
 
     <button class="btn-shutdown" onclick="shutdownServer()">⏻ 종료</button>
 
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon" id="confirmModalIcon">⚠️</div>
+            <div class="confirm-modal-title" id="confirmModalTitle">확인</div>
+            <div class="confirm-modal-message" id="confirmModalMessage">진행하시겠습니까?</div>
+            <div class="confirm-modal-buttons">
+                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
+                <button class="btn-confirm" id="confirmModalBtn" onclick="closeConfirmModal(true)">확인</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Custom Confirm Modal
+        let confirmCallback = null;
+
+        function showConfirmModal(options) {
+            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+
+            document.getElementById('confirmModalIcon').textContent = icon;
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').innerHTML = message;
+
+            const confirmBtn = document.getElementById('confirmModalBtn');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+
+            document.getElementById('confirmModal').classList.add('visible');
+
+            return new Promise(resolve => {
+                confirmCallback = resolve;
+            });
+        }
+
+        function closeConfirmModal(result) {
+            document.getElementById('confirmModal').classList.remove('visible');
+            if (confirmCallback) {
+                confirmCallback(result);
+                confirmCallback = null;
+            }
+        }
+
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('confirmModal').classList.contains('visible')) {
+                closeConfirmModal(false);
+            }
+        });
+
         // DB 정보 토글
         function toggleDbInfo() {
             const content = document.getElementById('db-info-content');
@@ -1144,7 +1296,14 @@
 
         // DB 재생성
         async function rebuildDatabase() {
-            if (!confirm('⚠️ DB를 재생성하시겠습니까?\n\n기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.\n이 작업은 수 분이 소요될 수 있습니다.')) {
+            const confirmed = await showConfirmModal({
+                icon: '⚠️',
+                title: 'DB 재생성',
+                message: '기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>이 작업은 수 분이 소요될 수 있습니다.',
+                confirmText: '재생성',
+                isDanger: true
+            });
+            if (!confirmed) {
                 return;
             }
 
@@ -1230,7 +1389,14 @@
                 return;
             }
 
-            if (!confirm(`정말 ${count}개의 보고서를 모두 삭제하시겠습니까?\n\n삭제된 보고서는 복구할 수 없습니다.`)) {
+            const confirmed = await showConfirmModal({
+                icon: '🗑️',
+                title: '전체 보고서 삭제',
+                message: `정말 <strong>${count}개</strong>의 보고서를 모두 삭제하시겠습니까?<br><br>삭제된 보고서는 복구할 수 없습니다.`,
+                confirmText: '전체 삭제',
+                isDanger: true
+            });
+            if (!confirmed) {
                 return;
             }
 
@@ -1279,7 +1445,14 @@
 
         // 보고서 삭제
         async function deleteReport(filename, reportType) {
-            if (!confirm('이 보고서를 삭제하시겠습니까?\n\n삭제된 보고서는 복구할 수 없습니다.')) {
+            const confirmed = await showConfirmModal({
+                icon: '🗑️',
+                title: '보고서 삭제',
+                message: '이 보고서를 삭제하시겠습니까?<br><br>삭제된 보고서는 복구할 수 없습니다.',
+                confirmText: '삭제',
+                isDanger: true
+            });
+            if (!confirmed) {
                 return;
             }
 
@@ -1330,7 +1503,14 @@
 
         // 서버 종료
         async function shutdownServer() {
-            if (!confirm('정말 애플리케이션을 종료하시겠습니까?')) {
+            const confirmed = await showConfirmModal({
+                icon: '⏻',
+                title: '애플리케이션 종료',
+                message: '정말 애플리케이션을 종료하시겠습니까?',
+                confirmText: '종료',
+                isDanger: true
+            });
+            if (!confirmed) {
                 return;
             }
 

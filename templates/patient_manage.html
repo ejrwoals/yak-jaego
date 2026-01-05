@@ -714,6 +714,86 @@
             75% { transform: translateX(5px); }
         }
 
+        /* Modal shake animation for close protection */
+        @keyframes modalShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .modal-content.shake {
+            animation: modalShake 0.4s ease-in-out;
+        }
+
+        /* Custom Confirm Modal */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirm-modal-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.2s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .confirm-modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-modal-buttons .btn {
+            min-width: 100px;
+        }
+
         .modal-error-message::before {
             content: '⚠️';
         }
@@ -884,6 +964,19 @@
             <div class="modal-footer" style="justify-content: center; gap: 12px;">
                 <button class="btn btn-secondary" onclick="closeConfirmDrugModal(false)" style="min-width: 100px;">나중에</button>
                 <button class="btn btn-primary" onclick="closeConfirmDrugModal(true)" style="min-width: 100px;">등록하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirmCloseModal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon">⚠️</div>
+            <div class="confirm-modal-title">작성 중인 내용이 있습니다</div>
+            <div class="confirm-modal-message">정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.</div>
+            <div class="confirm-modal-buttons">
+                <button class="btn btn-secondary" onclick="confirmClose()">닫기</button>
+                <button class="btn btn-primary" onclick="cancelCloseConfirm()">계속 작성</button>
             </div>
         </div>
     </div>
@@ -1479,25 +1572,110 @@
                 });
         }
 
+        // Modal content check functions
+        function hasPatientModalContent() {
+            const name = document.getElementById('inputPatientName').value.trim();
+            const birth = document.getElementById('inputPatientBirth').value.trim();
+            const visitCycle = document.getElementById('inputVisitCycle').value;
+            const memo = document.getElementById('inputPatientMemo').value.trim();
+
+            // 수정 모드에서는 약품 변경 여부도 체크
+            if (isEditMode) {
+                return true;  // 수정 모드에서는 항상 내용이 있음으로 판단
+            }
+
+            return name !== '' || birth !== '' || visitCycle !== '' || memo !== '';
+        }
+
+        function hasDosageModalContent() {
+            const dosage = document.getElementById('inputDosage').value;
+            return dosage !== '' && dosage !== '1';  // 기본값 1이 아닌 경우에만 내용 있음으로 판단
+        }
+
+        // Shake modal animation
+        function shakeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            const content = modal.querySelector('.modal-content');
+            content.classList.add('shake');
+            setTimeout(() => {
+                content.classList.remove('shake');
+            }, 400);
+        }
+
+        // Custom confirm modal state
+        let pendingCloseAction = null;
+
+        function showCloseConfirm(closeCallback) {
+            pendingCloseAction = closeCallback;
+            document.getElementById('confirmCloseModal').classList.add('visible');
+        }
+
+        function cancelCloseConfirm() {
+            document.getElementById('confirmCloseModal').classList.remove('visible');
+            pendingCloseAction = null;
+        }
+
+        function confirmClose() {
+            document.getElementById('confirmCloseModal').classList.remove('visible');
+            if (pendingCloseAction) {
+                pendingCloseAction();
+                pendingCloseAction = null;
+            }
+        }
+
+        // Try close modal with confirmation
+        function tryClosePatientModal() {
+            if (hasPatientModalContent()) {
+                shakeModal('patientModal');
+                showCloseConfirm(closePatientModal);
+            } else {
+                closePatientModal();
+            }
+        }
+
+        function tryCloseDosageModal() {
+            if (hasDosageModalContent()) {
+                shakeModal('dosageModal');
+                showCloseConfirm(closeDosageModal);
+            } else {
+                closeDosageModal();
+            }
+        }
+
         // Close modal on outside click
         document.getElementById('patientModal').addEventListener('click', function(e) {
-            if (e.target === this) closePatientModal();
+            if (e.target === this) tryClosePatientModal();
         });
 
         document.getElementById('dosageModal').addEventListener('click', function(e) {
-            if (e.target === this) closeDosageModal();
+            if (e.target === this) tryCloseDosageModal();
         });
 
         // ESC to close modal
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                closePatientModal();
-                closeDosageModal();
-                closeConfirmDrugModal(false);
+                // 커스텀 확인 모달이 열려있으면 취소
+                const confirmCloseModal = document.getElementById('confirmCloseModal');
+                if (confirmCloseModal.classList.contains('visible')) {
+                    cancelCloseConfirm();
+                    return;
+                }
+
+                const patientModal = document.getElementById('patientModal');
+                const dosageModal = document.getElementById('dosageModal');
+                const confirmModal = document.getElementById('confirmDrugModal');
+
+                if (confirmModal.classList.contains('visible')) {
+                    closeConfirmDrugModal(false);  // 약품 등록 확인 모달은 그냥 닫기
+                } else if (dosageModal.classList.contains('visible')) {
+                    tryCloseDosageModal();
+                } else if (patientModal.classList.contains('visible')) {
+                    tryClosePatientModal();
+                }
             }
         });
 
-        // Close confirm modal on outside click
+        // Close confirm modal on outside click (확인 모달은 내용이 없으므로 바로 닫기)
         document.getElementById('confirmDrugModal').addEventListener('click', function(e) {
             if (e.target === this) closeConfirmDrugModal(false);
         });
