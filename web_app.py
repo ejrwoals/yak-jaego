@@ -1281,34 +1281,40 @@ def get_managed_drugs():
     try:
         # 각 DB에서 설정된 약품코드 수집
         drug_codes = set()
-        drug_timestamps = {}  # 약품코드 -> 가장 이른 타임스탬프
+        drug_updated_at = {}  # 약품코드 -> 가장 최근 수정일시
 
-        # 1. 메모가 있는 약품 (타임스탬프 포함)
+        # 1. 메모가 있는 약품 (수정일시 추적)
         memos_with_details = drug_memos_db.get_all_memos_with_details()
         memos = {}
         for m in memos_with_details:
             code = m['약품코드']
             memos[code] = m['메모']
             drug_codes.add(code)
-            ts = m.get('작성일시')
+            ts = m.get('수정일시') or m.get('작성일시')
             if ts:
-                if code not in drug_timestamps or ts < drug_timestamps[code]:
-                    drug_timestamps[code] = ts
+                if code not in drug_updated_at or ts > drug_updated_at[code]:
+                    drug_updated_at[code] = ts
 
-        # 2. 임계값이 설정된 약품 (타임스탬프 포함)
+        # 2. 임계값이 설정된 약품 (수정일시 추적)
         thresholds_df = drug_thresholds_db.get_all_thresholds()
         if not thresholds_df.empty:
             drug_codes.update(thresholds_df['약품코드'].tolist())
             for _, row in thresholds_df.iterrows():
                 code = row['약품코드']
-                ts = row.get('생성일시')
+                ts = row.get('수정일시') or row.get('생성일시')
                 if ts:
-                    if code not in drug_timestamps or ts < drug_timestamps[code]:
-                        drug_timestamps[code] = ts
+                    if code not in drug_updated_at or ts > drug_updated_at[code]:
+                        drug_updated_at[code] = ts
 
-        # 3. 특별관리 플래그가 설정된 약품
-        flagged = drug_flags_db.get_flagged_drugs()
-        drug_codes.update(flagged)
+        # 3. 특별관리 플래그가 설정된 약품 (수정일시 추적)
+        all_flags_with_ts = drug_flags_db.get_all_flags_with_timestamps()
+        for code, data in all_flags_with_ts.items():
+            if data['flag']:
+                drug_codes.add(code)
+                ts = data.get('updated_at')
+                if ts:
+                    if code not in drug_updated_at or ts > drug_updated_at[code]:
+                        drug_updated_at[code] = ts
 
         # 4. 환자가 연결된 약품
         drugs_with_patients = drug_patient_map_db.get_all_drugs_with_patients()
@@ -1316,7 +1322,7 @@ def get_managed_drugs():
 
         # 약품 정보 조회 및 조합
         result = []
-        all_flags = drug_flags_db.get_all_flags()
+        all_flags = {code: data['flag'] for code, data in all_flags_with_ts.items()}
         all_mappings = drug_patient_map_db.get_all_mappings_dict()
 
         for drug_code in drug_codes:
@@ -1354,7 +1360,7 @@ def get_managed_drugs():
                 'memo_preview': memo[:50] + '...' if len(memo) > 50 else memo,
                 'special_flag': flag,
                 'patients': patients,
-                'created_at': drug_timestamps.get(drug_code)
+                'updated_at': drug_updated_at.get(drug_code)
             })
 
         # 약품명 기준 정렬
@@ -1648,7 +1654,8 @@ def get_patients_with_drugs():
                 'exact_count': exact_count,
                 'has_shortage': shortage_count > 0,
                 'has_exact': exact_count > 0,
-                'created_at': patient.get('생성일시')
+                'created_at': patient.get('생성일시'),
+                'updated_at': patient.get('수정일시') or patient.get('생성일시')
             })
 
         # 정렬: 부족 약품 있는 환자 우선, 그 다음 부족 개수 내림차순

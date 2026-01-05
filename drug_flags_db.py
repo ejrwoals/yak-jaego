@@ -198,6 +198,34 @@ def get_all_flags():
         return {}
 
 
+def get_all_flags_with_timestamps():
+    """
+    모든 플래그를 수정일시와 함께 반환
+
+    Returns:
+        dict: {약품코드: {'flag': bool, 'updated_at': str}, ...}
+    """
+    if not db_exists():
+        init_db()
+        return {}
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f'SELECT 약품코드, 특별관리, 수정일시 FROM {TABLE_NAME}')
+
+        result = {}
+        for row in cursor.fetchall():
+            result[row[0]] = {'flag': bool(row[1]), 'updated_at': row[2]}
+        conn.close()
+
+        return result
+    except Exception as e:
+        print(f"전체 플래그 조회 실패: {e}")
+        return {}
+
+
 def get_flagged_count():
     """
     특별관리 플래그가 활성화된 약품 수 조회
