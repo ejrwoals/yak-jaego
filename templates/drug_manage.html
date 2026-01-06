@@ -535,6 +535,38 @@
             margin-bottom: 12px;
         }
 
+        .min-threshold-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .min-threshold-warning .warning-icon {
+            flex-shrink: 0;
+        }
+
+        .min-threshold-warning .warning-text {
+            font-size: 13px;
+            color: #92400e;
+            line-height: 1.4;
+        }
+
+        .min-threshold-warning .auto-fill-link {
+            color: #d97706;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .min-threshold-warning .auto-fill-link:hover {
+            color: #b45309;
+        }
+
         .form-group {
             flex: 1;
         }
@@ -1175,12 +1207,16 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label>재고 임계값 (개)</label>
-                                <input type="number" id="inputStockThreshold" placeholder="이 값 이하 시 강조" oninput="checkChanges()">
+                                <input type="number" id="inputStockThreshold" placeholder="이 값 이하 시 강조" oninput="checkChanges(); checkMinThreshold();">
                             </div>
                             <div class="form-group">
                                 <label>런웨이 임계값 (개월)</label>
                                 <input type="number" step="0.1" id="inputRunwayThreshold" placeholder="이 값 미만 시 강조" oninput="checkChanges()">
                             </div>
+                        </div>
+                        <div id="minThresholdWarning" class="min-threshold-warning" style="display: none;">
+                            <span class="warning-icon">⚠️</span>
+                            <span class="warning-text"></span>
                         </div>
                     </div>
 
@@ -1302,8 +1338,8 @@
             <div class="confirm-modal-title">작성 중인 내용이 있습니다</div>
             <div class="confirm-modal-message">정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.</div>
             <div class="confirm-modal-buttons">
-                <button class="btn btn-secondary" onclick="confirmClose()">닫기</button>
-                <button class="btn btn-primary" onclick="cancelCloseConfirm()">계속 작성</button>
+                <button class="btn btn-secondary" onclick="cancelCloseConfirm()">계속 작성</button>
+                <button class="btn btn-danger" onclick="confirmClose()">닫기</button>
             </div>
         </div>
     </div>
@@ -1567,6 +1603,9 @@
             document.getElementById('bufferResult').style.display = 'none';
             updateBufferCalcButton();
 
+            // Hide min threshold warning
+            document.getElementById('minThresholdWarning').style.display = 'none';
+
             // Disable save button
             document.getElementById('saveBtn').disabled = true;
             clearAllChangedMarkers();
@@ -1655,6 +1694,7 @@
                         lastCalculatedBuffer = null;
                         document.getElementById('bufferResult').style.display = 'none';
                         updateBufferCalcButton();
+                        checkMinThreshold();  // 최소 임계값 체크
 
                         // Disable save button initially
                         document.getElementById('saveBtn').disabled = true;
@@ -1889,23 +1929,32 @@
                 fetch(`/api/search-patients?q=${encodeURIComponent(query)}`)
                     .then(r => r.json())
                     .then(data => {
+                        let html = '';
                         if (data.status === 'success' && data.data.length > 0) {
                             const filtered = data.data.filter(p => !selectedPatientIds.includes(p['환자ID']));
                             if (filtered.length > 0) {
-                                resultsDiv.innerHTML = filtered.map(p => `
+                                html = filtered.map(p => `
                                     <div class="patient-result-item" onclick="openDosageModal(${p['환자ID']}, '${escapeHtml(p['환자명'])}', '${p['주민번호_앞자리'] || ''}', ${p['방문주기_일'] || 30})">
                                         ${p['환자명']}${p['주민번호_앞자리'] ? ' (' + p['주민번호_앞자리'] + ')' : ''}
                                         ${p['방문주기_일'] ? '<span style="color: #718096; font-size: 12px; margin-left: 8px;">' + p['방문주기_일'] + '일 주기</span>' : ''}
                                     </div>
                                 `).join('');
                             } else {
-                                resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">이미 모두 추가됨</div>';
+                                html = '<div style="padding: 12px; color: #a0aec0;">이미 모두 추가됨</div>';
                             }
-                            resultsDiv.classList.add('visible');
-                        } else {
-                            resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">검색 결과가 없습니다</div>';
-                            resultsDiv.classList.add('visible');
                         }
+
+                        // 새 환자 등록 옵션 추가 (검색어가 있을 때)
+                        if (query.length > 0) {
+                            html += `
+                                <div class="patient-result-item new-patient-option" onclick="openPatientModal('${escapeHtml(query)}')" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); color: #16a34a; font-weight: 500;">
+                                    + "${escapeHtml(query)}" 새로 등록
+                                </div>
+                            `;
+                        }
+
+                        resultsDiv.innerHTML = html;
+                        resultsDiv.classList.add('visible');
                     });
             }, 300);
         }
@@ -1932,12 +1981,14 @@
         }
 
         // Patient Modal
-        function openPatientModal() {
-            document.getElementById('newPatientName').value = '';
+        function openPatientModal(preFillName = '') {
+            document.getElementById('newPatientName').value = preFillName;
             document.getElementById('newPatientBirth').value = '';
             document.getElementById('newPatientVisitCycle').value = '';
             document.getElementById('newPatientMemo').value = '';
             document.getElementById('patientModal').classList.add('visible');
+            // 검색 결과 숨기기
+            document.getElementById('patientSearchResults').classList.remove('visible');
         }
 
         function closePatientModal() {
@@ -1996,6 +2047,7 @@
                 if (patient) {
                     patient.dosage = dosage;
                     renderPatientTagsWithDosage();
+                    checkMinThreshold();  // 최소 임계값 체크
                     // Hide buffer result when dosage changes
                     document.getElementById('bufferResult').style.display = 'none';
                     lastCalculatedBuffer = null;
@@ -2032,6 +2084,7 @@
 
             renderPatientTagsWithDosage();
             updateBufferCalcButton();
+            checkMinThreshold();  // 최소 임계값 체크
             checkChanges();
         }
 
@@ -2058,6 +2111,7 @@
             selectedPatientData = selectedPatientData.filter(p => p.patientId !== patientId);
             renderPatientTagsWithDosage();
             updateBufferCalcButton();
+            checkMinThreshold();  // 최소 임계값 체크
             // Hide buffer result when patients change
             document.getElementById('bufferResult').style.display = 'none';
             lastCalculatedBuffer = null;
@@ -2070,6 +2124,52 @@
             if (!hasPatients) {
                 document.getElementById('bufferResult').style.display = 'none';
             }
+        }
+
+        // 최소 재고 임계값 체크 및 자동 설정
+        function checkMinThreshold() {
+            const warningDiv = document.getElementById('minThresholdWarning');
+            const warningText = warningDiv.querySelector('.warning-text');
+            const thresholdInput = document.getElementById('inputStockThreshold');
+
+            // 환자가 없으면 경고 숨기기
+            if (selectedPatientData.length === 0) {
+                warningDiv.style.display = 'none';
+                return;
+            }
+
+            // max(처방량) 계산
+            const maxDosage = Math.max(...selectedPatientData.map(p => p.dosage || 1));
+            const maxPatient = selectedPatientData.find(p => p.dosage === maxDosage);
+            const patientInfo = maxPatient ? `${maxPatient.name}` : '';
+
+            const currentThreshold = thresholdInput.value ? parseInt(thresholdInput.value) : null;
+
+            // Case 1: 임계값이 비어있음 → 자동 채움
+            if (currentThreshold === null || currentThreshold === 0) {
+                thresholdInput.value = maxDosage;
+                warningDiv.style.display = 'flex';
+                warningText.innerHTML = `환자 1회 최대 처방량(${patientInfo}: ${maxDosage}개)을 기준으로 재고 임계값이 자동 설정되었습니다.`;
+                checkChanges();
+                return;
+            }
+
+            // Case 2: 임계값이 max(처방량)보다 낮음 → 경고
+            if (currentThreshold < maxDosage) {
+                warningDiv.style.display = 'flex';
+                warningText.innerHTML = `현재 임계값(${currentThreshold}개)이 최대 처방량(${patientInfo}: ${maxDosage}개)보다 낮습니다. <span class="auto-fill-link" onclick="applyMinDosageThreshold(${maxDosage})">${maxDosage}개로 설정</span>`;
+                return;
+            }
+
+            // Case 3: 정상 → 경고 숨기기
+            warningDiv.style.display = 'none';
+        }
+
+        // 최소 처방량 임계값 적용
+        function applyMinDosageThreshold(value) {
+            document.getElementById('inputStockThreshold').value = value;
+            checkMinThreshold();
+            checkChanges();
         }
 
         // Buffer Calculation Functions

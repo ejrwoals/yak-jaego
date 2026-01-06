@@ -1243,16 +1243,39 @@ def save_drug_management(drug_code):
 
         # 6. 환자 연결 (전체 교체 방식)
         # 새 형식: patients (처방량 포함) 또는 이전 형식: patient_ids (호환성)
+        patients_data = None
         if 'patients' in data:
             # 새 형식: [{'patient_id': int, 'dosage': int}, ...]
-            patients = data['patients']
-            result = drug_patient_map_db.set_patients_for_drug(drug_code, patients)
+            patients_data = data['patients']
+            result = drug_patient_map_db.set_patients_for_drug(drug_code, patients_data)
             results.append(('환자연결', result))
         elif 'patient_ids' in data:
             # 이전 형식: [patient_id, ...]
             patient_ids = data['patient_ids']
             result = drug_patient_map_db.set_patients_for_drug(drug_code, patient_ids)
             results.append(('환자연결', result))
+
+        # 7. 환자가 있고 재고 임계값이 비어있으면 max(처방량)으로 자동 설정
+        if patients_data and len(patients_data) > 0:
+            # max(처방량) 계산
+            max_dosage = max(p.get('dosage', 1) for p in patients_data)
+
+            # 현재 임계값 확인 (요청에서 받은 값 또는 DB에서 조회)
+            th = data.get('threshold', {})
+            stock_th = th.get('stock')
+
+            # 재고 임계값이 비어있거나 None이면 자동 설정
+            if stock_th is None or stock_th == '':
+                # 기존 런웨이 임계값 유지
+                existing_th = drug_thresholds_db.get_threshold(drug_code)
+                existing_runway = existing_th.get('런웨이_임계값') if existing_th else None
+
+                result = drug_thresholds_db.upsert_threshold(
+                    drug_code,
+                    절대재고_임계값=max_dosage,
+                    런웨이_임계값=existing_runway
+                )
+                results.append(('자동임계값', {'success': True, 'message': f'환자 최대 처방량({max_dosage}개) 기준으로 재고 임계값 자동 설정', 'auto_threshold': max_dosage}))
 
         # 결과 요약
         failed = [r for r in results if not r[1].get('success', False)]
