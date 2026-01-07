@@ -332,10 +332,11 @@ def calculate_order():
         # 약품유형이 없는 경우 기본값 '미분류'로 설정
         df_merged['약품유형'] = df_merged['약품유형'].fillna('미분류')
 
+        # today 파일에서 조제수량/판매수량 정보 추출 (미리 초기화)
+        today_qty_info = {}
+
         # 신규 약품에 대해 today 파일의 조제수량/판매수량으로 약품유형 분류
         if df_merged['신규약품'].any() and ('조제수량' in df_today.columns or '판매수량' in df_today.columns):
-            # today 파일에서 조제수량/판매수량 정보 추출
-            today_qty_info = {}
             for _, row in df_today.iterrows():
                 code = str(row['약품코드'])
                 dispense = 0
@@ -369,6 +370,28 @@ def calculate_order():
         # 당일 소모 수량 컬럼 추가 (전문약: 조제수량, 일반약: 판매수량)
         df_merged['당일_소모수량'] = 0
         if '조제수량' in df_today.columns or '판매수량' in df_today.columns:
+            # today_qty_info가 비어있으면 채우기 (신규 약품이 없는 경우)
+            if not today_qty_info:
+                for _, row in df_today.iterrows():
+                    code = str(row['약품코드'])
+                    dispense = 0
+                    sale = 0
+                    if '조제수량' in df_today.columns:
+                        val = row['조제수량']
+                        if pd.notna(val):
+                            try:
+                                dispense = float(str(val).replace(',', '').replace('-', '0') or 0)
+                            except:
+                                dispense = 0
+                    if '판매수량' in df_today.columns:
+                        val = row['판매수량']
+                        if pd.notna(val):
+                            try:
+                                sale = float(str(val).replace(',', '').replace('-', '0') or 0)
+                            except:
+                                sale = 0
+                    today_qty_info[code] = {'조제수량': dispense, '판매수량': sale}
+
             for idx, row in df_merged.iterrows():
                 drug_code = str(row['약품코드'])
                 if drug_code in today_qty_info:
