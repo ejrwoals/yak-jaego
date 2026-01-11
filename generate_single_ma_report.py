@@ -576,7 +576,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
     urgent_drugs, dead_stock_drugs, negative_stock_drugs = classify_drugs_by_special_cases(df, ma_months)
 
     # 런웨이 분석 차트 생성 + 부족/충분/과다 약품 DataFrame
-    runtime_analysis_low, runtime_analysis_high, runtime_analysis_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df = analyze_runway(df, months, ma_months, threshold_low, threshold_high)
+    _, _, _, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df = analyze_runway(df, months, ma_months, threshold_low, threshold_high)
 
     # 전체 약품 수
     total_count = len(df)
@@ -689,9 +689,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
     # 모달 컨테이너 생성
     has_urgent = not urgent_drugs.empty
-    has_low_runway = runtime_analysis_low is not None
-    has_high_runway = runtime_analysis_high is not None
-    has_excess_runway = runtime_analysis_excess is not None
+    has_low_runway = low_count > 0
+    has_high_runway = high_count > 0
+    has_excess_runway = excess_count > 0
     has_dead_stock = not dead_stock_drugs.empty
 
     # 긴급 약품 모달
@@ -725,57 +725,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                             <span style="font-size: 1.5em;">🟡</span>
                             <span>재고 부족 약품 (런웨이 {threshold_low}개월 이하)</span>
                         </h2>
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <button id="toggle-view-low" class="nav-btn" onclick="toggleLowView()">📊 막대 그래프 보기</button>
-                            <span class="category-modal-close" onclick="closeCategoryModal('low-modal')">&times;</span>
-                        </div>
+                        <span class="category-modal-close" onclick="closeCategoryModal('low-modal')">&times;</span>
                     </div>
-                    <!-- 테이블 뷰 (기본) -->
-                    <div id="table-view-low" style="display: block;">
-                        {low_section_html}
-                    </div>
-                    <!-- 차트 뷰 (숨김) -->
-                    <div id="chart-view-low" style="display: none;">
-                        <div class="chart-container" style="background: white;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                                <div>
-                                    <button onclick="changePage('low', -1)" id="prev-low" class="nav-btn">◀ 이전</button>
-                                    <span id="page-info-low" style="margin: 0 20px;"></span>
-                                    <button onclick="changePage('low', 1)" id="next-low" class="nav-btn">다음 ▶</button>
-                                </div>
-                            </div>
-                            <div id="runway-chart-low"></div>
-                        </div>
-                    </div>
+                    {low_section_html}
                 </div>
             </div>
-            <script>
-                {runtime_analysis_low}
-
-                // 부족 탭 뷰 토글
-                var lowViewMode = 'table';
-                function toggleLowView() {{
-                    var tableView = document.getElementById('table-view-low');
-                    var chartView = document.getElementById('chart-view-low');
-                    var toggleBtn = document.getElementById('toggle-view-low');
-
-                    if (lowViewMode === 'table') {{
-                        tableView.style.display = 'none';
-                        chartView.style.display = 'block';
-                        toggleBtn.textContent = '📋 테이블 보기';
-                        lowViewMode = 'chart';
-                        // 차트 초기화 (처음 표시될 때)
-                        if (typeof updateChartLow === 'function') {{
-                            updateChartLow();
-                        }}
-                    }} else {{
-                        tableView.style.display = 'block';
-                        chartView.style.display = 'none';
-                        toggleBtn.textContent = '📊 막대 그래프 보기';
-                        lowViewMode = 'table';
-                    }}
-                }}
-            </script>
         """
 
     # 재고 충분 약품 모달 (테이블 + 차트 토글)
@@ -790,57 +744,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                             <span style="font-size: 1.5em;">🟢</span>
                             <span>재고 충분 약품 (런웨이 {threshold_low}~{threshold_high}개월)</span>
                         </h2>
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <button id="toggle-view-high" class="nav-btn" onclick="toggleHighView()">📊 막대 그래프 보기</button>
-                            <span class="category-modal-close" onclick="closeCategoryModal('high-modal')">&times;</span>
-                        </div>
+                        <span class="category-modal-close" onclick="closeCategoryModal('high-modal')">&times;</span>
                     </div>
-                    <!-- 테이블 뷰 (기본) -->
-                    <div id="table-view-high" style="display: block;">
-                        {high_section_html}
-                    </div>
-                    <!-- 차트 뷰 (숨김) -->
-                    <div id="chart-view-high" style="display: none;">
-                        <div class="chart-container" style="background: white;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                                <div>
-                                    <button onclick="changePage('high', -1)" id="prev-high" class="nav-btn">◀ 이전</button>
-                                    <span id="page-info-high" style="margin: 0 20px;"></span>
-                                    <button onclick="changePage('high', 1)" id="next-high" class="nav-btn">다음 ▶</button>
-                                </div>
-                            </div>
-                            <div id="runway-chart-high"></div>
-                        </div>
-                    </div>
+                    {high_section_html}
                 </div>
             </div>
-            <script>
-                {runtime_analysis_high}
-
-                // 충분 탭 뷰 토글
-                var highViewMode = 'table';
-                function toggleHighView() {{
-                    var tableView = document.getElementById('table-view-high');
-                    var chartView = document.getElementById('chart-view-high');
-                    var toggleBtn = document.getElementById('toggle-view-high');
-
-                    if (highViewMode === 'table') {{
-                        tableView.style.display = 'none';
-                        chartView.style.display = 'block';
-                        toggleBtn.textContent = '📋 테이블 보기';
-                        highViewMode = 'chart';
-                        // 차트 초기화 (처음 표시될 때)
-                        if (typeof updateChartHigh === 'function') {{
-                            updateChartHigh();
-                        }}
-                    }} else {{
-                        tableView.style.display = 'block';
-                        chartView.style.display = 'none';
-                        toggleBtn.textContent = '📊 막대 그래프 보기';
-                        highViewMode = 'table';
-                    }}
-                }}
-            </script>
         """
 
     # 과다 재고 모달 (런웨이 threshold_high 초과)
@@ -855,51 +763,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                             <span style="font-size: 1.5em;">🔵</span>
                             <span>과다 재고 약품 (런웨이 {threshold_high}개월 초과)</span>
                         </h2>
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <button id="toggle-view-excess" class="nav-btn" onclick="toggleExcessView()">📊 막대 그래프 보기</button>
-                            <span class="category-modal-close" onclick="closeCategoryModal('excess-modal')">&times;</span>
-                        </div>
+                        <span class="category-modal-close" onclick="closeCategoryModal('excess-modal')">&times;</span>
                     </div>
-                    <div id="table-view-excess">
-                        {excess_section_html}
-                    </div>
-                    <div id="chart-view-excess" style="display: none;">
-                        <div id="runway-chart-excess"></div>
-                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;">
-                            <button id="prev-excess" class="nav-btn" onclick="changePage('excess', -1)">◀ 이전</button>
-                            <span id="page-info-excess">페이지 1 / 1</span>
-                            <button id="next-excess" class="nav-btn" onclick="changePage('excess', 1)">다음 ▶</button>
-                        </div>
-                    </div>
+                    {excess_section_html}
                 </div>
             </div>
-            <script>
-                {runtime_analysis_excess if runtime_analysis_excess else ''}
-
-                // 과다 탭 뷰 토글
-                var excessViewMode = 'table';
-                function toggleExcessView() {{
-                    var tableView = document.getElementById('table-view-excess');
-                    var chartView = document.getElementById('chart-view-excess');
-                    var toggleBtn = document.getElementById('toggle-view-excess');
-
-                    if (excessViewMode === 'table') {{
-                        tableView.style.display = 'none';
-                        chartView.style.display = 'block';
-                        toggleBtn.textContent = '📋 테이블 보기';
-                        excessViewMode = 'chart';
-                        // 차트 초기화 (처음 표시될 때)
-                        if (typeof updateChartExcess === 'function') {{
-                            updateChartExcess();
-                        }}
-                    }} else {{
-                        tableView.style.display = 'block';
-                        chartView.style.display = 'none';
-                        toggleBtn.textContent = '📊 막대 그래프 보기';
-                        excessViewMode = 'table';
-                    }}
-                }}
-            </script>
         """
 
     # 악성 재고 모달
@@ -3113,14 +2981,18 @@ def generate_hidden_drugs_section(df, ma_months, months):
 
 
 def analyze_runway(df, months, ma_months, threshold_low=3, threshold_high=12):
-    """런웨이 분포 분석 차트 생성 (페이지네이션 지원) - N-MA 런웨이 기준
+    """런웨이 분석 및 약품 분류 - N-MA 런웨이 기준
 
     Args:
+        df: 약품 데이터 DataFrame
+        months: 월 리스트
+        ma_months: 이동평균 개월 수
         threshold_low: 부족/충분 경계 (개월)
         threshold_high: 충분/과다 경계 (개월)
 
     Returns:
-        tuple: (chart_js_low, chart_js_high, chart_js_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df)
+        tuple: (None, None, None, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df)
+               - 앞 3개 값(chart_js)은 더 이상 사용되지 않음 (하위 호환성을 위해 유지)
     """
     try:
         # N-MA 런웨이를 숫자로 변환 (개월 단위)
@@ -3199,307 +3071,6 @@ def analyze_runway(df, months, ma_months, threshold_low=3, threshold_high=12):
         low_count = len(low_data)
         high_count = len(high_data)
         excess_count = len(excess_data)
-
-        # 하위 차트 (3개월 이하, 오름차순 정렬)
-        if low_data:
-            import json
-            low_data_sorted = sorted(low_data)
-            low_data_json = json.dumps(low_data_sorted)
-
-            chart_js_low = f"""
-                var lowData = {low_data_json};
-                var currentPageLow = 0;
-                var itemsPerPage = 30;
-
-                function updateChartLow() {{
-                    var start = currentPageLow * itemsPerPage;
-                    var end = start + itemsPerPage;
-                    var pageData = lowData.slice(start, end);
-
-                    if (pageData.length === 0) return;
-
-                    // 데이터 구조: [N-MA런웨이(개월), 약품명, N개월평균]
-                    var values = pageData.map(function(item) {{ return item[0]; }});
-                    var names = pageData.map(function(item) {{ return item[1]; }});
-                    var maAvg = pageData.map(function(item) {{ return item[2]; }});
-
-                    // 하위 그룹: 런웨이가 짧은 것이 위에 오도록 역순
-                    values.reverse();
-                    names.reverse();
-                    maAvg.reverse();
-
-                    // 커스텀 호버 텍스트 생성
-                    var hoverTexts = [];
-                    for (var i = 0; i < values.length; i++) {{
-                        var maRunwayText = values[i] >= 1
-                            ? values[i].toFixed(2) + '개월'
-                            : (values[i] * 30.417).toFixed(2) + '일';
-
-                        hoverTexts.push(
-                            '런웨이: ' + maRunwayText + ' ({ma_months}개월 이동평균: ' + maAvg[i].toFixed(2) + ')'
-                        );
-                    }}
-
-                    var data = [{{
-                        x: values,
-                        y: names,
-                        type: 'bar',
-                        orientation: 'h',
-                        text: values,
-                        texttemplate: '%{{text:.2f}}개월',
-                        textposition: 'outside',
-                        hovertext: hoverTexts,
-                        hoverinfo: 'text',
-                        marker: {{
-                            color: values,
-                            colorscale: [
-                                [0, 'rgb(255, 0, 0)'],
-                                [0.5, 'rgb(255, 255, 0)'],
-                                [1, 'rgb(0, 255, 0)']
-                            ],
-                            cmin: 0,
-                            cmax: 3
-                        }},
-                        width: 0.7
-                    }}];
-
-                    var layout = {{
-                        xaxis: {{
-                            title: '개월',
-                            range: [0, Math.max(...values) * 1.3]
-                        }},
-                        yaxis: {{
-                            title: '',
-                            automargin: true,
-                            tickfont: {{size: 10}}
-                        }},
-                        height: Math.min(1200, pageData.length * 25 + 100),
-                        margin: {{
-                            l: 350,
-                            r: 100,
-                            t: 40,
-                            b: 60,
-                            pad: 10
-                        }},
-                        bargap: 0.3
-                    }};
-
-                    Plotly.newPlot('runway-chart-low', data, layout, {{responsive: true}});
-
-                    // 페이지 정보 업데이트
-                    var totalPages = Math.ceil(lowData.length / itemsPerPage);
-                    document.getElementById('page-info-low').textContent =
-                        '페이지 ' + (currentPageLow + 1) + ' / ' + totalPages +
-                        ' (총 ' + lowData.length + '개)';
-
-                    // 버튼 상태 업데이트
-                    document.getElementById('prev-low').disabled = (currentPageLow === 0);
-                    document.getElementById('next-low').disabled = (currentPageLow >= totalPages - 1);
-                }}
-
-                updateChartLow();
-            """
-
-        # 상위 차트 (3개월 초과, 내림차순 정렬)
-        if high_data:
-            high_data_sorted = sorted(high_data, reverse=True)
-            high_data_json = json.dumps(high_data_sorted)
-
-            chart_js_high = f"""
-                var highData = {high_data_json};
-                var currentPageHigh = 0;
-                var itemsPerPageHigh = 30;
-
-                function updateChartHigh() {{
-                    var start = currentPageHigh * itemsPerPageHigh;
-                    var end = start + itemsPerPageHigh;
-                    var pageData = highData.slice(start, end);
-
-                    if (pageData.length === 0) return;
-
-                    // 데이터 구조: [N-MA런웨이(개월), 약품명, N개월평균]
-                    var values = pageData.map(function(item) {{ return item[0]; }});
-                    var names = pageData.map(function(item) {{ return item[1]; }});
-                    var maAvg = pageData.map(function(item) {{ return item[2]; }});
-
-                    // 상위 그룹: 런웨이가 긴 것이 위에 오도록 역순
-                    values.reverse();
-                    names.reverse();
-                    maAvg.reverse();
-
-                    // 커스텀 호버 텍스트 생성
-                    var hoverTexts = [];
-                    for (var i = 0; i < values.length; i++) {{
-                        var maRunwayText = values[i] >= 1
-                            ? values[i].toFixed(2) + '개월'
-                            : (values[i] * 30.417).toFixed(2) + '일';
-
-                        hoverTexts.push(
-                            '런웨이: ' + maRunwayText + ' ({ma_months}개월 이동평균: ' + maAvg[i].toFixed(2) + ')'
-                        );
-                    }}
-
-                    var data = [{{
-                        x: values,
-                        y: names,
-                        type: 'bar',
-                        orientation: 'h',
-                        text: values,
-                        texttemplate: '%{{text:.2f}}개월',
-                        textposition: 'outside',
-                        hovertext: hoverTexts,
-                        hoverinfo: 'text',
-                        marker: {{
-                            color: 'rgb(34, 197, 94)'
-                        }},
-                        width: 0.7
-                    }}];
-
-                    var layout = {{
-                        xaxis: {{
-                            title: '개월',
-                            range: [0, Math.max(...values) * 1.1]
-                        }},
-                        yaxis: {{
-                            title: '',
-                            automargin: true,
-                            tickfont: {{size: 10}}
-                        }},
-                        height: Math.min(1200, pageData.length * 25 + 100),
-                        margin: {{
-                            l: 350,
-                            r: 100,
-                            t: 40,
-                            b: 60,
-                            pad: 10
-                        }},
-                        bargap: 0.3
-                    }};
-
-                    Plotly.newPlot('runway-chart-high', data, layout, {{responsive: true}});
-
-                    // 페이지 정보 업데이트
-                    var totalPages = Math.ceil(highData.length / itemsPerPageHigh);
-                    document.getElementById('page-info-high').textContent =
-                        '페이지 ' + (currentPageHigh + 1) + ' / ' + totalPages +
-                        ' (총 ' + highData.length + '개)';
-
-                    // 버튼 상태 업데이트
-                    document.getElementById('prev-high').disabled = (currentPageHigh === 0);
-                    document.getElementById('next-high').disabled = (currentPageHigh >= totalPages - 1);
-                }}
-
-                updateChartHigh();
-
-                // 페이지 변경 함수
-                function changePage(type, direction) {{
-                    if (type === 'low') {{
-                        var totalPages = Math.ceil(lowData.length / itemsPerPage);
-                        currentPageLow = Math.max(0, Math.min(currentPageLow + direction, totalPages - 1));
-                        updateChartLow();
-                    }} else if (type === 'high') {{
-                        var totalPages = Math.ceil(highData.length / itemsPerPageHigh);
-                        currentPageHigh = Math.max(0, Math.min(currentPageHigh + direction, totalPages - 1));
-                        updateChartHigh();
-                    }} else {{
-                        var totalPages = Math.ceil(excessData.length / itemsPerPageExcess);
-                        currentPageExcess = Math.max(0, Math.min(currentPageExcess + direction, totalPages - 1));
-                        updateChartExcess();
-                    }}
-                }}
-            """
-
-        # 과다 차트 (12개월 초과, 내림차순 정렬)
-        if excess_data:
-            excess_data_sorted = sorted(excess_data, reverse=True)
-            excess_data_json = json.dumps(excess_data_sorted)
-
-            chart_js_excess = f"""
-                var excessData = {excess_data_json};
-                var currentPageExcess = 0;
-                var itemsPerPageExcess = 30;
-
-                function updateChartExcess() {{
-                    var start = currentPageExcess * itemsPerPageExcess;
-                    var end = start + itemsPerPageExcess;
-                    var pageData = excessData.slice(start, end);
-
-                    if (pageData.length === 0) return;
-
-                    // 데이터 구조: [N-MA런웨이(개월), 약품명, N개월평균]
-                    var values = pageData.map(function(item) {{ return item[0]; }});
-                    var names = pageData.map(function(item) {{ return item[1]; }});
-                    var maAvg = pageData.map(function(item) {{ return item[2]; }});
-
-                    // 과다 그룹: 런웨이가 긴 것이 위에 오도록 역순
-                    values.reverse();
-                    names.reverse();
-                    maAvg.reverse();
-
-                    // 커스텀 호버 텍스트 생성
-                    var hoverTexts = [];
-                    for (var i = 0; i < values.length; i++) {{
-                        var maRunwayText = values[i] >= 1
-                            ? values[i].toFixed(2) + '개월'
-                            : (values[i] * 30.417).toFixed(2) + '일';
-
-                        hoverTexts.push(
-                            '런웨이: ' + maRunwayText + ' ({ma_months}개월 이동평균: ' + maAvg[i].toFixed(2) + ')'
-                        );
-                    }}
-
-                    var data = [{{
-                        x: values,
-                        y: names,
-                        type: 'bar',
-                        orientation: 'h',
-                        text: values,
-                        texttemplate: '%{{text:.2f}}개월',
-                        textposition: 'outside',
-                        hovertext: hoverTexts,
-                        hoverinfo: 'text',
-                        marker: {{
-                            color: 'rgb(59, 130, 246)'
-                        }},
-                        width: 0.7
-                    }}];
-
-                    var layout = {{
-                        xaxis: {{
-                            title: '개월',
-                            range: [0, Math.max(...values) * 1.1]
-                        }},
-                        yaxis: {{
-                            title: '',
-                            automargin: true,
-                            tickfont: {{size: 10}}
-                        }},
-                        height: Math.min(1200, pageData.length * 25 + 100),
-                        margin: {{
-                            l: 350,
-                            r: 100,
-                            t: 40,
-                            b: 60,
-                            pad: 10
-                        }},
-                        bargap: 0.3
-                    }};
-
-                    Plotly.newPlot('runway-chart-excess', data, layout, {{responsive: true}});
-
-                    // 페이지 정보 업데이트
-                    var totalPages = Math.ceil(excessData.length / itemsPerPageExcess);
-                    document.getElementById('page-info-excess').textContent =
-                        '페이지 ' + (currentPageExcess + 1) + ' / ' + totalPages +
-                        ' (총 ' + excessData.length + '개)';
-
-                    // 버튼 상태 업데이트
-                    document.getElementById('prev-excess').disabled = (currentPageExcess === 0);
-                    document.getElementById('next-excess').disabled = (currentPageExcess >= totalPages - 1);
-                }}
-
-                updateChartExcess();
-            """
 
         return chart_js_low, chart_js_high, chart_js_excess, low_count, high_count, excess_count, low_drugs_df, high_drugs_df, excess_drugs_df
     except Exception as e:
