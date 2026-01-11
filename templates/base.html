@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Jaego{% endblock %}</title>
+
+    {# Base CSS #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ config.get('VERSION', '1') }}">
+
+    {# Component CSS - Override these blocks to include specific components #}
+    {% block component_styles %}{% endblock %}
+
+    {# Page-specific styles #}
+    {% block page_styles %}{% endblock %}
+</head>
+<body class="{% block body_class %}page-container{% endblock %}">
+    {# Toast container - include if needed #}
+    {% block toast_container %}{% endblock %}
+
+    {# Shutdown button - included by default, override with empty block to remove #}
+    {% block shutdown_button %}
+        {% include 'partials/_shutdown_button.html' %}
+    {% endblock %}
+
+    {# Main content #}
+    {% block content %}{% endblock %}
+
+    {# Confirm modal - included by default for most pages #}
+    {% block confirm_modal %}
+        {% include 'partials/_confirm_modal.html' %}
+    {% endblock %}
+
+    {# Base scripts - core and confirm modal #}
+    {% block base_scripts %}
+    <script src="{{ url_for('static', filename='js/components/jaego-core.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/confirm-modal.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+    {% endblock %}
+
+    {# Component scripts - Override to include specific components #}
+    {% block component_scripts %}{% endblock %}
+
+    {# Page-specific scripts #}
+    {% block page_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,113 @@
+/* Jaego - Confirm Modal Component CSS */
+
+.confirm-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: var(--z-modal, 3000);
+    justify-content: center;
+    align-items: center;
+}
+
+.confirm-modal-overlay.visible {
+    display: flex;
+}
+
+.confirm-modal-box {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 320px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: modalSlideIn 0.2s ease;
+}
+
+.confirm-modal-box.shake {
+    animation: shake 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+
+.confirm-modal-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.confirm-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 8px;
+}
+
+.confirm-modal-message {
+    font-size: 14px;
+    color: #718096;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.confirm-modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.confirm-modal-buttons button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+
+.confirm-modal-buttons .btn-cancel {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+.confirm-modal-buttons .btn-cancel:hover {
+    background: #cbd5e0;
+}
+
+.confirm-modal-buttons .btn-confirm {
+    background: #4299e1;
+    color: white;
+}
+
+.confirm-modal-buttons .btn-confirm:hover {
+    background: #3182ce;
+}
+
+.confirm-modal-buttons .btn-danger {
+    background: #f56565;
+    color: white;
+}
+
+.confirm-modal-buttons .btn-danger:hover {
+    background: #e53e3e;
+}

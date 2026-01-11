@@ -1,1851 +1,1535 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>환자 관리 - Jaego</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f5f5;
-            min-height: 100vh;
-            padding: 20px;
-            overflow-y: scroll;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            padding: 30px;
-            animation: fadeIn 0.5s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .back-link {
-            color: #4299e1;
-            text-decoration: none;
-            font-size: 14px;
-            display: inline-block;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        .btn-shutdown {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 0.95em;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 1000;
-        }
-
-        .btn-shutdown:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
-            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
-        }
-
-        .btn-shutdown:active {
-            transform: translateY(0);
-        }
-
-        /* Header Row (Stats + Actions) */
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        /* Stats Bar */
-        .stats-bar {
-            display: flex;
-            gap: 15px;
-            padding: 12px 16px;
-            background: #f1f5f9;
-            border-radius: 10px;
-            flex-wrap: wrap;
-            border: 1px solid #e2e8f0;
-            flex: 1;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            flex-shrink: 0;
-        }
-
-        .stat-item {
-            color: #475569;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .stat-value {
-            font-weight: bold;
-            font-size: 16px;
-            color: #1e293b;
-        }
-
-        /* Search & Filter */
-        .search-section {
-            margin-bottom: 20px;
-        }
-
-        .search-filter-bar {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .search-input {
-            flex: 1;
-            min-width: 250px;
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 15px;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #48bb78;
-        }
-
-        .filter-buttons {
-            display: flex;
-            gap: 8px;
-        }
-
-        .filter-btn {
-            padding: 6px 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 20px;
-            background: #f9fafb;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            color: #6b7280;
-            transition: all 0.2s;
-        }
-
-        .filter-btn:hover {
-            background: #f3f4f6;
-            border-color: #9ca3af;
-            color: #374151;
-        }
-
-        .filter-btn.active {
-            background: #ecfdf5;
-            border-color: #34d399;
-            color: #059669;
-        }
-
-        .sort-buttons {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            padding-left: 10px;
-            border-left: 1px solid #e2e8f0;
-        }
-
-        .sort-btn {
-            padding: 5px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            background: white;
-            cursor: pointer;
-            font-size: 12px;
-            color: #9ca3af;
-            transition: all 0.2s;
-        }
-
-        .sort-btn:hover {
-            color: #6b7280;
-            border-color: #d1d5db;
-        }
-
-        .sort-btn.active {
-            background: #f9fafb;
-            border-color: #9ca3af;
-            color: #374151;
-        }
-
-        /* Patient Card List */
-        .patient-list {
-            max-height: 600px;
-            overflow-y: auto;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .patient-card {
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 14px;
-            transition: all 0.2s;
-        }
-
-        .patient-card:hover {
-            border-color: #cbd5e0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            transform: translateY(-1px);
-        }
-
-        .patient-card.has-shortage {
-            border-left: 4px solid #e53e3e;
-        }
-
-        .patient-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-
-        .patient-card-title {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .patient-name {
-            font-size: 16px;
-            font-weight: 700;
-            color: #1a202c;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .patient-birth {
-            font-size: 14px;
-            color: #718096;
-            font-weight: 400;
-        }
-
-        .patient-info {
-            font-size: 13px;
-            color: #a0aec0;
-            margin-bottom: 8px;
-        }
-
-        .patient-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-        }
-
-        .badge-drug {
-            background: #e8f4fd;
-            color: #2b6cb0;
-        }
-
-        .badge-shortage {
-            background: #fed7d7;
-            color: #c53030;
-        }
-
-        .badge-exact {
-            background: #fef3c7;
-            color: #d97706;
-        }
-
-        .badge-normal {
-            background: #c6f6d5;
-            color: #276749;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: #48bb78;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #38a169;
-        }
-
-        .btn-secondary {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .btn-secondary:hover {
-            background: #cbd5e0;
-        }
-
-        .btn-danger {
-            background: #fc8181;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #f56565;
-        }
-
-        .btn-suggest {
-            background: linear-gradient(135deg, #f6e05e 0%, #ecc94b 100%);
-            color: #744210;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .btn-suggest:hover {
-            background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(236, 201, 75, 0.4);
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal.visible {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 650px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 10;
-        }
-
-        .modal-header h3 {
-            font-size: 18px;
-            color: #2d3748;
-        }
-
-        .modal-close {
-            font-size: 24px;
-            cursor: pointer;
-            color: #a0aec0;
-        }
-
-        .modal-close:hover {
-            color: #718096;
-        }
-
-        .modal-body {
-            padding: 20px;
-        }
-
-        .modal-footer {
-            padding: 20px;
-            border-top: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            position: sticky;
-            bottom: 0;
-            background: white;
-        }
-
-        .modal-footer-left {
-            display: flex;
-            gap: 10px;
-        }
-
-        .modal-footer-right {
-            display: flex;
-            gap: 10px;
-        }
-
-        /* Form sections */
-        .form-section {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .form-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-        }
-
-        .form-section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #4a5568;
-            margin-bottom: 12px;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 12px;
-        }
-
-        .form-group {
-            flex: 1;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            color: #718096;
-            margin-bottom: 6px;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #48bb78;
-        }
-
-        .form-group textarea {
-            min-height: 60px;
-            resize: vertical;
-        }
-
-        /* Drug list in modal */
-        .drug-list-section {
-            margin-top: 15px;
-        }
-
-        .drug-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        .drug-table th {
-            text-align: left;
-            padding: 10px 8px;
-            background: #f7fafc;
-            border-bottom: 2px solid #e2e8f0;
-            color: #4a5568;
-            font-weight: 600;
-        }
-
-        .drug-table td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: middle;
-        }
-
-        .drug-table tr:hover {
-            background: #f7fafc;
-        }
-
-        .drug-table .status-icon {
-            font-size: 16px;
-        }
-
-        .drug-table .shortage {
-            color: #e53e3e;
-        }
-
-        .drug-table .exact {
-            color: #d97706;
-        }
-
-        .drug-table .sufficient {
-            color: #38a169;
-        }
-
-        .drug-table input[type="number"] {
-            width: 70px;
-            padding: 6px 8px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            text-align: center;
-        }
-
-        .drug-table .remove-drug-btn {
-            color: #a0aec0;
-            cursor: pointer;
-            font-size: 18px;
-        }
-
-        .drug-table .remove-drug-btn:hover {
-            color: #e53e3e;
-        }
-
-        .drug-table .empty-row td {
-            text-align: center;
-            color: #a0aec0;
-            padding: 20px;
-        }
-
-        /* Drug search in modal */
-        .drug-search-container {
-            position: relative;
-            margin-top: 10px;
-        }
-
-        .drug-search-input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .drug-search-input:focus {
-            outline: none;
-            border-color: #48bb78;
-        }
-
-        .drug-search-results {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            margin-top: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-            z-index: 100;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .drug-search-results.visible {
-            display: block;
-        }
-
-        .drug-result-item {
-            padding: 10px 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .drug-result-item:hover {
-            background: #f7fafc;
-        }
-
-        .drug-result-item:last-child {
-            border-bottom: none;
-        }
-
-        /* Status message */
-        .status-message {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .status-message.success {
-            background: #c6f6d5;
-            color: #276749;
-            display: block;
-        }
-
-        .status-message.error {
-            background: #fed7d7;
-            color: #c53030;
-            display: block;
-        }
-
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #a0aec0;
-            grid-column: 1 / -1;
-        }
-
-        .empty-state-icon {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-
-        /* Tooltip */
-        .help-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-            background: #e2e8f0;
-            color: #718096;
-            border-radius: 50%;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: help;
-            margin-left: 6px;
-            position: relative;
-        }
-
-        .help-icon:hover {
-            background: #cbd5e0;
-            color: #4a5568;
-        }
-
-        .help-icon .tooltip {
-            display: none;
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 0;
-            background: #2d3748;
-            color: white;
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 400;
-            white-space: normal;
-            width: 280px;
-            line-height: 1.5;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-        }
-
-        .help-icon .tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 12px;
-            border: 6px solid transparent;
-            border-top-color: #2d3748;
-        }
-
-        .help-icon:hover .tooltip {
-            display: block;
-        }
-
-        /* Modal error message */
-        .modal-error-message {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #fc8181;
-            animation: shake 0.3s ease-in-out;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-
-        /* Modal shake animation for close protection */
-        @keyframes modalShake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-
-        .modal-content.shake {
-            animation: modalShake 0.4s ease-in-out;
-        }
-
-        /* Custom Confirm Modal */
-        .confirm-modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 3000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .confirm-modal-overlay.visible {
-            display: flex;
-        }
-
-        .confirm-modal-box {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 320px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: modalSlideIn 0.2s ease;
-        }
-
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-10px);
+{% extends "base.html" %}
+
+{% block title %}환자 관리 - Jaego{% endblock %}
+
+{% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.VERSION }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.VERSION }}">
+{% endblock %}
+
+{% block page_styles %}
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+        overflow-y: scroll;
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        padding: 30px;
+        animation: fadeIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .back-link {
+        color: #4299e1;
+        text-decoration: none;
+        font-size: 14px;
+        display: inline-block;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    /* Header Row (Stats + Actions) */
+    .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    /* Stats Bar */
+    .stats-bar {
+        display: flex;
+        gap: 15px;
+        padding: 12px 16px;
+        background: #f1f5f9;
+        border-radius: 10px;
+        flex-wrap: wrap;
+        border: 1px solid #e2e8f0;
+        flex: 1;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+    }
+
+    .stat-item {
+        color: #475569;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .stat-value {
+        font-weight: bold;
+        font-size: 16px;
+        color: #1e293b;
+    }
+
+    /* Search & Filter */
+    .search-section {
+        margin-bottom: 20px;
+    }
+
+    .search-filter-bar {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .search-input {
+        flex: 1;
+        min-width: 250px;
+        padding: 14px 18px;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        font-size: 15px;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #48bb78;
+    }
+
+    .filter-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .filter-btn {
+        padding: 6px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        background: #f9fafb;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: #6b7280;
+        transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+        color: #374151;
+    }
+
+    .filter-btn.active {
+        background: #ecfdf5;
+        border-color: #34d399;
+        color: #059669;
+    }
+
+    .sort-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding-left: 10px;
+        border-left: 1px solid #e2e8f0;
+    }
+
+    .sort-btn {
+        padding: 5px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        color: #9ca3af;
+        transition: all 0.2s;
+    }
+
+    .sort-btn:hover {
+        color: #6b7280;
+        border-color: #d1d5db;
+    }
+
+    .sort-btn.active {
+        background: #f9fafb;
+        border-color: #9ca3af;
+        color: #374151;
+    }
+
+    /* Patient Card List */
+    .patient-list {
+        max-height: 600px;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .patient-card {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px;
+        transition: all 0.2s;
+    }
+
+    .patient-card:hover {
+        border-color: #cbd5e0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: translateY(-1px);
+    }
+
+    .patient-card.has-shortage {
+        border-left: 4px solid #e53e3e;
+    }
+
+    .patient-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+
+    .patient-card-title {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .patient-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a202c;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .patient-birth {
+        font-size: 14px;
+        color: #718096;
+        font-weight: 400;
+    }
+
+    .patient-info {
+        font-size: 13px;
+        color: #a0aec0;
+        margin-bottom: 8px;
+    }
+
+    .patient-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+
+    .badge-drug {
+        background: #e8f4fd;
+        color: #2b6cb0;
+    }
+
+    .badge-shortage {
+        background: #fed7d7;
+        color: #c53030;
+    }
+
+    .badge-exact {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .badge-normal {
+        background: #c6f6d5;
+        color: #276749;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #48bb78;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #38a169;
+    }
+
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+
+    .btn-secondary:hover {
+        background: #cbd5e0;
+    }
+
+    .btn-danger {
+        background: #fc8181;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #f56565;
+    }
+
+    .btn-suggest {
+        background: linear-gradient(135deg, #f6e05e 0%, #ecc94b 100%);
+        color: #744210;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .btn-suggest:hover {
+        background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(236, 201, 75, 0.4);
+    }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal.visible {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 650px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
+    }
+
+    .modal-header h3 {
+        font-size: 18px;
+        color: #2d3748;
+    }
+
+    .modal-close {
+        font-size: 24px;
+        cursor: pointer;
+        color: #a0aec0;
+    }
+
+    .modal-close:hover {
+        color: #718096;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        position: sticky;
+        bottom: 0;
+        background: white;
+    }
+
+    .modal-footer-left {
+        display: flex;
+        gap: 10px;
+    }
+
+    .modal-footer-right {
+        display: flex;
+        gap: 10px;
+    }
+
+    /* Form sections */
+    .form-section {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+
+    .form-section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 12px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 12px;
+    }
+
+    .form-group {
+        flex: 1;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        color: #718096;
+        margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #48bb78;
+    }
+
+    .form-group textarea {
+        min-height: 60px;
+        resize: vertical;
+    }
+
+    /* Drug list in modal */
+    .drug-list-section {
+        margin-top: 15px;
+    }
+
+    .drug-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .drug-table th {
+        text-align: left;
+        padding: 10px 8px;
+        background: #f7fafc;
+        border-bottom: 2px solid #e2e8f0;
+        color: #4a5568;
+        font-weight: 600;
+    }
+
+    .drug-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+    }
+
+    .drug-table tr:hover {
+        background: #f7fafc;
+    }
+
+    .drug-table .status-icon {
+        font-size: 16px;
+    }
+
+    .drug-table .shortage {
+        color: #e53e3e;
+    }
+
+    .drug-table .exact {
+        color: #d97706;
+    }
+
+    .drug-table .sufficient {
+        color: #38a169;
+    }
+
+    .drug-table input[type="number"] {
+        width: 70px;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        text-align: center;
+    }
+
+    .drug-table .remove-drug-btn {
+        color: #a0aec0;
+        cursor: pointer;
+        font-size: 18px;
+    }
+
+    .drug-table .remove-drug-btn:hover {
+        color: #e53e3e;
+    }
+
+    .drug-table .empty-row td {
+        text-align: center;
+        color: #a0aec0;
+        padding: 20px;
+    }
+
+    /* Drug search in modal */
+    .drug-search-container {
+        position: relative;
+        margin-top: 10px;
+    }
+
+    .drug-search-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .drug-search-input:focus {
+        outline: none;
+        border-color: #48bb78;
+    }
+
+    .drug-search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-top: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        z-index: 100;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .drug-search-results.visible {
+        display: block;
+    }
+
+    .drug-result-item {
+        padding: 10px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .drug-result-item:hover {
+        background: #f7fafc;
+    }
+
+    .drug-result-item:last-child {
+        border-bottom: none;
+    }
+
+    /* Status message */
+    .status-message {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+    }
+
+    .status-message.success {
+        background: #c6f6d5;
+        color: #276749;
+        display: block;
+    }
+
+    .status-message.error {
+        background: #fed7d7;
+        color: #c53030;
+        display: block;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #a0aec0;
+        grid-column: 1 / -1;
+    }
+
+    .empty-state-icon {
+        font-size: 3em;
+        margin-bottom: 10px;
+    }
+
+    /* Tooltip */
+    .help-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        background: #e2e8f0;
+        color: #718096;
+        border-radius: 50%;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: help;
+        margin-left: 6px;
+        position: relative;
+    }
+
+    .help-icon:hover {
+        background: #cbd5e0;
+        color: #4a5568;
+    }
+
+    .help-icon .tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        background: #2d3748;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 400;
+        white-space: normal;
+        width: 280px;
+        line-height: 1.5;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+    }
+
+    .help-icon .tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 12px;
+        border: 6px solid transparent;
+        border-top-color: #2d3748;
+    }
+
+    .help-icon:hover .tooltip {
+        display: block;
+    }
+
+    /* Modal error message */
+    .modal-error-message {
+        background: #fed7d7;
+        color: #c53030;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #fc8181;
+        animation: shake 0.3s ease-in-out;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+
+    /* Modal shake animation for close protection */
+    @keyframes modalShake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+
+    .modal-content.shake {
+        animation: modalShake 0.4s ease-in-out;
+    }
+
+    .modal-error-message::before {
+        content: '⚠️';
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <a href="/" class="back-link" style="margin-bottom: 20px;">&#8592; 홈으로 돌아가기</a>
+
+    <div style="display: block; text-align: center; padding-bottom: 10px; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
+        <h1 style="color: #2d3748; font-size: 1.8em; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <span>&#128100;</span>
+            환자 관리
+        </h1>
+        <p style="color: #718096; margin-top: 8px;">환자별 약품 재고 상태를 확인합니다</p>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+
+    <div class="header-row">
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item">
+                <span>전체 환자:</span>
+                <span class="stat-value" id="statTotal">0</span>명
+            </div>
+            <div class="stat-item">
+                <span>&#9888;&#65039; 부족 있음:</span>
+                <span class="stat-value" id="statShortage">0</span>명
+            </div>
+            <div class="stat-item">
+                <span>&#9989; 정상:</span>
+                <span class="stat-value" id="statNormal">0</span>명
+            </div>
+        </div>
+        <div class="header-actions">
+            <a href="/patient/suggest" class="btn btn-suggest" id="suggestLink" style="display: none; text-decoration: none;">&#128161; 약품 추천</a>
+            <button class="btn btn-primary" onclick="openPatientModal()">+ 새 환자</button>
+        </div>
+    </div>
+
+    <div class="search-filter-bar" style="margin-bottom: 20px;">
+        <input type="text" class="search-input" id="searchInput"
+               placeholder="환자명, 주민번호로 검색..."
+               oninput="filterPatients()">
+        <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
+            <button class="filter-btn" data-filter="shortage" onclick="setFilter('shortage')">⚠️ 부족</button>
+            <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">✅ 정상</button>
+        </div>
+        <div class="sort-buttons">
+            <button class="sort-btn active" data-sort="recent" onclick="setSort('recent')">최근순</button>
+            <button class="sort-btn" data-sort="name" onclick="setSort('name')">가나다순</button>
+        </div>
+    </div>
+
+    <div class="patient-list" id="patientList">
+        <div class="empty-state">
+            <div class="empty-state-icon">&#128100;</div>
+            <div>등록된 환자가 없습니다.</div>
+            <div style="margin-top: 10px; font-size: 14px;">"새 환자" 버튼을 클릭하여 환자를 등록하세요.</div>
+        </div>
+    </div>
+</div>
+
+<!-- Patient Modal (Create/Edit) -->
+<div id="patientModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">&#128100; 새 환자 등록</h3>
+            <span class="modal-close" onclick="closePatientModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <!-- In-modal error message -->
+            <div id="modalErrorMessage" class="modal-error-message" style="display: none;"></div>
+
+            <!-- Basic Info -->
+            <div class="form-section">
+                <div class="form-section-title">&#128203; 기본 정보</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>환자명 *</label>
+                        <input type="text" id="inputPatientName" placeholder="환자명">
+                    </div>
+                    <div class="form-group">
+                        <label>주민번호 앞자리 *</label>
+                        <input type="text" id="inputPatientBirth" maxlength="6" placeholder="예: 900101" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>방문 주기 (일)
+                            <span class="help-icon">?
+                                <span class="tooltip">환자가 평균적으로 몇 일마다 방문하는지 입력하세요. 최소 재고 버퍼 계산에 사용됩니다.</span>
+                            </span>
+                        </label>
+                        <input type="number" id="inputVisitCycle" placeholder="예: 30" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>메모</label>
+                        <input type="text" id="inputPatientMemo" placeholder="환자 메모">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drug List (only shown in edit mode) -->
+            <div class="form-section" id="drugListSection" style="display: none;">
+                <div class="form-section-title">
+                    &#128138; 처방 약품 목록
+                    <span class="help-icon">?
+                        <span class="tooltip">이 환자에게 처방되는 약품 목록입니다. 현재 재고가 1회 처방량 이하이면 부족으로 표시됩니다.</span>
+                    </span>
+                </div>
+                <div class="drug-list-section">
+                    <table class="drug-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 30px;"></th>
+                                <th>약품명</th>
+                                <th style="width: 80px;">1회처방량</th>
+                                <th style="width: 80px;">현재재고</th>
+                                <th style="width: 60px;">상태</th>
+                                <th style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="drugTableBody">
+                            <tr class="empty-row">
+                                <td colspan="6">연결된 약품이 없습니다</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="drug-search-container">
+                        <input type="text" class="drug-search-input" id="drugSearchInput"
+                               placeholder="약품명 또는 약품코드로 검색하여 추가..."
+                               oninput="searchDrugs()">
+                        <div class="drug-search-results" id="drugSearchResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div class="modal-footer-left">
+                <button class="btn btn-danger" id="deletePatientBtn" onclick="deletePatient()" style="display: none;">삭제</button>
+            </div>
+            <div class="modal-footer-right">
+                <button class="btn btn-secondary" onclick="closePatientModal()">취소</button>
+                <button class="btn btn-primary" onclick="savePatient()">저장</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Drug Registration Modal -->
+<div id="confirmDrugModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3>💊 약품 등록</h3>
+            <span class="modal-close" onclick="closeConfirmDrugModal(false)">&times;</span>
+        </div>
+        <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">💊</div>
+            <div style="font-size: 16px; color: #2d3748; line-height: 1.6;">
+                등록한 <strong id="confirmPatientName"></strong> 환자의<br>
+                사용 약품을 등록하시겠습니까?
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content: center; gap: 12px;">
+            <button class="btn btn-secondary" onclick="closeConfirmDrugModal(false)" style="min-width: 100px;">나중에</button>
+            <button class="btn btn-primary" onclick="closeConfirmDrugModal(true)" style="min-width: 100px;">등록하기</button>
+        </div>
+    </div>
+</div>
+
+<!-- Dosage Modal -->
+<div id="dosageModal" class="modal">
+    <div class="modal-content" style="max-width: 380px;">
+        <div class="modal-header">
+            <h3>&#128138; 1회 처방량 입력</h3>
+            <span class="modal-close" onclick="closeDosageModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px;">
+                <div style="font-weight: 600; color: #2d3748;" id="dosageDrugName">-</div>
+                <div style="color: #718096; font-size: 13px;" id="dosageDrugInfo">-</div>
+            </div>
+            <div class="form-group">
+                <label>1회 처방량 *</label>
+                <input type="number" id="inputDosage" placeholder="예: 30" min="1" value="1">
+                <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                    이 환자에게 한 번 방문 시 처방하는 약품 수량
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div></div>
+            <div class="modal-footer-right">
+                <button class="btn btn-secondary" onclick="closeDosageModal()">취소</button>
+                <button class="btn btn-primary" onclick="confirmDosage()">추가</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block component_scripts %}
+<script src="{{ url_for('static', filename='js/components/jaego-core.js') }}?v={{ config.VERSION }}"></script>
+<script src="{{ url_for('static', filename='js/components/confirm-modal.js') }}?v={{ config.VERSION }}"></script>
+<script src="{{ url_for('static', filename='js/components/shutdown.js') }}?v={{ config.VERSION }}"></script>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+    var allPatients = [];
+    var currentFilter = 'all';
+    var currentSort = 'recent';
+    var currentPatientId = null;
+    var isEditMode = false;
+    var patientDrugs = [];
+    var searchTimeout = null;
+    var pendingDrug = null;
+    var pendingNewPatient = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPatients();
+        checkSuggestionStatus();
+    });
+
+    // Check if suggestion feature is active
+    function checkSuggestionStatus() {
+        fetch('/api/suggestion/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'success' && data.data.active) {
+                    document.getElementById('suggestLink').style.display = 'inline-flex';
+                }
+            })
+            .catch(function(error) {
+                console.log('Suggestion status check failed:', error);
+            });
+    }
+
+    function loadPatients() {
+        fetch('/api/patients-with-drugs')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'success') {
+                    allPatients = data.data;
+                    updateStats();
+                    filterPatients();
+                }
+            })
+            .catch(function(error) {
+                showStatus('데이터 로드 실패: ' + error.message, 'error');
+            });
+    }
+
+    function updateStats() {
+        var total = allPatients.length;
+        var shortage = allPatients.filter(function(p) { return p.has_shortage; }).length;
+        var normal = total - shortage;
+
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statShortage').textContent = shortage;
+        document.getElementById('statNormal').textContent = normal;
+    }
+
+    function renderPatients(patients) {
+        var listDiv = document.getElementById('patientList');
+
+        if (patients.length === 0) {
+            listDiv.innerHTML =
+                '<div class="empty-state">' +
+                    '<div class="empty-state-icon">&#128100;</div>' +
+                    '<div>등록된 환자가 없습니다.</div>' +
+                    '<div style="margin-top: 10px; font-size: 14px;">"새 환자" 버튼을 클릭하여 환자를 등록하세요.</div>' +
+                '</div>';
+            return;
+        }
+
+        listDiv.innerHTML = patients.map(function(patient) {
+            var shortageClass = patient.has_shortage ? 'has-shortage' : '';
+            var statusBadges = '';
+            if (patient.has_shortage) {
+                statusBadges += '<span class="badge badge-shortage">&#9888;&#65039; 부족 ' + patient.shortage_count + '개</span>';
             }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
+            if (patient.has_exact) {
+                statusBadges += '<span class="badge badge-exact">&#127919; 딱맞음 ' + patient.exact_count + '개</span>';
             }
-        }
-
-        .confirm-modal-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .confirm-modal-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 8px;
-        }
-
-        .confirm-modal-message {
-            font-size: 14px;
-            color: #718096;
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-
-        .confirm-modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .confirm-modal-buttons .btn {
-            min-width: 100px;
-        }
-
-        .modal-error-message::before {
-            content: '⚠️';
-        }
-
-        /* Confirm Modal */
-        .confirm-modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 3000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .confirm-modal-overlay.visible {
-            display: flex;
-        }
-
-        .confirm-modal-box {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 360px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: confirmModalSlideIn 0.2s ease;
-        }
-
-        @keyframes confirmModalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-10px);
+            if (!patient.has_shortage && !patient.has_exact && patient.drug_count > 0) {
+                statusBadges = '<span class="badge badge-normal">&#9989; 정상</span>';
             }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
+
+            return '<div class="patient-card ' + shortageClass + '" data-id="' + patient.patient_id + '">' +
+                '<div class="patient-card-header">' +
+                    '<div class="patient-card-title">' +
+                        '<div class="patient-name">' +
+                            escapeHtml(patient.patient_name) +
+                            (patient.birth ? '<span class="patient-birth">(' + patient.birth + ')</span>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<button class="btn btn-secondary" onclick="openEditModal(' + patient.patient_id + ')" style="padding: 6px 12px; font-size: 13px;">관리</button>' +
+                '</div>' +
+                (patient.visit_cycle ? '<div class="patient-info">방문주기: ' + patient.visit_cycle + '일</div>' : '') +
+                (patient.memo ? '<div class="patient-info">' + escapeHtml(patient.memo.substring(0, 30)) + (patient.memo.length > 30 ? '...' : '') + '</div>' : '') +
+                '<div class="patient-badges">' +
+                    '<span class="badge badge-drug">&#128138; 약품 ' + patient.drug_count + '개</span>' +
+                    statusBadges +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function filterPatients() {
+        var query = document.getElementById('searchInput').value.toLowerCase();
+        var filtered = allPatients.slice();
+
+        if (query) {
+            filtered = filtered.filter(function(p) {
+                return p.patient_name.toLowerCase().includes(query) ||
+                    (p.birth && p.birth.includes(query));
+            });
         }
 
-        .confirm-modal-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
+        if (currentFilter === 'shortage') {
+            filtered = filtered.filter(function(p) { return p.has_shortage; });
+        } else if (currentFilter === 'normal') {
+            filtered = filtered.filter(function(p) { return !p.has_shortage || p.drug_count === 0; });
         }
 
-        .confirm-modal-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 8px;
+        if (currentSort === 'name') {
+            filtered.sort(function(a, b) { return a.patient_name.localeCompare(b.patient_name, 'ko'); });
+        } else if (currentSort === 'recent') {
+            filtered.sort(function(a, b) { return new Date(b.updated_at || 0) - new Date(a.updated_at || 0); });
         }
 
-        .confirm-modal-message {
-            font-size: 14px;
-            color: #718096;
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
+        renderPatients(filtered);
+    }
 
-        .confirm-modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
+    function setFilter(filter) {
+        currentFilter = filter;
 
-        .confirm-modal-buttons button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            min-width: 80px;
-            transition: all 0.2s;
-        }
-
-        .confirm-modal-buttons .btn-cancel {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .confirm-modal-buttons .btn-cancel:hover {
-            background: #cbd5e0;
-        }
-
-        .confirm-modal-buttons .btn-confirm {
-            background: #48bb78;
-            color: white;
-        }
-
-        .confirm-modal-buttons .btn-confirm:hover {
-            background: #38a169;
-        }
-
-        .confirm-modal-buttons .btn-danger {
-            background: #f56565;
-            color: white;
-        }
-
-        .confirm-modal-buttons .btn-danger:hover {
-            background: #e53e3e;
-        }
-    </style>
-</head>
-<body>
-    <button class="btn-shutdown" onclick="shutdownServer()">⏻ 종료</button>
-
-    <div class="container">
-        <a href="/" class="back-link" style="margin-bottom: 20px;">&#8592; 홈으로 돌아가기</a>
-
-        <div style="display: block; text-align: center; padding-bottom: 10px; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
-            <h1 style="color: #2d3748; font-size: 1.8em; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <span>&#128100;</span>
-                환자 관리
-            </h1>
-            <p style="color: #718096; margin-top: 8px;">환자별 약품 재고 상태를 확인합니다</p>
-        </div>
-
-        <div id="statusMessage" class="status-message"></div>
-
-        <div class="header-row">
-            <div class="stats-bar" id="statsBar">
-                <div class="stat-item">
-                    <span>전체 환자:</span>
-                    <span class="stat-value" id="statTotal">0</span>명
-                </div>
-                <div class="stat-item">
-                    <span>&#9888;&#65039; 부족 있음:</span>
-                    <span class="stat-value" id="statShortage">0</span>명
-                </div>
-                <div class="stat-item">
-                    <span>&#9989; 정상:</span>
-                    <span class="stat-value" id="statNormal">0</span>명
-                </div>
-            </div>
-            <div class="header-actions">
-                <a href="/patient/suggest" class="btn btn-suggest" id="suggestLink" style="display: none; text-decoration: none;">&#128161; 약품 추천</a>
-                <button class="btn btn-primary" onclick="openPatientModal()">+ 새 환자</button>
-            </div>
-        </div>
-
-        <div class="search-filter-bar" style="margin-bottom: 20px;">
-            <input type="text" class="search-input" id="searchInput"
-                   placeholder="환자명, 주민번호로 검색..."
-                   oninput="filterPatients()">
-            <div class="filter-buttons">
-                <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
-                <button class="filter-btn" data-filter="shortage" onclick="setFilter('shortage')">⚠️ 부족</button>
-                <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">✅ 정상</button>
-            </div>
-            <div class="sort-buttons">
-                <button class="sort-btn active" data-sort="recent" onclick="setSort('recent')">최근순</button>
-                <button class="sort-btn" data-sort="name" onclick="setSort('name')">가나다순</button>
-            </div>
-        </div>
-
-        <div class="patient-list" id="patientList">
-            <div class="empty-state">
-                <div class="empty-state-icon">&#128100;</div>
-                <div>등록된 환자가 없습니다.</div>
-                <div style="margin-top: 10px; font-size: 14px;">"새 환자" 버튼을 클릭하여 환자를 등록하세요.</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Patient Modal (Create/Edit) -->
-    <div id="patientModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">&#128100; 새 환자 등록</h3>
-                <span class="modal-close" onclick="closePatientModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <!-- In-modal error message -->
-                <div id="modalErrorMessage" class="modal-error-message" style="display: none;"></div>
-
-                <!-- Basic Info -->
-                <div class="form-section">
-                    <div class="form-section-title">&#128203; 기본 정보</div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>환자명 *</label>
-                            <input type="text" id="inputPatientName" placeholder="환자명">
-                        </div>
-                        <div class="form-group">
-                            <label>주민번호 앞자리 *</label>
-                            <input type="text" id="inputPatientBirth" maxlength="6" placeholder="예: 900101" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>방문 주기 (일)
-                                <span class="help-icon">?
-                                    <span class="tooltip">환자가 평균적으로 몇 일마다 방문하는지 입력하세요. 최소 재고 버퍼 계산에 사용됩니다.</span>
-                                </span>
-                            </label>
-                            <input type="number" id="inputVisitCycle" placeholder="예: 30" min="1">
-                        </div>
-                        <div class="form-group">
-                            <label>메모</label>
-                            <input type="text" id="inputPatientMemo" placeholder="환자 메모">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Drug List (only shown in edit mode) -->
-                <div class="form-section" id="drugListSection" style="display: none;">
-                    <div class="form-section-title">
-                        &#128138; 처방 약품 목록
-                        <span class="help-icon">?
-                            <span class="tooltip">이 환자에게 처방되는 약품 목록입니다. 현재 재고가 1회 처방량 이하이면 부족으로 표시됩니다.</span>
-                        </span>
-                    </div>
-                    <div class="drug-list-section">
-                        <table class="drug-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 30px;"></th>
-                                    <th>약품명</th>
-                                    <th style="width: 80px;">1회처방량</th>
-                                    <th style="width: 80px;">현재재고</th>
-                                    <th style="width: 60px;">상태</th>
-                                    <th style="width: 40px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="drugTableBody">
-                                <tr class="empty-row">
-                                    <td colspan="6">연결된 약품이 없습니다</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="drug-search-container">
-                            <input type="text" class="drug-search-input" id="drugSearchInput"
-                                   placeholder="약품명 또는 약품코드로 검색하여 추가..."
-                                   oninput="searchDrugs()">
-                            <div class="drug-search-results" id="drugSearchResults"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <div class="modal-footer-left">
-                    <button class="btn btn-danger" id="deletePatientBtn" onclick="deletePatient()" style="display: none;">삭제</button>
-                </div>
-                <div class="modal-footer-right">
-                    <button class="btn btn-secondary" onclick="closePatientModal()">취소</button>
-                    <button class="btn btn-primary" onclick="savePatient()">저장</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirm Drug Registration Modal -->
-    <div id="confirmDrugModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>💊 약품 등록</h3>
-                <span class="modal-close" onclick="closeConfirmDrugModal(false)">&times;</span>
-            </div>
-            <div class="modal-body" style="text-align: center; padding: 30px 20px;">
-                <div style="font-size: 48px; margin-bottom: 16px;">💊</div>
-                <div style="font-size: 16px; color: #2d3748; line-height: 1.6;">
-                    등록한 <strong id="confirmPatientName"></strong> 환자의<br>
-                    사용 약품을 등록하시겠습니까?
-                </div>
-            </div>
-            <div class="modal-footer" style="justify-content: center; gap: 12px;">
-                <button class="btn btn-secondary" onclick="closeConfirmDrugModal(false)" style="min-width: 100px;">나중에</button>
-                <button class="btn btn-primary" onclick="closeConfirmDrugModal(true)" style="min-width: 100px;">등록하기</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Custom Confirm Modal -->
-    <div id="confirmCloseModal" class="confirm-modal-overlay">
-        <div class="confirm-modal-box">
-            <div class="confirm-modal-icon">⚠️</div>
-            <div class="confirm-modal-title">작성 중인 내용이 있습니다</div>
-            <div class="confirm-modal-message">정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.</div>
-            <div class="confirm-modal-buttons">
-                <button class="btn btn-secondary" onclick="cancelCloseConfirm()">계속 작성</button>
-                <button class="btn btn-danger" onclick="confirmClose()">닫기</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Dosage Modal -->
-    <div id="dosageModal" class="modal">
-        <div class="modal-content" style="max-width: 380px;">
-            <div class="modal-header">
-                <h3>&#128138; 1회 처방량 입력</h3>
-                <span class="modal-close" onclick="closeDosageModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px;">
-                    <div style="font-weight: 600; color: #2d3748;" id="dosageDrugName">-</div>
-                    <div style="color: #718096; font-size: 13px;" id="dosageDrugInfo">-</div>
-                </div>
-                <div class="form-group">
-                    <label>1회 처방량 *</label>
-                    <input type="number" id="inputDosage" placeholder="예: 30" min="1" value="1">
-                    <div style="font-size: 12px; color: #718096; margin-top: 4px;">
-                        이 환자에게 한 번 방문 시 처방하는 약품 수량
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <div></div>
-                <div class="modal-footer-right">
-                    <button class="btn btn-secondary" onclick="closeDosageModal()">취소</button>
-                    <button class="btn btn-primary" onclick="confirmDosage()">추가</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let allPatients = [];
-        let currentFilter = 'all';
-        let currentSort = 'recent';
-        let currentPatientId = null;
-        let isEditMode = false;
-        let patientDrugs = [];  // Current patient's drugs in modal
-        let searchTimeout = null;
-        let pendingDrug = null;  // For dosage modal
-        let pendingNewPatient = null;  // For confirm drug registration modal
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            loadPatients();
-            checkSuggestionStatus();
+        document.querySelectorAll('.filter-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.dataset.filter === filter);
         });
 
-        // Check if suggestion feature is active
-        function checkSuggestionStatus() {
-            fetch('/api/suggestion/status')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success' && data.data.active) {
-                        document.getElementById('suggestLink').style.display = 'inline-flex';
-                    }
-                })
-                .catch(error => {
-                    console.log('Suggestion status check failed:', error);
-                });
-        }
+        filterPatients();
+    }
 
-        function loadPatients() {
-            fetch('/api/patients-with-drugs')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        allPatients = data.data;
-                        updateStats();
-                        filterPatients();  // 정렬 적용 후 렌더링
-                    }
-                })
-                .catch(error => {
-                    showStatus('데이터 로드 실패: ' + error.message, 'error');
-                });
-        }
+    function setSort(sort) {
+        currentSort = sort;
 
-        function updateStats() {
-            const total = allPatients.length;
-            const shortage = allPatients.filter(p => p.has_shortage).length;
-            const normal = total - shortage;
+        document.querySelectorAll('.sort-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.dataset.sort === sort);
+        });
 
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statShortage').textContent = shortage;
-            document.getElementById('statNormal').textContent = normal;
-        }
+        filterPatients();
+    }
 
-        function renderPatients(patients) {
-            const listDiv = document.getElementById('patientList');
+    // Modal Functions
+    function openPatientModal() {
+        isEditMode = false;
+        currentPatientId = null;
+        patientDrugs = [];
 
-            if (patients.length === 0) {
-                listDiv.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">&#128100;</div>
-                        <div>등록된 환자가 없습니다.</div>
-                        <div style="margin-top: 10px; font-size: 14px;">"새 환자" 버튼을 클릭하여 환자를 등록하세요.</div>
-                    </div>
-                `;
-                return;
-            }
+        hideModalError();
+        document.getElementById('modalTitle').textContent = '👤 새 환자 등록';
+        document.getElementById('inputPatientName').value = '';
+        document.getElementById('inputPatientBirth').value = '';
+        document.getElementById('inputVisitCycle').value = '';
+        document.getElementById('inputPatientMemo').value = '';
 
-            listDiv.innerHTML = patients.map(patient => {
-                const shortageClass = patient.has_shortage ? 'has-shortage' : '';
-                let statusBadges = '';
-                if (patient.has_shortage) {
-                    statusBadges += `<span class="badge badge-shortage">&#9888;&#65039; 부족 ${patient.shortage_count}개</span>`;
+        document.getElementById('drugListSection').style.display = 'none';
+        document.getElementById('deletePatientBtn').style.display = 'none';
+
+        document.getElementById('patientModal').classList.add('visible');
+    }
+
+    function openEditModal(patientId) {
+        isEditMode = true;
+        currentPatientId = patientId;
+
+        hideModalError();
+        document.getElementById('modalTitle').textContent = '👤 환자 관리';
+        document.getElementById('drugListSection').style.display = 'block';
+        document.getElementById('deletePatientBtn').style.display = 'block';
+
+        fetch('/api/patient/' + patientId + '/drugs-with-stock')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'success') {
+                    var patient = data.patient;
+                    patientDrugs = data.drugs;
+
+                    document.getElementById('inputPatientName').value = patient.name || '';
+                    document.getElementById('inputPatientBirth').value = patient.birth || '';
+                    document.getElementById('inputVisitCycle').value = patient.visit_cycle || '';
+                    document.getElementById('inputPatientMemo').value = patient.memo || '';
+
+                    renderDrugTable();
+                    document.getElementById('patientModal').classList.add('visible');
                 }
-                if (patient.has_exact) {
-                    statusBadges += `<span class="badge badge-exact">&#127919; 딱맞음 ${patient.exact_count}개</span>`;
-                }
-                if (!patient.has_shortage && !patient.has_exact && patient.drug_count > 0) {
-                    statusBadges = `<span class="badge badge-normal">&#9989; 정상</span>`;
-                }
-
-                return `
-                    <div class="patient-card ${shortageClass}" data-id="${patient.patient_id}">
-                        <div class="patient-card-header">
-                            <div class="patient-card-title">
-                                <div class="patient-name">
-                                    ${escapeHtml(patient.patient_name)}
-                                    ${patient.birth ? `<span class="patient-birth">(${patient.birth})</span>` : ''}
-                                </div>
-                            </div>
-                            <button class="btn btn-secondary" onclick="openEditModal(${patient.patient_id})" style="padding: 6px 12px; font-size: 13px;">관리</button>
-                        </div>
-                        ${patient.visit_cycle ? `<div class="patient-info">방문주기: ${patient.visit_cycle}일</div>` : ''}
-                        ${patient.memo ? `<div class="patient-info">${escapeHtml(patient.memo.substring(0, 30))}${patient.memo.length > 30 ? '...' : ''}</div>` : ''}
-                        <div class="patient-badges">
-                            <span class="badge badge-drug">&#128138; 약품 ${patient.drug_count}개</span>
-                            ${statusBadges}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function filterPatients() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            let filtered = [...allPatients];  // 복사본 사용
-
-            // Apply search
-            if (query) {
-                filtered = filtered.filter(p =>
-                    p.patient_name.toLowerCase().includes(query) ||
-                    (p.birth && p.birth.includes(query))
-                );
-            }
-
-            // Apply filter
-            if (currentFilter === 'shortage') {
-                filtered = filtered.filter(p => p.has_shortage);
-            } else if (currentFilter === 'normal') {
-                filtered = filtered.filter(p => !p.has_shortage || p.drug_count === 0);
-            }
-
-            // Apply sort
-            if (currentSort === 'name') {
-                filtered.sort((a, b) => a.patient_name.localeCompare(b.patient_name, 'ko'));
-            } else if (currentSort === 'recent') {
-                filtered.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
-            }
-
-            renderPatients(filtered);
-        }
-
-        function setFilter(filter) {
-            currentFilter = filter;
-
-            // Update button states
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.filter === filter);
+            })
+            .catch(function(error) {
+                showStatus('환자 정보 로드 실패: ' + error.message, 'error');
             });
+    }
 
-            filterPatients();
+    function closePatientModal() {
+        document.getElementById('patientModal').classList.remove('visible');
+        document.getElementById('drugSearchInput').value = '';
+        document.getElementById('drugSearchResults').classList.remove('visible');
+    }
+
+    function renderDrugTable() {
+        var tbody = document.getElementById('drugTableBody');
+
+        if (patientDrugs.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="6">연결된 약품이 없습니다</td></tr>';
+            return;
         }
 
-        function setSort(sort) {
-            currentSort = sort;
-
-            // Update button states
-            document.querySelectorAll('.sort-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.sort === sort);
-            });
-
-            filterPatients();
-        }
-
-        // Modal Functions
-        function openPatientModal() {
-            isEditMode = false;
-            currentPatientId = null;
-            patientDrugs = [];
-
-            hideModalError();
-            document.getElementById('modalTitle').textContent = '👤 새 환자 등록';
-            document.getElementById('inputPatientName').value = '';
-            document.getElementById('inputPatientBirth').value = '';
-            document.getElementById('inputVisitCycle').value = '';
-            document.getElementById('inputPatientMemo').value = '';
-
-            document.getElementById('drugListSection').style.display = 'none';
-            document.getElementById('deletePatientBtn').style.display = 'none';
-
-            document.getElementById('patientModal').classList.add('visible');
-        }
-
-        function openEditModal(patientId) {
-            isEditMode = true;
-            currentPatientId = patientId;
-
-            hideModalError();
-            document.getElementById('modalTitle').textContent = '👤 환자 관리';
-            document.getElementById('drugListSection').style.display = 'block';
-            document.getElementById('deletePatientBtn').style.display = 'block';
-
-            // Load patient data with drugs
-            fetch(`/api/patient/${patientId}/drugs-with-stock`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const patient = data.patient;
-                        patientDrugs = data.drugs;
-
-                        document.getElementById('inputPatientName').value = patient.name || '';
-                        document.getElementById('inputPatientBirth').value = patient.birth || '';
-                        document.getElementById('inputVisitCycle').value = patient.visit_cycle || '';
-                        document.getElementById('inputPatientMemo').value = patient.memo || '';
-
-                        renderDrugTable();
-                        document.getElementById('patientModal').classList.add('visible');
-                    }
-                })
-                .catch(error => {
-                    showStatus('환자 정보 로드 실패: ' + error.message, 'error');
-                });
-        }
-
-        function closePatientModal() {
-            document.getElementById('patientModal').classList.remove('visible');
-            document.getElementById('drugSearchInput').value = '';
-            document.getElementById('drugSearchResults').classList.remove('visible');
-        }
-
-        function renderDrugTable() {
-            const tbody = document.getElementById('drugTableBody');
-
-            if (patientDrugs.length === 0) {
-                tbody.innerHTML = `<tr class="empty-row"><td colspan="6">연결된 약품이 없습니다</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = patientDrugs.map((drug, index) => {
-                let statusIcon, statusText;
-                if (drug.status === 'shortage') {
-                    statusIcon = '<span class="status-icon shortage">&#128308;</span>';
-                    statusText = '부족';
-                } else if (drug.status === 'exact') {
-                    statusIcon = '<span class="status-icon exact">&#127919;</span>';
-                    statusText = '딱맞음';
-                } else {
-                    statusIcon = '<span class="status-icon sufficient">&#128994;</span>';
-                    statusText = '충분';
-                }
-
-                return `
-                    <tr data-code="${drug.drug_code}">
-                        <td>${statusIcon}</td>
-                        <td>
-                            <div style="font-weight: 500;">${escapeHtml(drug.drug_name)}</div>
-                            <div style="font-size: 12px; color: #a0aec0;">${drug.drug_code}</div>
-                        </td>
-                        <td>
-                            <input type="number" value="${drug.dosage}" min="1"
-                                   onchange="updateDosage(${index}, this.value)">
-                        </td>
-                        <td style="text-align: center;">${drug.current_stock}</td>
-                        <td class="${drug.status}">${statusText}</td>
-                        <td>
-                            <span class="remove-drug-btn" onclick="removeDrug(${index})">&times;</span>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function updateDosage(index, value) {
-            patientDrugs[index].dosage = parseInt(value) || 1;
-            // Re-check status
-            const drug = patientDrugs[index];
-            if (drug.current_stock < drug.dosage) {
-                drug.status = 'shortage';
-            } else if (drug.current_stock === drug.dosage) {
-                drug.status = 'exact';
+        tbody.innerHTML = patientDrugs.map(function(drug, index) {
+            var statusIcon, statusText;
+            if (drug.status === 'shortage') {
+                statusIcon = '<span class="status-icon shortage">&#128308;</span>';
+                statusText = '부족';
+            } else if (drug.status === 'exact') {
+                statusIcon = '<span class="status-icon exact">&#127919;</span>';
+                statusText = '딱맞음';
             } else {
-                drug.status = 'sufficient';
-            }
-            renderDrugTable();
-        }
-
-        function removeDrug(index) {
-            patientDrugs.splice(index, 1);
-            renderDrugTable();
-        }
-
-        // Drug search in modal
-        function searchDrugs() {
-            clearTimeout(searchTimeout);
-            const query = document.getElementById('drugSearchInput').value.trim();
-            const resultsDiv = document.getElementById('drugSearchResults');
-
-            if (query.length < 2) {
-                resultsDiv.classList.remove('visible');
-                return;
+                statusIcon = '<span class="status-icon sufficient">&#128994;</span>';
+                statusText = '충분';
             }
 
-            searchTimeout = setTimeout(() => {
-                fetch(`/api/search-inventory?q=${encodeURIComponent(query)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.status === 'success' && data.results.length > 0) {
-                            // Filter out already added drugs
-                            const existingCodes = patientDrugs.map(d => d.drug_code);
-                            const filtered = data.results.filter(d => !existingCodes.includes(d['약품코드']));
+            return '<tr data-code="' + drug.drug_code + '">' +
+                '<td>' + statusIcon + '</td>' +
+                '<td>' +
+                    '<div style="font-weight: 500;">' + escapeHtml(drug.drug_name) + '</div>' +
+                    '<div style="font-size: 12px; color: #a0aec0;">' + drug.drug_code + '</div>' +
+                '</td>' +
+                '<td>' +
+                    '<input type="number" value="' + drug.dosage + '" min="1" onchange="updateDosage(' + index + ', this.value)">' +
+                '</td>' +
+                '<td style="text-align: center;">' + drug.current_stock + '</td>' +
+                '<td class="' + drug.status + '">' + statusText + '</td>' +
+                '<td>' +
+                    '<span class="remove-drug-btn" onclick="removeDrug(' + index + ')">&times;</span>' +
+                '</td>' +
+            '</tr>';
+        }).join('');
+    }
 
-                            if (filtered.length > 0) {
-                                resultsDiv.innerHTML = filtered.slice(0, 10).map(item => `
-                                    <div class="drug-result-item" onclick="openDosageModal('${item['약품코드']}', '${escapeHtml(item['약품명'])}', '${escapeHtml(item['제약회사'])}', ${item['현재_재고수량']})">
-                                        <div style="font-weight: 500;">${item['약품명']}</div>
-                                        <div style="font-size: 13px; color: #718096;">${item['약품코드']} | 재고: ${item['현재_재고수량']}</div>
-                                    </div>
-                                `).join('');
-                            } else {
-                                resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">이미 모두 추가됨</div>';
-                            }
-                            resultsDiv.classList.add('visible');
+    function updateDosage(index, value) {
+        patientDrugs[index].dosage = parseInt(value) || 1;
+        var drug = patientDrugs[index];
+        if (drug.current_stock < drug.dosage) {
+            drug.status = 'shortage';
+        } else if (drug.current_stock === drug.dosage) {
+            drug.status = 'exact';
+        } else {
+            drug.status = 'sufficient';
+        }
+        renderDrugTable();
+    }
+
+    function removeDrug(index) {
+        patientDrugs.splice(index, 1);
+        renderDrugTable();
+    }
+
+    function searchDrugs() {
+        clearTimeout(searchTimeout);
+        var query = document.getElementById('drugSearchInput').value.trim();
+        var resultsDiv = document.getElementById('drugSearchResults');
+
+        if (query.length < 2) {
+            resultsDiv.classList.remove('visible');
+            return;
+        }
+
+        searchTimeout = setTimeout(function() {
+            fetch('/api/search-inventory?q=' + encodeURIComponent(query))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'success' && data.results.length > 0) {
+                        var existingCodes = patientDrugs.map(function(d) { return d.drug_code; });
+                        var filtered = data.results.filter(function(d) {
+                            return !existingCodes.includes(d['약품코드']);
+                        });
+
+                        if (filtered.length > 0) {
+                            resultsDiv.innerHTML = filtered.slice(0, 10).map(function(item) {
+                                return '<div class="drug-result-item" onclick="openDosageModal(\'' + item['약품코드'] + '\', \'' + escapeHtml(item['약품명']) + '\', \'' + escapeHtml(item['제약회사']) + '\', ' + item['현재_재고수량'] + ')">' +
+                                    '<div style="font-weight: 500;">' + item['약품명'] + '</div>' +
+                                    '<div style="font-size: 13px; color: #718096;">' + item['약품코드'] + ' | 재고: ' + item['현재_재고수량'] + '</div>' +
+                                '</div>';
+                            }).join('');
                         } else {
-                            resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">검색 결과가 없습니다</div>';
-                            resultsDiv.classList.add('visible');
+                            resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">이미 모두 추가됨</div>';
                         }
-                    });
-            }, 300);
-        }
-
-        // Dosage Modal
-        function openDosageModal(drugCode, drugName, company, currentStock) {
-            pendingDrug = { drugCode, drugName, company, currentStock };
-
-            document.getElementById('dosageDrugName').textContent = drugName;
-            document.getElementById('dosageDrugInfo').textContent = `${drugCode} | 현재 재고: ${currentStock}`;
-            document.getElementById('inputDosage').value = 1;
-
-            document.getElementById('drugSearchInput').value = '';
-            document.getElementById('drugSearchResults').classList.remove('visible');
-
-            document.getElementById('dosageModal').classList.add('visible');
-        }
-
-        function closeDosageModal() {
-            document.getElementById('dosageModal').classList.remove('visible');
-            pendingDrug = null;
-        }
-
-        // Confirm Drug Registration Modal
-        function openConfirmDrugModal(patientId, patientName) {
-            pendingNewPatient = { id: patientId, name: patientName };
-            document.getElementById('confirmPatientName').textContent = patientName;
-            document.getElementById('confirmDrugModal').classList.add('visible');
-        }
-
-        function closeConfirmDrugModal(shouldRegister) {
-            document.getElementById('confirmDrugModal').classList.remove('visible');
-
-            if (shouldRegister && pendingNewPatient) {
-                const patientId = pendingNewPatient.id;  // 먼저 저장
-                pendingNewPatient = null;
-                // loadPatients 완료 대기 후 관리 모달 열기
-                setTimeout(() => {
-                    openEditModal(patientId);
-                }, 100);
-            } else {
-                pendingNewPatient = null;
-                showStatus('저장되었습니다.', 'success');
-            }
-        }
-
-        function confirmDosage() {
-            if (!pendingDrug) return;
-
-            const dosage = parseInt(document.getElementById('inputDosage').value) || 1;
-            let status;
-            if (pendingDrug.currentStock < dosage) {
-                status = 'shortage';
-            } else if (pendingDrug.currentStock === dosage) {
-                status = 'exact';
-            } else {
-                status = 'sufficient';
-            }
-
-            patientDrugs.push({
-                drug_code: pendingDrug.drugCode,
-                drug_name: pendingDrug.drugName,
-                company: pendingDrug.company,
-                dosage: dosage,
-                current_stock: pendingDrug.currentStock,
-                status: status
-            });
-
-            renderDrugTable();
-            closeDosageModal();
-        }
-
-        // Modal error display
-        function showModalError(message) {
-            const errorDiv = document.getElementById('modalErrorMessage');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'flex';
-            // Re-trigger animation
-            errorDiv.style.animation = 'none';
-            errorDiv.offsetHeight; // Force reflow
-            errorDiv.style.animation = 'shake 0.3s ease-in-out';
-        }
-
-        function hideModalError() {
-            document.getElementById('modalErrorMessage').style.display = 'none';
-        }
-
-        // Save patient
-        async function savePatient() {
-            hideModalError();
-
-            const name = document.getElementById('inputPatientName').value.trim();
-            const birth = document.getElementById('inputPatientBirth').value.trim();
-            const visitCycle = document.getElementById('inputVisitCycle').value;
-            const memo = document.getElementById('inputPatientMemo').value.trim();
-
-            if (!name) {
-                showModalError('환자명은 필수입니다.');
-                document.getElementById('inputPatientName').focus();
-                return;
-            }
-
-            if (!birth) {
-                showModalError('주민번호 앞자리는 필수입니다.');
-                document.getElementById('inputPatientBirth').focus();
-                return;
-            }
-
-            if (birth.length !== 6 || !/^\d{6}$/.test(birth)) {
-                showModalError('주민번호 앞자리는 6자리 숫자여야 합니다.');
-                document.getElementById('inputPatientBirth').focus();
-                return;
-            }
-
-            try {
-                // Save patient info
-                const patientData = {
-                    name: name,
-                    birth: birth || null,
-                    memo: memo || null,
-                    visit_cycle: visitCycle || null
-                };
-
-                let patientId = currentPatientId;
-
-                if (isEditMode) {
-                    // Update existing patient
-                    const response = await fetch(`/api/patient/${currentPatientId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patientData)
-                    });
-                    const data = await response.json();
-                    if (data.status !== 'success') {
-                        throw new Error(data.message);
+                        resultsDiv.classList.add('visible');
+                    } else {
+                        resultsDiv.innerHTML = '<div style="padding: 12px; color: #a0aec0;">검색 결과가 없습니다</div>';
+                        resultsDiv.classList.add('visible');
                     }
-                } else {
-                    // Create new patient
-                    const response = await fetch('/api/patient', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patientData)
-                    });
-                    const data = await response.json();
-                    if (data.status !== 'success') {
-                        throw new Error(data.message);
-                    }
-                    patientId = data.patient_id;
+                });
+        }, 300);
+    }
+
+    function openDosageModal(drugCode, drugName, company, currentStock) {
+        pendingDrug = { drugCode: drugCode, drugName: drugName, company: company, currentStock: currentStock };
+
+        document.getElementById('dosageDrugName').textContent = drugName;
+        document.getElementById('dosageDrugInfo').textContent = drugCode + ' | 현재 재고: ' + currentStock;
+        document.getElementById('inputDosage').value = 1;
+
+        document.getElementById('drugSearchInput').value = '';
+        document.getElementById('drugSearchResults').classList.remove('visible');
+
+        document.getElementById('dosageModal').classList.add('visible');
+    }
+
+    function closeDosageModal() {
+        document.getElementById('dosageModal').classList.remove('visible');
+        pendingDrug = null;
+    }
+
+    function openConfirmDrugModal(patientId, patientName) {
+        pendingNewPatient = { id: patientId, name: patientName };
+        document.getElementById('confirmPatientName').textContent = patientName;
+        document.getElementById('confirmDrugModal').classList.add('visible');
+    }
+
+    function closeConfirmDrugModal(shouldRegister) {
+        document.getElementById('confirmDrugModal').classList.remove('visible');
+
+        if (shouldRegister && pendingNewPatient) {
+            var patientId = pendingNewPatient.id;
+            pendingNewPatient = null;
+            setTimeout(function() {
+                openEditModal(patientId);
+            }, 100);
+        } else {
+            pendingNewPatient = null;
+            showStatus('저장되었습니다.', 'success');
+        }
+    }
+
+    function confirmDosage() {
+        if (!pendingDrug) return;
+
+        var dosage = parseInt(document.getElementById('inputDosage').value) || 1;
+        var status;
+        if (pendingDrug.currentStock < dosage) {
+            status = 'shortage';
+        } else if (pendingDrug.currentStock === dosage) {
+            status = 'exact';
+        } else {
+            status = 'sufficient';
+        }
+
+        patientDrugs.push({
+            drug_code: pendingDrug.drugCode,
+            drug_name: pendingDrug.drugName,
+            company: pendingDrug.company,
+            dosage: dosage,
+            current_stock: pendingDrug.currentStock,
+            status: status
+        });
+
+        renderDrugTable();
+        closeDosageModal();
+    }
+
+    function showModalError(message) {
+        var errorDiv = document.getElementById('modalErrorMessage');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'flex';
+        errorDiv.style.animation = 'none';
+        errorDiv.offsetHeight;
+        errorDiv.style.animation = 'shake 0.3s ease-in-out';
+    }
+
+    function hideModalError() {
+        document.getElementById('modalErrorMessage').style.display = 'none';
+    }
+
+    async function savePatient() {
+        hideModalError();
+
+        var name = document.getElementById('inputPatientName').value.trim();
+        var birth = document.getElementById('inputPatientBirth').value.trim();
+        var visitCycle = document.getElementById('inputVisitCycle').value;
+        var memo = document.getElementById('inputPatientMemo').value.trim();
+
+        if (!name) {
+            showModalError('환자명은 필수입니다.');
+            document.getElementById('inputPatientName').focus();
+            return;
+        }
+
+        if (!birth) {
+            showModalError('주민번호 앞자리는 필수입니다.');
+            document.getElementById('inputPatientBirth').focus();
+            return;
+        }
+
+        if (birth.length !== 6 || !/^\d{6}$/.test(birth)) {
+            showModalError('주민번호 앞자리는 6자리 숫자여야 합니다.');
+            document.getElementById('inputPatientBirth').focus();
+            return;
+        }
+
+        try {
+            var patientData = {
+                name: name,
+                birth: birth || null,
+                memo: memo || null,
+                visit_cycle: visitCycle || null
+            };
+
+            var patientId = currentPatientId;
+
+            if (isEditMode) {
+                var response = await fetch('/api/patient/' + currentPatientId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patientData)
+                });
+                var data = await response.json();
+                if (data.status !== 'success') {
+                    throw new Error(data.message);
                 }
+            } else {
+                var response = await fetch('/api/patient', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patientData)
+                });
+                var data = await response.json();
+                if (data.status !== 'success') {
+                    throw new Error(data.message);
+                }
+                patientId = data.patient_id;
+            }
 
-                // Save drug links (only in edit mode or if we have drugs)
-                if (isEditMode && patientId) {
-                    // Get current drugs linked to patient
-                    const currentDrugsResponse = await fetch(`/api/patient/${patientId}/drugs-with-stock`);
-                    const currentDrugsData = await currentDrugsResponse.json();
-                    const currentDrugCodes = currentDrugsData.status === 'success'
-                        ? currentDrugsData.drugs.map(d => d.drug_code)
-                        : [];
+            if (isEditMode && patientId) {
+                var currentDrugsResponse = await fetch('/api/patient/' + patientId + '/drugs-with-stock');
+                var currentDrugsData = await currentDrugsResponse.json();
+                var currentDrugCodes = currentDrugsData.status === 'success'
+                    ? currentDrugsData.drugs.map(function(d) { return d.drug_code; })
+                    : [];
 
-                    const newDrugCodes = patientDrugs.map(d => d.drug_code);
+                var newDrugCodes = patientDrugs.map(function(d) { return d.drug_code; });
 
-                    // Unlink removed drugs
-                    for (const code of currentDrugCodes) {
-                        if (!newDrugCodes.includes(code)) {
-                            await fetch(`/api/patient/${patientId}/unlink-drug/${code}`, {
-                                method: 'DELETE'
-                            });
-                        }
-                    }
-
-                    // Link/update drugs
-                    for (const drug of patientDrugs) {
-                        await fetch(`/api/patient/${patientId}/link-drug`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                drug_code: drug.drug_code,
-                                dosage: drug.dosage
-                            })
+                for (var i = 0; i < currentDrugCodes.length; i++) {
+                    var code = currentDrugCodes[i];
+                    if (newDrugCodes.indexOf(code) === -1) {
+                        await fetch('/api/patient/' + patientId + '/unlink-drug/' + code, {
+                            method: 'DELETE'
                         });
                     }
                 }
 
+                for (var j = 0; j < patientDrugs.length; j++) {
+                    var drug = patientDrugs[j];
+                    await fetch('/api/patient/' + patientId + '/link-drug', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            drug_code: drug.drug_code,
+                            dosage: drug.dosage
+                        })
+                    });
+                }
+            }
+
+            closePatientModal();
+            loadPatients();
+
+            if (!isEditMode && patientId) {
+                openConfirmDrugModal(patientId, name);
+            } else {
+                showStatus('저장되었습니다.', 'success');
+            }
+
+        } catch (error) {
+            showModalError('저장 실패: ' + error.message);
+        }
+    }
+
+    async function deletePatient() {
+        if (!currentPatientId) return;
+
+        var confirmed = await showConfirmModal({
+            icon: '🗑️',
+            title: '환자 삭제',
+            message: '이 환자를 삭제하시겠습니까?<br><br>연결된 모든 약품 정보도 함께 삭제됩니다.',
+            confirmText: '삭제',
+            isDanger: true
+        });
+
+        if (!confirmed) return;
+
+        try {
+            var response = await fetch('/api/patient/' + currentPatientId, {
+                method: 'DELETE'
+            });
+            var data = await response.json();
+
+            if (data.status === 'success') {
                 closePatientModal();
                 loadPatients();
-
-                // 새 환자 생성 시 약품 등록 여부 확인
-                if (!isEditMode && patientId) {
-                    openConfirmDrugModal(patientId, name);
-                } else {
-                    showStatus('저장되었습니다.', 'success');
-                }
-
-            } catch (error) {
-                showModalError('저장 실패: ' + error.message);
-            }
-        }
-
-        // Delete patient
-        async function deletePatient() {
-            if (!currentPatientId) return;
-
-            const confirmed = await showConfirmModal({
-                icon: '🗑️',
-                title: '환자 삭제',
-                message: '이 환자를 삭제하시겠습니까?<br><br>연결된 모든 약품 정보도 함께 삭제됩니다.',
-                confirmText: '삭제',
-                isDanger: true
-            });
-
-            if (!confirmed) return;
-
-            try {
-                const response = await fetch(`/api/patient/${currentPatientId}`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    closePatientModal();
-                    loadPatients();
-                    showStatus('환자가 삭제되었습니다.', 'success');
-                } else {
-                    showStatus(data.message, 'error');
-                }
-            } catch (error) {
-                showStatus('삭제 실패: ' + error.message, 'error');
-            }
-        }
-
-        // Utility functions
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.textContent = message;
-            statusDiv.className = 'status-message ' + type;
-            setTimeout(() => {
-                statusDiv.className = 'status-message';
-            }, 3000);
-        }
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text.replace(/[&<>"']/g, m => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[m]));
-        }
-
-        async function shutdownServer() {
-            const confirmed = await showConfirmModal({
-                icon: '⏻',
-                title: '앱 종료',
-                message: '애플리케이션을 종료하시겠습니까?',
-                confirmText: '종료',
-                isDanger: true
-            });
-
-            if (!confirmed) return;
-
-            fetch('/api/shutdown', { method: 'POST' })
-                .then(() => {
-                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
-                })
-                .catch(() => {
-                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
-                });
-        }
-
-        // Confirm Modal Functions
-        let confirmCallback = null;
-
-        function showConfirmModal(options) {
-            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
-
-            document.getElementById('confirmModalIcon').textContent = icon;
-            document.getElementById('confirmModalTitle').textContent = title;
-            document.getElementById('confirmModalMessage').innerHTML = message;
-
-            const confirmBtn = document.getElementById('confirmModalBtn');
-            confirmBtn.textContent = confirmText;
-            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
-
-            document.getElementById('confirmModal').classList.add('visible');
-
-            return new Promise(resolve => {
-                confirmCallback = resolve;
-            });
-        }
-
-        function closeConfirmModal(result) {
-            document.getElementById('confirmModal').classList.remove('visible');
-            if (confirmCallback) {
-                confirmCallback(result);
-                confirmCallback = null;
-            }
-        }
-
-        // Modal content check functions
-        function hasPatientModalContent() {
-            const name = document.getElementById('inputPatientName').value.trim();
-            const birth = document.getElementById('inputPatientBirth').value.trim();
-            const visitCycle = document.getElementById('inputVisitCycle').value;
-            const memo = document.getElementById('inputPatientMemo').value.trim();
-
-            // 수정 모드에서는 약품 변경 여부도 체크
-            if (isEditMode) {
-                return true;  // 수정 모드에서는 항상 내용이 있음으로 판단
-            }
-
-            return name !== '' || birth !== '' || visitCycle !== '' || memo !== '';
-        }
-
-        function hasDosageModalContent() {
-            const dosage = document.getElementById('inputDosage').value;
-            return dosage !== '' && dosage !== '1';  // 기본값 1이 아닌 경우에만 내용 있음으로 판단
-        }
-
-        // Shake modal animation
-        function shakeModal(modalId) {
-            const modal = document.getElementById(modalId);
-            const content = modal.querySelector('.modal-content');
-            content.classList.add('shake');
-            setTimeout(() => {
-                content.classList.remove('shake');
-            }, 400);
-        }
-
-        // Custom confirm modal state
-        let pendingCloseAction = null;
-
-        function showCloseConfirm(closeCallback) {
-            pendingCloseAction = closeCallback;
-            document.getElementById('confirmCloseModal').classList.add('visible');
-        }
-
-        function cancelCloseConfirm() {
-            document.getElementById('confirmCloseModal').classList.remove('visible');
-            pendingCloseAction = null;
-        }
-
-        function confirmClose() {
-            document.getElementById('confirmCloseModal').classList.remove('visible');
-            if (pendingCloseAction) {
-                pendingCloseAction();
-                pendingCloseAction = null;
-            }
-        }
-
-        // Try close modal with confirmation
-        function tryClosePatientModal() {
-            if (hasPatientModalContent()) {
-                shakeModal('patientModal');
-                showCloseConfirm(closePatientModal);
+                showStatus('환자가 삭제되었습니다.', 'success');
             } else {
+                showStatus(data.message, 'error');
+            }
+        } catch (error) {
+            showStatus('삭제 실패: ' + error.message, 'error');
+        }
+    }
+
+    function showStatus(message, type) {
+        var statusDiv = document.getElementById('statusMessage');
+        statusDiv.textContent = message;
+        statusDiv.className = 'status-message ' + type;
+        setTimeout(function() {
+            statusDiv.className = 'status-message';
+        }, 3000);
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // Modal content check functions
+    function hasPatientModalContent() {
+        var name = document.getElementById('inputPatientName').value.trim();
+        var birth = document.getElementById('inputPatientBirth').value.trim();
+        var visitCycle = document.getElementById('inputVisitCycle').value;
+        var memo = document.getElementById('inputPatientMemo').value.trim();
+
+        if (isEditMode) {
+            return true;
+        }
+
+        return name !== '' || birth !== '' || visitCycle !== '' || memo !== '';
+    }
+
+    function hasDosageModalContent() {
+        var dosage = document.getElementById('inputDosage').value;
+        return dosage !== '' && dosage !== '1';
+    }
+
+    function shakeModal(modalId) {
+        var modal = document.getElementById(modalId);
+        var content = modal.querySelector('.modal-content');
+        content.classList.add('shake');
+        setTimeout(function() {
+            content.classList.remove('shake');
+        }, 400);
+    }
+
+    async function tryClosePatientModal() {
+        if (hasPatientModalContent()) {
+            shakeModal('patientModal');
+            var confirmed = await showConfirmModal({
+                icon: '⚠️',
+                title: '작성 중인 내용이 있습니다',
+                message: '정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.',
+                confirmText: '닫기',
+                isDanger: true
+            });
+            if (confirmed) {
                 closePatientModal();
             }
+        } else {
+            closePatientModal();
         }
+    }
 
-        function tryCloseDosageModal() {
-            if (hasDosageModalContent()) {
-                shakeModal('dosageModal');
-                showCloseConfirm(closeDosageModal);
-            } else {
+    async function tryCloseDosageModal() {
+        if (hasDosageModalContent()) {
+            shakeModal('dosageModal');
+            var confirmed = await showConfirmModal({
+                icon: '⚠️',
+                title: '작성 중인 내용이 있습니다',
+                message: '정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.',
+                confirmText: '닫기',
+                isDanger: true
+            });
+            if (confirmed) {
                 closeDosageModal();
             }
+        } else {
+            closeDosageModal();
         }
+    }
 
-        // Close modal on outside click
-        document.getElementById('patientModal').addEventListener('click', function(e) {
-            if (e.target === this) tryClosePatientModal();
-        });
+    // Close modal on outside click
+    document.getElementById('patientModal').addEventListener('click', function(e) {
+        if (e.target === this) tryClosePatientModal();
+    });
 
-        document.getElementById('dosageModal').addEventListener('click', function(e) {
-            if (e.target === this) tryCloseDosageModal();
-        });
+    document.getElementById('dosageModal').addEventListener('click', function(e) {
+        if (e.target === this) tryCloseDosageModal();
+    });
 
-        // ESC to close modal
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                // 새 커스텀 확인 모달이 열려있으면 취소
-                const customConfirmModal = document.getElementById('confirmModal');
-                if (customConfirmModal && customConfirmModal.classList.contains('visible')) {
-                    closeConfirmModal(false);
-                    return;
-                }
-
-                // 기존 커스텀 확인 모달이 열려있으면 취소
-                const confirmCloseModal = document.getElementById('confirmCloseModal');
-                if (confirmCloseModal.classList.contains('visible')) {
-                    cancelCloseConfirm();
-                    return;
-                }
-
-                const patientModal = document.getElementById('patientModal');
-                const dosageModal = document.getElementById('dosageModal');
-                const confirmDrugModal = document.getElementById('confirmDrugModal');
-
-                if (confirmDrugModal.classList.contains('visible')) {
-                    closeConfirmDrugModal(false);  // 약품 등록 확인 모달은 그냥 닫기
-                } else if (dosageModal.classList.contains('visible')) {
-                    tryCloseDosageModal();
-                } else if (patientModal.classList.contains('visible')) {
-                    tryClosePatientModal();
-                }
+    // ESC to close modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var customConfirmModal = document.getElementById('confirmModal');
+            if (customConfirmModal && customConfirmModal.classList.contains('visible')) {
+                closeConfirmModal(false);
+                return;
             }
-        });
 
-        // Close confirm modal on outside click (확인 모달은 내용이 없으므로 바로 닫기)
-        document.getElementById('confirmDrugModal').addEventListener('click', function(e) {
-            if (e.target === this) closeConfirmDrugModal(false);
-        });
-    </script>
+            var patientModal = document.getElementById('patientModal');
+            var dosageModal = document.getElementById('dosageModal');
+            var confirmDrugModal = document.getElementById('confirmDrugModal');
 
-    <!-- Custom Confirm Modal -->
-    <div id="confirmModal" class="confirm-modal-overlay">
-        <div class="confirm-modal-box">
-            <div class="confirm-modal-icon" id="confirmModalIcon">⚠️</div>
-            <div class="confirm-modal-title" id="confirmModalTitle">확인</div>
-            <div class="confirm-modal-message" id="confirmModalMessage">진행하시겠습니까?</div>
-            <div class="confirm-modal-buttons">
-                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
-                <button class="btn-confirm" id="confirmModalBtn" onclick="closeConfirmModal(true)">확인</button>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+            if (confirmDrugModal.classList.contains('visible')) {
+                closeConfirmDrugModal(false);
+            } else if (dosageModal.classList.contains('visible')) {
+                tryCloseDosageModal();
+            } else if (patientModal.classList.contains('visible')) {
+                tryClosePatientModal();
+            }
+        }
+    });
+
+    document.getElementById('confirmDrugModal').addEventListener('click', function(e) {
+        if (e.target === this) closeConfirmDrugModal(false);
+    });
+</script>
+{% endblock %}

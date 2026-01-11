@@ -1,846 +1,536 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>약 주문 수량 산출 - Jaego</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html {
-            overflow-y: scroll;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #ebebeb;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background-color: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 50px;
-            max-width: 600px;
-            width: 100%;
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            color: #2c3e50;
-            font-size: 1.8em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .header h1 .icon {
-            font-size: 1.2em;
-        }
-
-        .back-link {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #666;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .back-link:hover {
-            color: #333;
-            text-decoration: underline;
-        }
-
-        .info-box {
-            background-color: #fff3e0;
-            border-left: 4px solid #ff9800;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            overflow: hidden;
-        }
-
-        .info-box-header {
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.2s;
-        }
-
-        .info-box-header:hover {
-            background: rgba(255, 152, 0, 0.1);
-        }
-
-        .info-box-header h3 {
-            color: #e65100;
-            margin: 0;
-            font-size: 0.95em;
-        }
-
-        .info-box-arrow {
-            color: #e65100;
-            font-size: 0.8em;
-            transition: transform 0.3s ease;
-        }
-
-        .info-box-arrow.open {
-            transform: rotate(180deg);
-        }
-
-        .info-box-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        .info-box-content.open {
-            max-height: 200px;
-        }
-
-        .info-box-content ul {
-            color: #bf360c;
-            margin: 0 20px 15px 35px;
-            line-height: 1.8;
-        }
-
-        .info-box-content li {
-            margin: 5px 0;
-            font-size: 0.9em;
-        }
-
-        .upload-section {
-            margin: 30px 0;
-            text-align: center;
-        }
-
-        .file-label {
-            display: inline-block;
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-
-        .file-label:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .file-name {
-            margin-top: 15px;
-            font-size: 0.95em;
-            color: #7f8c8d;
-            min-height: 24px;
-        }
-
-        .file-name.selected {
-            color: #2e7d32;
-            font-weight: 600;
-        }
-
-        .calculate-btn {
-            background: #555;
-            color: white;
-            border: none;
-            padding: 15px 40px;
-            border-radius: 10px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 20px;
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-
-        .calculate-btn:hover:not(:disabled) {
-            background: #444;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
-        }
-
-        .calculate-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status-message {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            display: none;
-        }
-
-        .status-message.info {
-            background-color: #e3f2fd;
-            color: #1976d2;
-            border: 1px solid #1976d2;
-        }
-
-        .status-message.success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #2e7d32;
-        }
-
-        .status-message.error {
-            background-color: #ffebee;
-            color: #c62828;
-            border: 1px solid #c62828;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .btn-shutdown {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 0.95em;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 1000;
-        }
-
-        .btn-shutdown:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
-            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
-        }
-
-        .btn-shutdown:active {
-            transform: translateY(0);
-        }
-
-        /* 슬라이더 섹션 스타일 */
-        .slider-section {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .slider-section h3 {
-            color: #2c3e50;
-            font-size: 1em;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .slider-container {
-            position: relative;
-            width: 100%;
-            padding: 10px 0;
-        }
-
-        .slider-track {
-            position: relative;
-            width: 100%;
-            height: 12px;
-            background: linear-gradient(90deg, #f56565 0%, #fbd38d 50%, #68d391 100%);
-            border-radius: 6px;
-        }
-
-        .slider-handle {
-            position: absolute;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 28px;
-            height: 28px;
-            background: white;
-            border: 3px solid #4b5563;
-            border-radius: 50%;
-            cursor: grab;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            transition: box-shadow 0.2s, transform 0.1s;
-            z-index: 10;
-        }
-
-        .slider-handle:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
-        .slider-handle:active {
-            cursor: grabbing;
-            transform: translate(-50%, -50%) scale(1.1);
-        }
-
-        .slider-handle::before {
-            content: '⋮';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 14px;
-            color: #4b5563;
-            font-weight: bold;
-        }
-
-        .slider-labels {
-            position: relative;
-            margin-top: 8px;
-            font-size: 0.85em;
-            color: #718096;
-            height: 20px;
-        }
-
-        .slider-labels span {
-            position: absolute;
-            transform: translateX(-50%);
-        }
-
-        .slider-value-display {
-            text-align: center;
-            margin-top: 15px;
-            padding: 12px;
-            background: white;
-            border-radius: 8px;
-            border: 2px solid #e2e8f0;
-        }
-
-        .slider-value-display .value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-
-        .slider-value-display .unit {
-            color: #718096;
-            font-size: 0.9em;
-        }
-
-        .slider-value-display .description {
-            color: #718096;
-            font-size: 0.85em;
-            margin-top: 5px;
-        }
-
-        /* Toast 알림 */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .toast {
-            padding: 14px 20px;
-            border-radius: 10px;
-            color: white;
-            font-weight: 500;
-            font-size: 0.95em;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            max-width: 320px;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.success {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        }
-
-        .toast.error {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        }
-
-        /* Custom Confirm Modal Styles */
-        .confirm-modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 3000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .confirm-modal-overlay.visible {
-            display: flex;
-        }
-
-        .confirm-modal-box {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 320px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: confirmModalSlideIn 0.2s ease;
-        }
-
-        @keyframes confirmModalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
-
-        .confirm-modal-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .confirm-modal-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 8px;
-        }
-
-        .confirm-modal-message {
-            font-size: 14px;
-            color: #718096;
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-
-        .confirm-modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .confirm-modal-buttons button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            min-width: 80px;
-        }
-
-        .confirm-modal-buttons .btn-cancel {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .confirm-modal-buttons .btn-cancel:hover {
-            background: #cbd5e0;
-        }
-
-        .confirm-modal-buttons .btn-danger {
-            background: #f56565;
-            color: white;
-        }
-
-        .confirm-modal-buttons .btn-danger:hover {
-            background: #e53e3e;
-        }
-    </style>
-</head>
-<body>
-    <div class="toast-container" id="toast-container"></div>
-
-    <div class="container">
-        <a href="/" class="back-link">← 홈으로 돌아가기</a>
-
-        <div class="header">
-            <h1><span class="icon">📦</span> 약 주문 수량 산출</h1>
-        </div>
-
-        <div class="info-box">
-            <div class="info-box-header" onclick="toggleInfoBox()">
-                <h3>⚠️ 실행 전 확인사항</h3>
-                <span class="info-box-arrow" id="info-box-arrow">▼</span>
-            </div>
-            <div class="info-box-content" id="info-box-content">
-                <ul>
-                    <li>오늘 나간 약품의 재고 현황 파일을 업로드해주세요</li>
-                    <li>지원 형식: <strong>.csv, .xls, .xlsx</strong></li>
-                    <li>런웨이 <span id="thresholdInfoText">1</span>개월 미만 약품은 노란색으로 강조됩니다</li>
-                    <li>표의 각 행을 클릭하면 자세한 차트와 주문수량 계산기가 나옵니다</li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- 런웨이 임계값 슬라이더 -->
-        <div class="slider-section">
-            <h3>🎚️ 강조 표시 기준 런웨이</h3>
-            <div class="slider-container">
-                <div class="slider-track" id="sliderTrack">
-                    <div class="slider-handle" id="sliderHandle"></div>
-                </div>
-                <div class="slider-labels">
-                    <span style="left: 0%;">0.5</span>
-                    <span style="left: 9.09%;">1</span>
-                    <span style="left: 27.27%;">2</span>
-                    <span style="left: 45.45%;">3</span>
-                    <span style="left: 63.64%;">4</span>
-                    <span style="left: 81.82%;">5</span>
-                    <span style="left: 100%;">6</span>
-                </div>
-            </div>
-            <div class="slider-value-display">
-                <span class="value" id="thresholdValue">1</span>
-                <span class="unit">개월 미만</span>
-                <div class="description">이 기준 미만의 런웨이를 가진 약품이 강조 표시됩니다</div>
-            </div>
-            <input type="hidden" id="runwayThreshold" value="1">
-        </div>
-
-        <div class="upload-section">
-            <label for="todayFileInput" class="file-label">
-                📂 재고 현황 파일 선택
-            </label>
-            <input type="file" id="todayFileInput" accept=".csv,.xls,.xlsx" style="display: none;">
-            <div id="fileName" class="file-name">파일이 선택되지 않았습니다</div>
-        </div>
-
-        <button class="calculate-btn" onclick="calculateOrder()" id="calculateBtn" disabled>
-            주문 수량 계산하기
-        </button>
-
-        <div class="status-message" id="statusMessage"></div>
+{% extends "base.html" %}
+
+{% block title %}약 주문 수량 산출 - Jaego{% endblock %}
+
+{% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
+{% endblock %}
+
+{% block page_styles %}
+<style>
+    html {
+        overflow-y: scroll;
+    }
+
+    body {
+        background: #ebebeb;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .header h1 {
+        color: #2c3e50;
+        font-size: 1.8em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .header h1 .icon {
+        font-size: 1.2em;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: #666;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .back-link:hover {
+        color: #333;
+        text-decoration: underline;
+    }
+
+    /* Info box - orange theme */
+    .info-box-orange {
+        background-color: #fff3e0;
+        border-left: 4px solid #ff9800;
+        border-radius: 10px;
+        margin-bottom: 30px;
+        overflow: hidden;
+    }
+
+    .info-box-orange .info-box-header:hover {
+        background: rgba(255, 152, 0, 0.1);
+    }
+
+    .info-box-orange .info-box-header h3 {
+        color: #e65100;
+        margin: 0;
+        font-size: 0.95em;
+    }
+
+    .info-box-orange .info-box-arrow {
+        color: #e65100;
+    }
+
+    .info-box-orange .info-box-content ul {
+        color: #bf360c;
+        margin: 0 20px 15px 35px;
+        line-height: 1.8;
+    }
+
+    .info-box-orange .info-box-content li {
+        margin: 5px 0;
+        font-size: 0.9em;
+    }
+
+    .upload-section {
+        margin: 30px 0;
+        text-align: center;
+    }
+
+    .file-label {
+        display: inline-block;
+        padding: 12px 30px;
+        background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+        color: white;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+
+    .file-label:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .file-name {
+        margin-top: 15px;
+        font-size: 0.95em;
+        color: #7f8c8d;
+        min-height: 24px;
+    }
+
+    .file-name.selected {
+        color: #2e7d32;
+        font-weight: 600;
+    }
+
+    .calculate-btn {
+        background: #555;
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        border-radius: 10px;
+        font-size: 1.1em;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 20px;
+        width: 100%;
+        transition: all 0.3s ease;
+    }
+
+    .calculate-btn:hover:not(:disabled) {
+        background: #444;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .calculate-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .status-message {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        display: none;
+    }
+
+    .status-message.info {
+        background-color: #e3f2fd;
+        color: #1976d2;
+        border: 1px solid #1976d2;
+    }
+
+    .status-message.success {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #2e7d32;
+    }
+
+    .status-message.error {
+        background-color: #ffebee;
+        color: #c62828;
+        border: 1px solid #c62828;
+    }
+
+    .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    /* Slider section */
+    .slider-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .slider-section h3 {
+        color: #2c3e50;
+        font-size: 1em;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .slider-container {
+        position: relative;
+        width: 100%;
+        padding: 10px 0;
+    }
+
+    .slider-track {
+        position: relative;
+        width: 100%;
+        height: 12px;
+        background: linear-gradient(90deg, #f56565 0%, #fbd38d 50%, #68d391 100%);
+        border-radius: 6px;
+    }
+
+    .slider-handle {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 28px;
+        height: 28px;
+        background: white;
+        border: 3px solid #4b5563;
+        border-radius: 50%;
+        cursor: grab;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: box-shadow 0.2s, transform 0.1s;
+        z-index: 10;
+    }
+
+    .slider-handle:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .slider-handle:active {
+        cursor: grabbing;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+
+    .slider-handle::before {
+        content: '\22EE';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 14px;
+        color: #4b5563;
+        font-weight: bold;
+    }
+
+    .slider-labels {
+        position: relative;
+        margin-top: 8px;
+        font-size: 0.85em;
+        color: #718096;
+        height: 20px;
+    }
+
+    .slider-labels span {
+        position: absolute;
+        transform: translateX(-50%);
+    }
+
+    .slider-value-display {
+        text-align: center;
+        margin-top: 15px;
+        padding: 12px;
+        background: white;
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+    }
+
+    .slider-value-display .value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .slider-value-display .unit {
+        color: #718096;
+        font-size: 0.9em;
+    }
+
+    .slider-value-display .description {
+        color: #718096;
+        font-size: 0.85em;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block toast_container %}
+{% include 'partials/_toast_container.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <a href="/" class="back-link">&larr; 홈으로 돌아가기</a>
+
+    <div class="header">
+        <h1><span class="icon">📦</span> 약 주문 수량 산출</h1>
     </div>
 
-    <button class="btn-shutdown" onclick="shutdownServer()">⏻ 종료</button>
-
-    <!-- Custom Confirm Modal -->
-    <div id="confirmModal" class="confirm-modal-overlay">
-        <div class="confirm-modal-box">
-            <div class="confirm-modal-icon" id="confirmModalIcon">⏻</div>
-            <div class="confirm-modal-title" id="confirmModalTitle">애플리케이션 종료</div>
-            <div class="confirm-modal-message" id="confirmModalMessage">정말 애플리케이션을 종료하시겠습니까?</div>
-            <div class="confirm-modal-buttons">
-                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
-                <button class="btn-danger" id="confirmModalBtn" onclick="closeConfirmModal(true)">종료</button>
-            </div>
+    <div class="info-box-orange">
+        <div class="info-box-header" onclick="toggleInfoBox()">
+            <h3>⚠️ 실행 전 확인사항</h3>
+            <span class="info-box-arrow" id="info-box-arrow">▼</span>
+        </div>
+        <div class="info-box-content" id="info-box-content">
+            <ul>
+                <li>오늘 나간 약품의 재고 현황 파일을 업로드해주세요</li>
+                <li>지원 형식: <strong>.csv, .xls, .xlsx</strong></li>
+                <li>런웨이 <span id="thresholdInfoText">1</span>개월 미만 약품은 노란색으로 강조됩니다</li>
+                <li>표의 각 행을 클릭하면 자세한 차트와 주문수량 계산기가 나옵니다</li>
+            </ul>
         </div>
     </div>
 
-    <script>
-        // Custom Confirm Modal
-        let confirmCallback = null;
+    <!-- 런웨이 임계값 슬라이더 -->
+    <div class="slider-section">
+        <h3>🎚️ 강조 표시 기준 런웨이</h3>
+        <div class="slider-container">
+            <div class="slider-track" id="sliderTrack">
+                <div class="slider-handle" id="sliderHandle"></div>
+            </div>
+            <div class="slider-labels">
+                <span style="left: 0%;">0.5</span>
+                <span style="left: 9.09%;">1</span>
+                <span style="left: 27.27%;">2</span>
+                <span style="left: 45.45%;">3</span>
+                <span style="left: 63.64%;">4</span>
+                <span style="left: 81.82%;">5</span>
+                <span style="left: 100%;">6</span>
+            </div>
+        </div>
+        <div class="slider-value-display">
+            <span class="value" id="thresholdValue">1</span>
+            <span class="unit">개월 미만</span>
+            <div class="description">이 기준 미만의 런웨이를 가진 약품이 강조 표시됩니다</div>
+        </div>
+        <input type="hidden" id="runwayThreshold" value="1">
+    </div>
 
-        function showConfirmModal(options) {
-            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+    <div class="upload-section">
+        <label for="todayFileInput" class="file-label">
+            📂 재고 현황 파일 선택
+        </label>
+        <input type="file" id="todayFileInput" accept=".csv,.xls,.xlsx" style="display: none;">
+        <div id="fileName" class="file-name">파일이 선택되지 않았습니다</div>
+    </div>
 
-            document.getElementById('confirmModalIcon').textContent = icon;
-            document.getElementById('confirmModalTitle').textContent = title;
-            document.getElementById('confirmModalMessage').innerHTML = message;
+    <button class="calculate-btn" onclick="calculateOrder()" id="calculateBtn" disabled>
+        주문 수량 계산하기
+    </button>
 
-            const confirmBtn = document.getElementById('confirmModalBtn');
-            confirmBtn.textContent = confirmText;
-            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+    <div class="status-message" id="statusMessage"></div>
+</div>
+{% endblock %}
 
-            document.getElementById('confirmModal').classList.add('visible');
+{% block component_scripts %}
+<script src="{{ url_for('static', filename='js/components/toast.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+<script src="{{ url_for('static', filename='js/components/shutdown.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+{% endblock %}
 
-            return new Promise(resolve => {
-                confirmCallback = resolve;
-            });
+{% block page_scripts %}
+<script>
+    // Toggle info box
+    function toggleInfoBox() {
+        var content = document.getElementById('info-box-content');
+        var arrow = document.getElementById('info-box-arrow');
+        content.classList.toggle('open');
+        arrow.classList.toggle('open');
+    }
+
+    // Slider logic
+    (function() {
+        var MIN_VALUE = 0.5;
+        var MAX_VALUE = 6;
+        var STEP = 0.5;
+        var currentValue = 1;
+
+        var track = document.getElementById('sliderTrack');
+        var handle = document.getElementById('sliderHandle');
+        var thresholdInput = document.getElementById('runwayThreshold');
+        var thresholdValue = document.getElementById('thresholdValue');
+        var thresholdInfoText = document.getElementById('thresholdInfoText');
+
+        function valueToPercent(value) {
+            return ((value - MIN_VALUE) / (MAX_VALUE - MIN_VALUE)) * 100;
         }
 
-        function closeConfirmModal(result) {
-            document.getElementById('confirmModal').classList.remove('visible');
-            if (confirmCallback) {
-                confirmCallback(result);
-                confirmCallback = null;
-            }
+        function percentToValue(percent) {
+            var rawValue = MIN_VALUE + (percent / 100) * (MAX_VALUE - MIN_VALUE);
+            return Math.round(rawValue / STEP) * STEP;
         }
 
-        // ESC 키로 모달 닫기
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && document.getElementById('confirmModal').classList.contains('visible')) {
-                closeConfirmModal(false);
-            }
+        function updateUI() {
+            var percent = valueToPercent(currentValue);
+            handle.style.left = percent + '%';
+            thresholdInput.value = currentValue;
+            thresholdValue.textContent = currentValue;
+            thresholdInfoText.textContent = currentValue;
+        }
+
+        function getValueFromPosition(clientX) {
+            var rect = track.getBoundingClientRect();
+            var percent = ((clientX - rect.left) / rect.width) * 100;
+            percent = Math.max(0, Math.min(100, percent));
+            return percentToValue(percent);
+        }
+
+        var isDragging = false;
+
+        handle.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            e.preventDefault();
+            document.body.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
         });
-        // ========== 토스트 알림 ==========
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
 
-            setTimeout(() => toast.classList.add('show'), 10);
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // ========== 토글 로직 ==========
-        function toggleInfoBox() {
-            const content = document.getElementById('info-box-content');
-            const arrow = document.getElementById('info-box-arrow');
-            content.classList.toggle('open');
-            arrow.classList.toggle('open');
-        }
-
-        // ========== 슬라이더 로직 ==========
-        (function() {
-            const MIN_VALUE = 0.5;
-            const MAX_VALUE = 6;
-            const STEP = 0.5;
-            let currentValue = 1;  // 기본값
-
-            const track = document.getElementById('sliderTrack');
-            const handle = document.getElementById('sliderHandle');
-            const thresholdInput = document.getElementById('runwayThreshold');
-            const thresholdValue = document.getElementById('thresholdValue');
-            const thresholdInfoText = document.getElementById('thresholdInfoText');
-
-            // 값을 퍼센트로 변환
-            function valueToPercent(value) {
-                return ((value - MIN_VALUE) / (MAX_VALUE - MIN_VALUE)) * 100;
-            }
-
-            // 퍼센트를 값으로 변환
-            function percentToValue(percent) {
-                const rawValue = MIN_VALUE + (percent / 100) * (MAX_VALUE - MIN_VALUE);
-                // STEP 단위로 반올림
-                return Math.round(rawValue / STEP) * STEP;
-            }
-
-            // UI 업데이트
-            function updateUI() {
-                const percent = valueToPercent(currentValue);
-                handle.style.left = percent + '%';
-                thresholdInput.value = currentValue;
-                thresholdValue.textContent = currentValue;
-                thresholdInfoText.textContent = currentValue;
-            }
-
-            // 마우스 위치에서 값 계산
-            function getValueFromPosition(clientX) {
-                const rect = track.getBoundingClientRect();
-                let percent = ((clientX - rect.left) / rect.width) * 100;
-                percent = Math.max(0, Math.min(100, percent));
-                return percentToValue(percent);
-            }
-
-            // 드래그 이벤트
-            let isDragging = false;
-
-            handle.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                e.preventDefault();
-                document.body.style.cursor = 'grabbing';
-                document.body.style.userSelect = 'none';
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                currentValue = getValueFromPosition(e.clientX);
-                updateUI();
-            });
-
-            document.addEventListener('mouseup', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    document.body.style.cursor = '';
-                    document.body.style.userSelect = '';
-                }
-            });
-
-            // 터치 이벤트 지원
-            handle.addEventListener('touchstart', (e) => {
-                isDragging = true;
-                e.preventDefault();
-            });
-
-            document.addEventListener('touchmove', (e) => {
-                if (!isDragging) return;
-                const touch = e.touches[0];
-                currentValue = getValueFromPosition(touch.clientX);
-                updateUI();
-            });
-
-            document.addEventListener('touchend', () => {
-                isDragging = false;
-            });
-
-            // 트랙 클릭 시 해당 위치로 이동
-            track.addEventListener('click', (e) => {
-                if (e.target === handle) return;
-                currentValue = getValueFromPosition(e.clientX);
-                updateUI();
-            });
-
-            // 초기화
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            currentValue = getValueFromPosition(e.clientX);
             updateUI();
-        })();
+        });
 
-        // ========== 파일 선택 핸들러 ==========
-        const fileInput = document.getElementById('todayFileInput');
-        const fileName = document.getElementById('fileName');
-        const calculateBtn = document.getElementById('calculateBtn');
-
-        // label의 for 속성이 자동으로 input과 연결되므로 클릭 이벤트는 불필요
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                fileName.textContent = `✅ ${file.name}`;
-                fileName.classList.add('selected');
-                calculateBtn.disabled = false;  // 버튼 활성화
-            } else {
-                fileName.textContent = '파일이 선택되지 않았습니다';
-                fileName.classList.remove('selected');
-                calculateBtn.disabled = true;  // 버튼 비활성화
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
             }
         });
 
-        async function calculateOrder() {
-            const file = fileInput.files[0];
-            if (!file) {
-                showStatus('❌ 파일을 먼저 선택해주세요', 'error');
-                return;
-            }
+        handle.addEventListener('touchstart', function(e) {
+            isDragging = true;
+            e.preventDefault();
+        });
 
-            const btn = calculateBtn;
-            const originalText = btn.innerHTML;
-            const runwayThreshold = document.getElementById('runwayThreshold').value;
+        document.addEventListener('touchmove', function(e) {
+            if (!isDragging) return;
+            var touch = e.touches[0];
+            currentValue = getValueFromPosition(touch.clientX);
+            updateUI();
+        });
 
-            try {
-                // 버튼 비활성화 및 로딩 표시
-                btn.disabled = true;
-                btn.innerHTML = '<span class="loading"></span> 계산 중...';
+        document.addEventListener('touchend', function() {
+            isDragging = false;
+        });
 
-                // FormData 생성 (런웨이 임계값 포함)
-                const formData = new FormData();
-                formData.append('todayFile', file);
-                formData.append('runway_threshold', runwayThreshold);
+        track.addEventListener('click', function(e) {
+            if (e.target === handle) return;
+            currentValue = getValueFromPosition(e.clientX);
+            updateUI();
+        });
 
-                showStatus('파일을 업로드하고 주문 수량을 계산하고 있습니다...', 'info');
+        updateUI();
+    })();
 
-                // API 호출 (multipart/form-data)
-                const response = await fetch('/api/calculate-order', {
-                    method: 'POST',
-                    body: formData  // Content-Type은 자동으로 설정됨
-                });
+    // File selection
+    var fileInput = document.getElementById('todayFileInput');
+    var fileName = document.getElementById('fileName');
+    var calculateBtn = document.getElementById('calculateBtn');
 
-                const result = await response.json();
+    fileInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (file) {
+            fileName.textContent = '\u2705 ' + file.name;
+            fileName.classList.add('selected');
+            calculateBtn.disabled = false;
+        } else {
+            fileName.textContent = '파일이 선택되지 않았습니다';
+            fileName.classList.remove('selected');
+            calculateBtn.disabled = true;
+        }
+    });
 
-                if (response.ok && result.success) {
-                    showStatus(`✅ 주문 수량 계산 완료! (총 ${result.drug_count}개, 긴급 ${result.urgent_count}개)`, 'success');
-                    showToast(`✅ 주문 수량 계산 완료!`, 'success');
+    async function calculateOrder() {
+        var file = fileInput.files[0];
+        if (!file) {
+            showStatus('\u274C 파일을 먼저 선택해주세요', 'error');
+            return;
+        }
 
-                    // 새 탭에서 보고서 열기
-                    setTimeout(() => {
-                        window.open(`/reports/${result.html_filename}`, '_blank');
+        var btn = calculateBtn;
+        var originalText = btn.innerHTML;
+        var runwayThreshold = document.getElementById('runwayThreshold').value;
 
-                        // 버튼 복원 및 초기화
-                        btn.disabled = true;
-                        btn.innerHTML = originalText;
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 계산 중...';
 
-                        // 파일 선택 초기화
-                        fileInput.value = '';
-                        fileName.textContent = '파일이 선택되지 않았습니다';
-                        fileName.classList.remove('selected');
-                    }, 800);
-                } else {
-                    showStatus(`❌ 오류: ${result.error}`, 'error');
-                    showToast(`❌ 오류가 발생했습니다`, 'error');
-                    btn.disabled = false;
+            var formData = new FormData();
+            formData.append('todayFile', file);
+            formData.append('runway_threshold', runwayThreshold);
+
+            showStatus('파일을 업로드하고 주문 수량을 계산하고 있습니다...', 'info');
+
+            var response = await fetch('/api/calculate-order', {
+                method: 'POST',
+                body: formData
+            });
+
+            var result = await response.json();
+
+            if (response.ok && result.success) {
+                showStatus('\u2705 주문 수량 계산 완료! (총 ' + result.drug_count + '개, 긴급 ' + result.urgent_count + '개)', 'success');
+                showToast('\u2705 주문 수량 계산 완료!', 'success');
+
+                setTimeout(function() {
+                    window.open('/reports/' + result.html_filename, '_blank');
+
+                    btn.disabled = true;
                     btn.innerHTML = originalText;
-                }
-            } catch (error) {
-                showStatus(`❌ 오류: ${error.message}`, 'error');
-                showToast(`❌ 오류가 발생했습니다`, 'error');
+
+                    fileInput.value = '';
+                    fileName.textContent = '파일이 선택되지 않았습니다';
+                    fileName.classList.remove('selected');
+                }, 800);
+            } else {
+                showStatus('\u274C 오류: ' + result.error, 'error');
+                showToast('\u274C 오류가 발생했습니다', 'error');
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
+        } catch (error) {
+            showStatus('\u274C 오류: ' + error.message, 'error');
+            showToast('\u274C 오류가 발생했습니다', 'error');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
+    }
 
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.className = `status-message ${type}`;
-            statusDiv.textContent = message;
-            statusDiv.style.display = 'block';
-        }
-
-        // 서버 종료
-        async function shutdownServer() {
-            const confirmed = await showConfirmModal({
-                icon: '⏻',
-                title: '애플리케이션 종료',
-                message: '정말 애플리케이션을 종료하시겠습니까?',
-                confirmText: '종료',
-                isDanger: true
-            });
-            if (!confirmed) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/shutdown', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
-            } catch (error) {
-                console.log('서버 종료됨');
-                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
-            }
-        }
-    </script>
-</body>
-</html>
+    function showStatus(message, type) {
+        var statusDiv = document.getElementById('statusMessage');
+        statusDiv.className = 'status-message ' + type;
+        statusDiv.textContent = message;
+        statusDiv.style.display = 'block';
+    }
+</script>
+{% endblock %}

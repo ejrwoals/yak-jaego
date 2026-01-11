@@ -1,1151 +1,448 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>재고 분석 보고서</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #f5f5f5;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 50px;
-            max-width: 600px;
-            width: 100%;
-            animation: slideIn 0.5s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        h1 {
-            color: #2d3748;
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 2em;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #718096;
-            margin-bottom: 40px;
-            font-size: 1em;
-        }
-
-        .form-group {
-            margin-bottom: 30px;
-        }
-
-        .form-group label {
-            display: block;
-            color: #2d3748;
-            font-weight: bold;
-            margin-bottom: 12px;
-            font-size: 1.1em;
-        }
-
-        .radio-group {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .radio-option {
-            flex: 1;
-            min-width: 160px;
-        }
-
-        .radio-option input[type="radio"] {
-            display: none;
-        }
-
-        .radio-option label {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: #f7fafc;
-        }
-
-        .radio-option .radio-icon {
-            font-size: 1.4em;
-        }
-
-        .radio-option .radio-text {
-            text-align: left;
-        }
-
-        .radio-option .radio-title {
-            font-weight: bold;
-            margin-bottom: 2px;
-        }
-
-        .radio-option .radio-desc {
-            font-size: 0.8em;
-            opacity: 0.7;
-        }
-
-        .radio-option input[type="radio"]:checked + label {
-            border-color: #555;
-            background: #555;
-            color: white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .radio-option input[type="radio"]:checked + label .radio-desc {
-            opacity: 0.8;
-        }
-
-        .radio-option label:hover {
-            border-color: #cbd5e0;
-            background: #edf2f7;
-        }
-
-        .radio-option input[type="radio"]:checked + label:hover {
-            border-color: #555;
-            background: #555;
-        }
-
-        /* Custom Dropdown Styles */
-        .custom-dropdown {
-            position: relative;
-            width: 100%;
-        }
-
-        .custom-dropdown-selected {
-            width: 100%;
-            padding: 15px 40px 15px 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 1em;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-        }
-
-        .custom-dropdown-selected:hover {
-            border-color: #cbd5e0;
-        }
-
-        .custom-dropdown-selected.open {
-            border-color: #555;
-            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
-            border-radius: 10px 10px 0 0;
-        }
-
-        .custom-dropdown-selected::after {
-            content: '▼';
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #718096;
-            font-size: 0.8em;
-            transition: transform 0.3s;
-        }
-
-        .custom-dropdown-selected.open::after {
-            transform: translateY(-50%) rotate(180deg);
-        }
-
-        .custom-dropdown-options {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 2px solid #555;
-            border-top: none;
-            border-radius: 0 0 10px 10px;
-            max-height: 0;
-            overflow: hidden;
-            opacity: 0;
-            transition: max-height 0.3s ease, opacity 0.2s ease;
-            z-index: 100;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-        }
-
-        .custom-dropdown-options.open {
-            max-height: 300px;
-            overflow-y: auto;
-            opacity: 1;
-        }
-
-        .custom-dropdown-option {
-            padding: 12px 15px;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .custom-dropdown-option:hover {
-            background: #f7fafc;
-        }
-
-        .custom-dropdown-option.selected {
-            background: #edf2f7;
-            font-weight: 600;
-        }
-
-        .custom-dropdown-option.selected::before {
-            content: '✓';
-            color: #555;
-            font-weight: bold;
-        }
-
-        .custom-dropdown-option:last-child {
-            border-radius: 0 0 8px 8px;
-        }
-
-        /* Custom Confirm Modal Styles */
-        .confirm-modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 3000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .confirm-modal-overlay.visible {
-            display: flex;
-        }
-
-        .confirm-modal-box {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 320px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: modalSlideIn 0.2s ease;
-        }
-
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
-
-        .confirm-modal-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .confirm-modal-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 8px;
-        }
-
-        .confirm-modal-message {
-            font-size: 14px;
-            color: #718096;
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-
-        .confirm-modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .confirm-modal-buttons button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            min-width: 80px;
-        }
-
-        .confirm-modal-buttons .btn-cancel {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .confirm-modal-buttons .btn-cancel:hover {
-            background: #cbd5e0;
-        }
-
-        .confirm-modal-buttons .btn-danger {
-            background: #f56565;
-            color: white;
-        }
-
-        .confirm-modal-buttons .btn-danger:hover {
-            background: #e53e3e;
-        }
-
-        .tooltip {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            background: #4299e1;
-            color: white;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 20px;
-            font-size: 14px;
-            cursor: help;
-            margin-left: 8px;
-            position: relative;
-        }
-
-        .tooltip:hover::after {
-            content: attr(title);
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2d3748;
-            color: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            white-space: nowrap;
-            font-size: 13px;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        .tooltip:hover::before {
-            content: '';
-            position: absolute;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent;
-            border-top-color: #2d3748;
-        }
-
-        .info-box {
-            background: #ebf8ff;
-            border-left: 4px solid #4299e1;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            font-size: 0.95em;
-            color: #2c5282;
-            overflow: hidden;
-        }
-
-        .info-box-header {
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.2s;
-        }
-
-        .info-box-header:hover {
-            background: #dbeafe;
-        }
-
-        .info-box-title {
-            color: #2b6cb0;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .info-box-arrow {
-            color: #4299e1;
-            font-size: 0.8em;
-            transition: transform 0.3s ease;
-        }
-
-        .info-box-arrow.open {
-            transform: rotate(180deg);
-        }
-
-        .info-box-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        .info-box-content.open {
-            max-height: 200px;
-        }
-
-        .info-box-body {
-            padding: 0 15px 15px 15px;
-            line-height: 1.6;
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 18px;
-            background: #555;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.2em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            background: #444;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .submit-btn:active {
-            transform: translateY(0);
-        }
-
-        .submit-btn:disabled {
-            background: #cbd5e0;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        .back-btn {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #718096;
-            text-decoration: none;
-            transition: color 0.3s;
-        }
-
-        .back-btn:hover {
-            color: #2d3748;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .loading.active {
-            display: block;
-        }
-
-        .spinner {
-            border: 4px solid #e0e0e0;
-            border-top: 4px solid #555;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .exit-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 0.95em;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 1000;
-        }
-
-        .exit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
-            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
-        }
-
-        .exit-btn:active {
-            transform: translateY(0);
-        }
-
-        /* Runway Slider Styles */
-        .runway-slider-container {
-            background: #f7fafc;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .runway-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-        }
-
-        .runway-label {
-            font-size: 0.9em;
-            font-weight: 600;
-            padding: 4px 12px;
-            border-radius: 15px;
-        }
-
-        .runway-label.shortage {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .runway-label.sufficient {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .runway-label.excess {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .runway-bar {
-            position: relative;
-            height: 40px;
-            background: #e2e8f0;
-            border-radius: 20px;
-            margin-bottom: 10px;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .runway-segment {
-            height: 100%;
-            transition: width 0.1s ease;
-        }
-
-        .runway-segment.shortage {
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        }
-
-        .runway-segment.sufficient {
-            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-        }
-
-        .runway-segment.excess {
-            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-        }
-
-        .runway-handle {
-            position: absolute;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 24px;
-            height: 48px;
-            background: white;
-            border: 3px solid #555;
-            border-radius: 8px;
-            cursor: ew-resize;
-            z-index: 10;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            transition: box-shadow 0.2s, transform 0.1s;
-        }
-
-        .runway-handle:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
-        .runway-handle:active {
-            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-            transform: translate(-50%, -50%) scale(1.05);
-        }
-
-        .runway-handle::before {
-            content: '⋮';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #555;
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .runway-scale {
-            position: relative;
-            height: 20px;
-            font-size: 0.85em;
-            color: #718096;
-            margin-bottom: 15px;
-        }
-
-        .runway-scale span {
-            position: absolute;
-            transform: translateX(-50%);
-        }
-
-        .runway-scale span:first-child {
-            left: 0;
-            transform: translateX(0);
-        }
-
-        .runway-scale span:last-child {
-            left: 100%;
-            transform: translateX(-100%);
-        }
-
-        .runway-values {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-        }
-
-        .runway-value-box {
-            text-align: center;
-            background: white;
-            padding: 12px 20px;
-            border-radius: 10px;
-            border: 2px solid #e2e8f0;
-            min-width: 120px;
-        }
-
-        .runway-value-label {
-            display: block;
-            font-size: 0.8em;
-            color: #718096;
-            margin-bottom: 5px;
-        }
-
-        .runway-value {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #2d3748;
-        }
-
-        .runway-value-unit {
-            font-size: 0.9em;
-            color: #718096;
-            margin-left: 2px;
-        }
-
-        /* Toast 알림 */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .toast {
-            padding: 14px 20px;
-            border-radius: 10px;
-            color: white;
-            font-weight: 500;
-            font-size: 0.95em;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            transform: translateX(120%);
-            transition: transform 0.3s ease;
-            max-width: 320px;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.success {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        }
-
-        .toast.error {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        }
-    </style>
-</head>
-<body>
-    <div class="toast-container" id="toast-container"></div>
-
-    <div class="container">
-        <a href="/" class="back-btn">← 홈으로 돌아가기</a>
-
-        <h1>📊 재고 분석 보고서</h1>
-
-        <div class="info-box">
-            <div class="info-box-header" onclick="toggleInfoBox()">
-                <span class="info-box-title">💡 이 보고서는?</span>
-                <span class="info-box-arrow" id="info-box-arrow">▼</span>
-            </div>
-            <div class="info-box-content" id="info-box-content">
-                <div class="info-box-body">
-                    평균 소모량을 기반으로 현재 재고가 몇개월 후쯤 소진되는지 정보 등의 재고 분석을 제공합니다.<br><br>
-                    이동평균 개월수를 짧게 설정할수록 최근 단기적인 변화 트렌드를 더 잘 반영합니다.
-                    반면 개월수를 길게 설정할수록 단기 변동에 민감하지 않은 보다 안정적인 장기 트렌드를 기반으로 분석합니다.
-                </div>
-            </div>
+{% extends "base.html" %}
+
+{% block title %}재고 분석 보고서{% endblock %}
+
+{% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/dropdown.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
+{% endblock %}
+
+{% block page_styles %}
+<style>
+    /* Runway Slider Styles */
+    .runway-slider-container {
+        background: #f7fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+    }
+
+    .runway-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+    }
+
+    .runway-label {
+        font-size: 0.9em;
+        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 15px;
+    }
+
+    .runway-label.shortage {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .runway-label.sufficient {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .runway-label.excess {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .runway-bar {
+        position: relative;
+        height: 40px;
+        background: #e2e8f0;
+        border-radius: 20px;
+        margin-bottom: 10px;
+        display: flex;
+        overflow: hidden;
+    }
+
+    .runway-segment {
+        height: 100%;
+        transition: width 0.1s ease;
+    }
+
+    .runway-segment.shortage {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    }
+
+    .runway-segment.sufficient {
+        background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    }
+
+    .runway-segment.excess {
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+    }
+
+    .runway-handle {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 24px;
+        height: 48px;
+        background: white;
+        border: 3px solid #555;
+        border-radius: 8px;
+        cursor: ew-resize;
+        z-index: 10;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: box-shadow 0.2s, transform 0.1s;
+    }
+
+    .runway-handle:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .runway-handle:active {
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+
+    .runway-handle::before {
+        content: '\22EE';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #555;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .runway-scale {
+        position: relative;
+        height: 20px;
+        font-size: 0.85em;
+        color: #718096;
+        margin-bottom: 15px;
+    }
+
+    .runway-scale span {
+        position: absolute;
+        transform: translateX(-50%);
+    }
+
+    .runway-scale span:first-child {
+        left: 0;
+        transform: translateX(0);
+    }
+
+    .runway-scale span:last-child {
+        left: 100%;
+        transform: translateX(-100%);
+    }
+
+    .runway-values {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+    }
+
+    .runway-value-box {
+        text-align: center;
+        background: white;
+        padding: 12px 20px;
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        min-width: 120px;
+    }
+
+    .runway-value-label {
+        display: block;
+        font-size: 0.8em;
+        color: #718096;
+        margin-bottom: 5px;
+    }
+
+    .runway-value {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #2d3748;
+    }
+
+    .runway-value-unit {
+        font-size: 0.9em;
+        color: #718096;
+        margin-left: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block toast_container %}
+{% include 'partials/_toast_container.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <a href="/" class="back-btn">&larr; 홈으로 돌아가기</a>
+
+    <h1>📊 재고 분석 보고서</h1>
+
+    <div class="info-box">
+        <div class="info-box-header" onclick="toggleInfoBox()">
+            <span class="info-box-title">💡 이 보고서는?</span>
+            <span class="info-box-arrow" id="info-box-arrow">▼</span>
         </div>
-
-        <form id="reportForm" method="POST" action="/generate/simple_report">
-            <div class="form-group">
-                <label>
-                    약품 유형 선택
-                </label>
-                <div class="radio-group">
-                    <div class="radio-option">
-                        <input type="radio" id="dispense" name="mode" value="dispense" checked>
-                        <label for="dispense">
-                            <span class="radio-icon">💊</span>
-                            <span class="radio-text">
-                                <div class="radio-title">전문약</div>
-                                <div class="radio-desc">조제수량 기준</div>
-                            </span>
-                        </label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="sale" name="mode" value="sale">
-                        <label for="sale">
-                            <span class="radio-icon">🏥</span>
-                            <span class="radio-text">
-                                <div class="radio-title">일반약</div>
-                                <div class="radio-desc">판매수량 기준</div>
-                            </span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="ma_months">
-                    이동평균 개월 수
-                    <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.&#10;• 3개월: 단기 트렌드 (권장)&#10;• 6개월: 중기 트렌드&#10;• 12개월: 장기 트렌드">ⓘ</span>
-                </label>
-                <div class="custom-dropdown" id="maMonthsDropdown">
-                    <div class="custom-dropdown-selected" onclick="toggleDropdown('maMonthsDropdown')">
-                        3개월 (권장 - 단기 트렌드)
-                    </div>
-                    <div class="custom-dropdown-options">
-                        <div class="custom-dropdown-option" data-value="1">1개월 (매우 단기)</div>
-                        <div class="custom-dropdown-option" data-value="2">2개월 (단기)</div>
-                        <div class="custom-dropdown-option selected" data-value="3">3개월 (권장 - 단기 트렌드)</div>
-                        <div class="custom-dropdown-option" data-value="4">4개월</div>
-                        <div class="custom-dropdown-option" data-value="5">5개월</div>
-                        <div class="custom-dropdown-option" data-value="6">6개월 (중기 트렌드)</div>
-                        <div class="custom-dropdown-option" data-value="9">9개월</div>
-                        <div class="custom-dropdown-option" data-value="12">12개월 (장기 트렌드)</div>
-                    </div>
-                </div>
-                <input type="hidden" name="ma_months" id="ma_months" value="3">
-            </div>
-
-            <div class="form-group">
-                <label>
-                    런웨이 구간 설정
-                    <span class="tooltip" title="런웨이(재고 소진 예상 기간) 기준으로&#10;약품을 부족/충분/과다로 분류합니다.&#10;핸들을 드래그하여 경계값을 조정하세요.">ⓘ</span>
-                </label>
-                <div class="runway-slider-container">
-                    <div class="runway-labels">
-                        <span class="runway-label shortage">🟡 부족</span>
-                        <span class="runway-label sufficient">🟢 충분</span>
-                        <span class="runway-label excess">🔵 과다</span>
-                    </div>
-                    <div class="runway-bar">
-                        <div class="runway-segment shortage" id="segment-shortage"></div>
-                        <div class="runway-segment sufficient" id="segment-sufficient"></div>
-                        <div class="runway-segment excess" id="segment-excess"></div>
-                        <div class="runway-handle" id="handle-low" title="부족/충분 경계"></div>
-                        <div class="runway-handle" id="handle-high" title="충분/과다 경계"></div>
-                    </div>
-                    <div class="runway-scale">
-                        <span>0</span>
-                        <span id="scale-low">1</span>
-                        <span id="scale-high">3</span>
-                        <span>7+</span>
-                    </div>
-                    <div class="runway-values">
-                        <div class="runway-value-box">
-                            <span class="runway-value-label">부족/충분 경계</span>
-                            <span class="runway-value" id="value-low">1</span>
-                            <span class="runway-value-unit">개월</span>
-                        </div>
-                        <div class="runway-value-box">
-                            <span class="runway-value-label">충분/과다 경계</span>
-                            <span class="runway-value" id="value-high">3</span>
-                            <span class="runway-value-unit">개월</span>
-                        </div>
-                    </div>
-                </div>
-                <input type="hidden" name="threshold_low" id="threshold_low" value="1">
-                <input type="hidden" name="threshold_high" id="threshold_high" value="3">
-            </div>
-
-            <button type="submit" class="submit-btn" id="submitBtn">
-                🚀 보고서 생성하기
-            </button>
-        </form>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p style="color: #718096;">보고서를 생성하고 있습니다...</p>
-        </div>
-    </div>
-
-    <button class="exit-btn" onclick="exitApp()">⏻ 종료</button>
-
-    <!-- Custom Confirm Modal -->
-    <div id="confirmModal" class="confirm-modal-overlay">
-        <div class="confirm-modal-box">
-            <div class="confirm-modal-icon" id="confirmModalIcon">⏻</div>
-            <div class="confirm-modal-title" id="confirmModalTitle">애플리케이션 종료</div>
-            <div class="confirm-modal-message" id="confirmModalMessage">정말 애플리케이션을 종료하시겠습니까?</div>
-            <div class="confirm-modal-buttons">
-                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
-                <button class="btn-danger" id="confirmModalBtn" onclick="closeConfirmModal(true)">종료</button>
+        <div class="info-box-content" id="info-box-content">
+            <div class="info-box-body">
+                평균 소모량을 기반으로 현재 재고가 몇개월 후쯤 소진되는지 정보 등의 재고 분석을 제공합니다.<br><br>
+                이동평균 개월수를 짧게 설정할수록 최근 단기적인 변화 트렌드를 더 잘 반영합니다.
+                반면 개월수를 길게 설정할수록 단기 변동에 민감하지 않은 보다 안정적인 장기 트렌드를 기반으로 분석합니다.
             </div>
         </div>
     </div>
 
-    <script>
-        // Custom Confirm Modal
-        let confirmCallback = null;
+    <form id="reportForm" method="POST" action="/generate/simple_report">
+        <div class="form-group">
+            <label>약품 유형 선택</label>
+            <div class="radio-group">
+                <div class="radio-option">
+                    <input type="radio" id="dispense" name="mode" value="dispense" checked>
+                    <label for="dispense">
+                        <span class="radio-icon">💊</span>
+                        <span class="radio-text">
+                            <div class="radio-title">전문약</div>
+                            <div class="radio-desc">조제수량 기준</div>
+                        </span>
+                    </label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="sale" name="mode" value="sale">
+                    <label for="sale">
+                        <span class="radio-icon">🏥</span>
+                        <span class="radio-text">
+                            <div class="radio-title">일반약</div>
+                            <div class="radio-desc">판매수량 기준</div>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </div>
 
-        function showConfirmModal(options) {
-            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+        <div class="form-group">
+            <label for="ma_months">
+                이동평균 개월 수
+                <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.&#10;• 3개월: 단기 트렌드 (권장)&#10;• 6개월: 중기 트렌드&#10;• 12개월: 장기 트렌드">ⓘ</span>
+            </label>
+            <div class="custom-dropdown" id="maMonthsDropdown">
+                <div class="custom-dropdown-selected" onclick="toggleDropdown('maMonthsDropdown')">
+                    3개월 (권장 - 단기 트렌드)
+                </div>
+                <div class="custom-dropdown-options">
+                    <div class="custom-dropdown-option" data-value="1">1개월 (매우 단기)</div>
+                    <div class="custom-dropdown-option" data-value="2">2개월 (단기)</div>
+                    <div class="custom-dropdown-option selected" data-value="3">3개월 (권장 - 단기 트렌드)</div>
+                    <div class="custom-dropdown-option" data-value="4">4개월</div>
+                    <div class="custom-dropdown-option" data-value="5">5개월</div>
+                    <div class="custom-dropdown-option" data-value="6">6개월 (중기 트렌드)</div>
+                    <div class="custom-dropdown-option" data-value="9">9개월</div>
+                    <div class="custom-dropdown-option" data-value="12">12개월 (장기 트렌드)</div>
+                </div>
+            </div>
+            <input type="hidden" name="ma_months" id="ma_months" value="3">
+        </div>
 
-            document.getElementById('confirmModalIcon').textContent = icon;
-            document.getElementById('confirmModalTitle').textContent = title;
-            document.getElementById('confirmModalMessage').innerHTML = message;
+        <div class="form-group">
+            <label>
+                런웨이 구간 설정
+                <span class="tooltip" title="런웨이(재고 소진 예상 기간) 기준으로&#10;약품을 부족/충분/과다로 분류합니다.&#10;핸들을 드래그하여 경계값을 조정하세요.">ⓘ</span>
+            </label>
+            <div class="runway-slider-container">
+                <div class="runway-labels">
+                    <span class="runway-label shortage">🟡 부족</span>
+                    <span class="runway-label sufficient">🟢 충분</span>
+                    <span class="runway-label excess">🔵 과다</span>
+                </div>
+                <div class="runway-bar">
+                    <div class="runway-segment shortage" id="segment-shortage"></div>
+                    <div class="runway-segment sufficient" id="segment-sufficient"></div>
+                    <div class="runway-segment excess" id="segment-excess"></div>
+                    <div class="runway-handle" id="handle-low" title="부족/충분 경계"></div>
+                    <div class="runway-handle" id="handle-high" title="충분/과다 경계"></div>
+                </div>
+                <div class="runway-scale">
+                    <span>0</span>
+                    <span id="scale-low">1</span>
+                    <span id="scale-high">3</span>
+                    <span>7+</span>
+                </div>
+                <div class="runway-values">
+                    <div class="runway-value-box">
+                        <span class="runway-value-label">부족/충분 경계</span>
+                        <span class="runway-value" id="value-low">1</span>
+                        <span class="runway-value-unit">개월</span>
+                    </div>
+                    <div class="runway-value-box">
+                        <span class="runway-value-label">충분/과다 경계</span>
+                        <span class="runway-value" id="value-high">3</span>
+                        <span class="runway-value-unit">개월</span>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" name="threshold_low" id="threshold_low" value="1">
+            <input type="hidden" name="threshold_high" id="threshold_high" value="3">
+        </div>
 
-            const confirmBtn = document.getElementById('confirmModalBtn');
-            confirmBtn.textContent = confirmText;
-            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+        <button type="submit" class="submit-btn" id="submitBtn">
+            🚀 보고서 생성하기
+        </button>
+    </form>
 
-            document.getElementById('confirmModal').classList.add('visible');
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p style="color: #718096;">보고서를 생성하고 있습니다...</p>
+    </div>
+</div>
+{% endblock %}
 
-            return new Promise(resolve => {
-                confirmCallback = resolve;
-            });
-        }
+{% block component_scripts %}
+<script src="{{ url_for('static', filename='js/components/toast.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+<script src="{{ url_for('static', filename='js/components/dropdown.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+<script src="{{ url_for('static', filename='js/components/shutdown.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+{% endblock %}
 
-        function closeConfirmModal(result) {
-            document.getElementById('confirmModal').classList.remove('visible');
-            if (confirmCallback) {
-                confirmCallback(result);
-                confirmCallback = null;
-            }
-        }
+{% block page_scripts %}
+<script>
+    function toggleInfoBox() {
+        var content = document.getElementById('info-box-content');
+        var arrow = document.getElementById('info-box-arrow');
+        content.classList.toggle('open');
+        arrow.classList.toggle('open');
+    }
 
-        // Custom Dropdown
-        function toggleDropdown(dropdownId) {
-            const dropdown = document.getElementById(dropdownId);
-            const selected = dropdown.querySelector('.custom-dropdown-selected');
-            const options = dropdown.querySelector('.custom-dropdown-options');
+    document.getElementById('reportForm').addEventListener('submit', function(e) {
+        e.preventDefault();
 
-            // 다른 드롭다운 닫기
-            document.querySelectorAll('.custom-dropdown').forEach(dd => {
-                if (dd.id !== dropdownId) {
-                    dd.querySelector('.custom-dropdown-selected').classList.remove('open');
-                    dd.querySelector('.custom-dropdown-options').classList.remove('open');
-                }
-            });
+        var submitBtn = document.getElementById('submitBtn');
+        var loading = document.getElementById('loading');
 
-            selected.classList.toggle('open');
-            options.classList.toggle('open');
-        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = '\u23F3 생성 중...';
+        loading.classList.add('active');
 
-        // 드롭다운 옵션 클릭 이벤트
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.custom-dropdown-option').forEach(option => {
-                option.addEventListener('click', function() {
-                    const dropdown = this.closest('.custom-dropdown');
-                    const selected = dropdown.querySelector('.custom-dropdown-selected');
-                    const options = dropdown.querySelector('.custom-dropdown-options');
-                    const hiddenInput = dropdown.nextElementSibling;
+        var formData = new FormData(this);
 
-                    // 모든 옵션에서 selected 클래스 제거
-                    dropdown.querySelectorAll('.custom-dropdown-option').forEach(opt => {
-                        opt.classList.remove('selected');
-                    });
+        fetch('/generate/simple_report', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                window.open(data.report_url, '_blank');
 
-                    // 선택된 옵션에 selected 클래스 추가
-                    this.classList.add('selected');
-
-                    // 선택된 텍스트 업데이트
-                    selected.textContent = this.textContent;
-
-                    // hidden input 값 업데이트
-                    if (hiddenInput && hiddenInput.type === 'hidden') {
-                        hiddenInput.value = this.dataset.value;
-                    }
-
-                    // 드롭다운 닫기
-                    selected.classList.remove('open');
-                    options.classList.remove('open');
-                });
-            });
-        });
-
-        // 외부 클릭 시 드롭다운 닫기
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.custom-dropdown')) {
-                document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
-                    dropdown.querySelector('.custom-dropdown-selected').classList.remove('open');
-                    dropdown.querySelector('.custom-dropdown-options').classList.remove('open');
-                });
-            }
-        });
-
-        // ESC 키로 모달/드롭다운 닫기
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                // 확인 모달 닫기
-                if (document.getElementById('confirmModal').classList.contains('visible')) {
-                    closeConfirmModal(false);
-                    return;
-                }
-                // 드롭다운 닫기
-                document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
-                    dropdown.querySelector('.custom-dropdown-selected').classList.remove('open');
-                    dropdown.querySelector('.custom-dropdown-options').classList.remove('open');
-                });
-            }
-        });
-
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
-
-            // 애니메이션을 위해 약간의 지연 후 show 클래스 추가
-            setTimeout(() => toast.classList.add('show'), 10);
-
-            // 3초 후 자동으로 사라짐
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        function toggleInfoBox() {
-            const content = document.getElementById('info-box-content');
-            const arrow = document.getElementById('info-box-arrow');
-            content.classList.toggle('open');
-            arrow.classList.toggle('open');
-        }
-
-        document.getElementById('reportForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('submitBtn');
-            const loading = document.getElementById('loading');
-
-            // 버튼 비활성화 및 로딩 표시
-            submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ 생성 중...';
-            loading.classList.add('active');
-
-            const formData = new FormData(this);
-
-            fetch('/generate/simple_report', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // 새 탭에서 보고서 열기
-                    window.open(data.report_url, '_blank');
-
-                    // 버튼 복원
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = '🚀 보고서 생성하기';
-                    loading.classList.remove('active');
-
-                    // 성공 메시지
-                    showToast('✅ 보고서가 성공적으로 생성되었습니다!', 'success');
-                } else {
-                    throw new Error(data.message || '보고서 생성 실패');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showToast('❌ 보고서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
-
-                // 버튼 복원
                 submitBtn.disabled = false;
-                submitBtn.textContent = '🚀 보고서 생성하기';
+                submitBtn.textContent = '\uD83D\uDE80 보고서 생성하기';
                 loading.classList.remove('active');
-            });
-        });
 
-        async function exitApp() {
-            const confirmed = await showConfirmModal({
-                icon: '⏻',
-                title: '애플리케이션 종료',
-                message: '정말 애플리케이션을 종료하시겠습니까?',
-                confirmText: '종료',
-                isDanger: true
-            });
-            if (confirmed) {
-                fetch('/shutdown', {method: 'POST'})
-                    .then(() => {
-                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #2d3748;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
-                    })
-                    .catch(() => {
-                        document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #2d3748;">✅ 서버가 종료되었습니다. 이 창을 닫으셔도 됩니다.</div>';
-                    });
+                showToast('\u2705 보고서가 성공적으로 생성되었습니다!', 'success');
+            } else {
+                throw new Error(data.message || '보고서 생성 실패');
             }
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+            showToast('\u274C 보고서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '\uD83D\uDE80 보고서 생성하기';
+            loading.classList.remove('active');
+        });
+    });
+
+    // Runway Slider Logic
+    (function() {
+        var MAX_VALUE = 7;
+        var lowValue = 1;
+        var highValue = 3;
+
+        var bar = document.querySelector('.runway-bar');
+        var handleLow = document.getElementById('handle-low');
+        var handleHigh = document.getElementById('handle-high');
+        var segmentShortage = document.getElementById('segment-shortage');
+        var segmentSufficient = document.getElementById('segment-sufficient');
+        var segmentExcess = document.getElementById('segment-excess');
+        var scaleLow = document.getElementById('scale-low');
+        var scaleHigh = document.getElementById('scale-high');
+        var valueLowEl = document.getElementById('value-low');
+        var valueHighEl = document.getElementById('value-high');
+        var inputLow = document.getElementById('threshold_low');
+        var inputHigh = document.getElementById('threshold_high');
+
+        function updateUI() {
+            var lowPercent = (lowValue / MAX_VALUE) * 100;
+            var highPercent = (highValue / MAX_VALUE) * 100;
+
+            segmentShortage.style.width = lowPercent + '%';
+            segmentSufficient.style.width = (highPercent - lowPercent) + '%';
+            segmentExcess.style.width = (100 - highPercent) + '%';
+
+            handleLow.style.left = lowPercent + '%';
+            handleHigh.style.left = highPercent + '%';
+
+            scaleLow.textContent = lowValue;
+            scaleHigh.textContent = highValue;
+            scaleLow.style.left = lowPercent + '%';
+            scaleHigh.style.left = highPercent + '%';
+
+            valueLowEl.textContent = lowValue;
+            valueHighEl.textContent = highValue;
+
+            inputLow.value = lowValue;
+            inputHigh.value = highValue;
         }
 
-        // Runway Slider Logic
-        (function() {
-            const MAX_VALUE = 7;
-            let lowValue = 1;
-            let highValue = 3;
+        function getValueFromPosition(clientX) {
+            var rect = bar.getBoundingClientRect();
+            var percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            return Math.round(percent * MAX_VALUE);
+        }
 
-            const bar = document.querySelector('.runway-bar');
-            const handleLow = document.getElementById('handle-low');
-            const handleHigh = document.getElementById('handle-high');
-            const segmentShortage = document.getElementById('segment-shortage');
-            const segmentSufficient = document.getElementById('segment-sufficient');
-            const segmentExcess = document.getElementById('segment-excess');
-            const scaleLow = document.getElementById('scale-low');
-            const scaleHigh = document.getElementById('scale-high');
-            const valueLow = document.getElementById('value-low');
-            const valueHigh = document.getElementById('value-high');
-            const inputLow = document.getElementById('threshold_low');
-            const inputHigh = document.getElementById('threshold_high');
+        function makeDraggable(handle, isLow) {
+            var isDragging = false;
 
-            function updateUI() {
-                const lowPercent = (lowValue / MAX_VALUE) * 100;
-                const highPercent = (highValue / MAX_VALUE) * 100;
-
-                // Update segments
-                segmentShortage.style.width = lowPercent + '%';
-                segmentSufficient.style.width = (highPercent - lowPercent) + '%';
-                segmentExcess.style.width = (100 - highPercent) + '%';
-
-                // Update handles
-                handleLow.style.left = lowPercent + '%';
-                handleHigh.style.left = highPercent + '%';
-
-                // Update scale labels (position and text)
-                scaleLow.textContent = lowValue;
-                scaleHigh.textContent = highValue;
-                scaleLow.style.left = lowPercent + '%';
-                scaleHigh.style.left = highPercent + '%';
-
-                // Update value displays
-                valueLow.textContent = lowValue;
-                valueHigh.textContent = highValue;
-
-                // Update hidden inputs
-                inputLow.value = lowValue;
-                inputHigh.value = highValue;
+            function startDrag(e) {
+                isDragging = true;
+                e.preventDefault();
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none';
             }
 
-            function getValueFromPosition(clientX) {
-                const rect = bar.getBoundingClientRect();
-                const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-                return Math.round(percent * MAX_VALUE);
+            function doDrag(e) {
+                if (!isDragging) return;
+
+                var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                var newValue = getValueFromPosition(clientX);
+
+                if (isLow) {
+                    newValue = Math.max(1, Math.min(newValue, highValue - 1));
+                    lowValue = newValue;
+                } else {
+                    newValue = Math.max(lowValue + 1, Math.min(newValue, MAX_VALUE - 1));
+                    highValue = newValue;
+                }
+
+                updateUI();
             }
 
-            function makeDraggable(handle, isLow) {
-                let isDragging = false;
-
-                function startDrag(e) {
-                    isDragging = true;
-                    e.preventDefault();
-                    document.body.style.cursor = 'ew-resize';
-                    document.body.style.userSelect = 'none';
-                }
-
-                function doDrag(e) {
-                    if (!isDragging) return;
-
-                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                    let newValue = getValueFromPosition(clientX);
-
-                    if (isLow) {
-                        // Low handle: min 1, max is highValue - 1
-                        newValue = Math.max(1, Math.min(newValue, highValue - 1));
-                        lowValue = newValue;
-                    } else {
-                        // High handle: min is lowValue + 1, max is MAX_VALUE - 1
-                        newValue = Math.max(lowValue + 1, Math.min(newValue, MAX_VALUE - 1));
-                        highValue = newValue;
-                    }
-
-                    updateUI();
-                }
-
-                function endDrag() {
-                    isDragging = false;
-                    document.body.style.cursor = '';
-                    document.body.style.userSelect = '';
-                }
-
-                // Mouse events
-                handle.addEventListener('mousedown', startDrag);
-                document.addEventListener('mousemove', doDrag);
-                document.addEventListener('mouseup', endDrag);
-
-                // Touch events
-                handle.addEventListener('touchstart', startDrag);
-                document.addEventListener('touchmove', doDrag);
-                document.addEventListener('touchend', endDrag);
+            function endDrag() {
+                isDragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
             }
 
-            // Initialize
-            makeDraggable(handleLow, true);
-            makeDraggable(handleHigh, false);
-            updateUI();
-        })();
-    </script>
-</body>
-</html>
+            handle.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', endDrag);
+
+            handle.addEventListener('touchstart', startDrag);
+            document.addEventListener('touchmove', doDrag);
+            document.addEventListener('touchend', endDrag);
+        }
+
+        makeDraggable(handleLow, true);
+        makeDraggable(handleHigh, false);
+        updateUI();
+    })();
+</script>
+{% endblock %}

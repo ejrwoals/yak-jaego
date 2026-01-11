@@ -1,0 +1,12 @@
+{# Confirm Modal Partial #}
+<div id="confirmModal" class="confirm-modal-overlay">
+    <div class="confirm-modal-box">
+        <div class="confirm-modal-icon" id="confirmModalIcon"></div>
+        <div class="confirm-modal-title" id="confirmModalTitle"></div>
+        <div class="confirm-modal-message" id="confirmModalMessage"></div>
+        <div class="confirm-modal-buttons">
+            <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
+            <button class="btn-danger" id="confirmModalBtn" onclick="closeConfirmModal(true)">확인</button>
+        </div>
+    </div>
+</div>

@@ -1,1540 +1,925 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>약국 적정 재고 솔루션</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=optional" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+{% extends "base.html" %}
 
-        body {
-            font-family: 'Noto Sans KR', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            gap: 20px;
-            overflow-y: scroll;
-        }
+{% block title %}약국 적정 재고 솔루션{% endblock %}
 
-        .title-container {
-            background: #555;
-            border-radius: 20px;
-            padding: 28px 50px;
-            max-width: 800px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-        }
+{% block body_class %}{% endblock %}
 
-        .page-title {
-            font-size: 1.8em;
-            font-weight: 700;
-            color: white;
-            letter-spacing: -0.5px;
-            margin: 0;
-        }
+{% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
+{% endblock %}
 
+{% block page_styles %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=optional" rel="stylesheet">
+<style>
+    body {
+        font-family: 'Noto Sans KR', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        overflow-y: scroll;
+    }
+
+    .title-container {
+        background: #555;
+        border-radius: 20px;
+        padding: 28px 50px;
+        max-width: 800px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .page-title {
+        font-size: 1.8em;
+        font-weight: 700;
+        color: white;
+        letter-spacing: -0.5px;
+        margin: 0;
+    }
+
+    .container {
+        max-width: 800px;
+        animation: fadeIn 0.5s ease-in;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .header-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .toolbar-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: none;
+        background: none;
+    }
+
+    .toolbar-item.db-status {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #c8e6c9;
+    }
+
+    .toolbar-item.db-status:hover {
+        background: #c8e6c9;
+    }
+
+    .toolbar-item.util-link {
+        background: #f5f5f5;
+        color: #555;
+        border: 1px solid #e0e0e0;
+    }
+
+    .toolbar-item.util-link:hover {
+        background: #e0e0e0;
+        color: #333;
+    }
+
+    .toolbar-arrow {
+        font-size: 0.7em;
+        transition: transform 0.3s ease;
+    }
+
+    .toolbar-arrow.open {
+        transform: rotate(180deg);
+    }
+
+    .db-info-panel {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        margin-top: 15px;
+        max-height: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .db-info-panel.open {
+        max-height: 400px;
+        margin-top: 15px;
+    }
+
+    .db-info-panel-body {
+        padding: 24px;
+    }
+
+    .db-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .db-stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        border: 1px solid #e8e8e8;
+    }
+
+    .db-stat-card .stat-value {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 2px;
+    }
+
+    .db-stat-card .stat-label {
+        font-size: 0.75em;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .db-bottom-row {
+        display: flex;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .db-stat-card.period {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 16px;
+        margin: 0;
+    }
+
+    .db-stat-card.period .stat-label {
+        margin: 0;
+        font-size: 0.8em;
+    }
+
+    .db-stat-card.period .stat-value {
+        font-size: 0.9em;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .btn-rebuild-db {
+        background: #e5e7eb;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: center;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+
+    .btn-rebuild-db:hover {
+        background: #d1d5db;
+        border-color: #9ca3af;
+    }
+
+    .btn-rebuild-db:disabled {
+        background: #f3f4f6;
+        color: #9ca3af;
+        cursor: not-allowed;
+    }
+
+    .rebuild-status {
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 0.9em;
+        display: none;
+    }
+
+    .rebuild-status.success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+        display: block;
+    }
+
+    .rebuild-status.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        display: block;
+    }
+
+    .rebuild-status.loading {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+        display: block;
+    }
+
+    .tabs-container {
+        margin-bottom: 30px;
+    }
+
+    .tabs {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 25px;
+    }
+
+    .tab-button {
+        background: white;
+        border: 2px solid #e0e0e0;
+        color: #7f8c8d;
+        padding: 15px 40px;
+        border-radius: 12px;
+        font-size: 1.1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .tab-button:hover {
+        border-color: #cbd5e0;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .tab-button.active {
+        background: #555;
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+        animation: fadeIn 0.4s ease-in;
+    }
+
+    .workflow-content {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    .workflow-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+    }
+
+    .workflow-section {
+        border-radius: 12px;
+        padding: 20px;
+    }
+
+    .workflow-section h3 {
+        font-size: 1.3em;
+        margin-bottom: 20px;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-new {
+        background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+        border: 2px solid #e8eeff;
+    }
+
+    .section-history {
+        background: linear-gradient(135deg, #fff8f8 0%, #fff0f0 100%);
+        border: 2px solid #ffe8e8;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .btn-new {
+        background: #555;
+        color: white;
+        border: none;
+        padding: 15px 25px;
+        border-radius: 10px;
+        font-size: 1em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        text-decoration: none;
+        display: block;
+        text-align: center;
+    }
+
+    .btn-new:hover {
+        background: #444;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .report-list {
+        max-height: 240px;
+        overflow-y: auto;
+        padding-right: 5px;
+    }
+
+    .report-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .report-list::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    .report-list::-webkit-scrollbar-thumb {
+        background: #cbd5e0;
+        border-radius: 10px;
+    }
+
+    .report-item {
+        background: white;
+        border: 1px solid #e8ecef;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .report-item:hover {
+        border-color: #cbd5e0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .report-item-link {
+        flex: 1;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.2s ease;
+    }
+
+    .report-item-link:hover {
+        transform: translateX(5px);
+    }
+
+    .btn-delete-report {
+        background: none;
+        border: none;
+        color: #a0aec0;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .btn-delete-report:hover {
+        background-color: #fee2e2;
+        color: #ef4444;
+    }
+
+    .btn-delete-report svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .btn-delete-all {
+        background: none;
+        color: #a0aec0;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 0.75em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 10px;
+    }
+
+    .btn-delete-all:hover {
+        color: #ef4444;
+        background-color: #fee2e2;
+    }
+
+    .btn-delete-all:disabled {
+        color: #cbd5e0;
+        cursor: not-allowed;
+    }
+
+    .report-item-time {
+        font-size: 0.8em;
+        color: #718096;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .report-item-type {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .report-item-type.dispense::before { content: "💊"; }
+    .report-item-type.sale::before { content: "🛒"; }
+    .report-item-type.order::before { content: "📦"; }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #a0aec0;
+    }
+
+    .empty-state-icon {
+        font-size: 3em;
+        margin-bottom: 10px;
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 30px;
+        color: #718096;
+    }
+
+    .footer {
+        text-align: center;
+        margin-top: 40px;
+        color: #95a5a6;
+        font-size: 0.9em;
+    }
+
+    @media (max-width: 768px) {
         .container {
-            background-color: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 50px;
-            max-width: 800px;
-            width: 100%;
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        /* 툴바: DB 상태 + 유틸리티 버튼 한 줄 배치 */
-        .header-toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .toolbar-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            border: none;
-            background: none;
-        }
-
-        .toolbar-item.db-status {
-            background: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #c8e6c9;
-        }
-
-        .toolbar-item.db-status:hover {
-            background: #c8e6c9;
-        }
-
-        .toolbar-item.util-link {
-            background: #f5f5f5;
-            color: #555;
-            border: 1px solid #e0e0e0;
-        }
-
-        .toolbar-item.util-link:hover {
-            background: #e0e0e0;
-            color: #333;
-        }
-
-        .toolbar-arrow {
-            font-size: 0.7em;
-            transition: transform 0.3s ease;
-        }
-
-        .toolbar-arrow.open {
-            transform: rotate(180deg);
-        }
-
-        /* DB 정보 패널 */
-        .db-info-panel {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            margin-top: 15px;
-            max-height: 0;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .db-info-panel.open {
-            max-height: 400px;
-            margin-top: 15px;
-        }
-
-        .db-info-panel-body {
-            padding: 24px;
-        }
-
-        .db-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .db-stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            border: 1px solid #e8e8e8;
-        }
-
-        .db-stat-card .stat-value {
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 2px;
-        }
-
-        .db-stat-card .stat-label {
-            font-size: 0.75em;
-            color: #6b7280;
-            font-weight: 500;
-        }
-
-        .db-bottom-row {
-            display: flex;
-            gap: 12px;
-            align-items: stretch;
-        }
-
-        .db-stat-card.period {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 16px;
-            margin: 0;
-        }
-
-        .db-stat-card.period .stat-label {
-            margin: 0;
-            font-size: 0.8em;
-        }
-
-        .db-stat-card.period .stat-value {
-            font-size: 0.9em;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .btn-rebuild-db {
-            background: #e5e7eb;
-            color: #374151;
-            border: 1px solid #d1d5db;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            justify-content: center;
-            transition: all 0.2s ease;
-            white-space: nowrap;
-        }
-
-        .btn-rebuild-db:hover {
-            background: #d1d5db;
-            border-color: #9ca3af;
-        }
-
-        .btn-rebuild-db:disabled {
-            background: #f3f4f6;
-            color: #9ca3af;
-            cursor: not-allowed;
-        }
-
-        .rebuild-status {
-            margin-top: 12px;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 0.9em;
-            display: none;
-        }
-
-        .rebuild-status.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            display: block;
-        }
-
-        .rebuild-status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            display: block;
-        }
-
-        .rebuild-status.loading {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-            display: block;
-        }
-
-        .tabs-container {
-            margin-bottom: 30px;
+            padding: 30px 20px;
         }
 
         .tabs {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 25px;
+            flex-direction: column;
         }
 
         .tab-button {
-            background: white;
-            border: 2px solid #e0e0e0;
-            color: #7f8c8d;
-            padding: 15px 40px;
-            border-radius: 12px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-
-        .tab-button:hover {
-            border-color: #cbd5e0;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .tab-button.active {
-            background: #555;
-            color: white;
-            border-color: transparent;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-        }
-
-        .tab-button.active.order-tab {
-            background: #555;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.4s ease-in;
-        }
-
-        .workflow-content {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 100%;
+            justify-content: center;
         }
 
         .workflow-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
+            grid-template-columns: 1fr;
         }
 
-        .workflow-section {
-            border-radius: 12px;
+        .workflow-content {
             padding: 20px;
         }
-
-        .workflow-section h3 {
-            font-size: 1.3em;
-            margin-bottom: 20px;
-            color: #2c3e50;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .section-new {
-            background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
-            border: 2px solid #e8eeff;
-        }
-
-        .section-history {
-            background: linear-gradient(135deg, #fff8f8 0%, #fff0f0 100%);
-            border: 2px solid #ffe8e8;
-        }
-
-        .action-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .btn-new {
-            background: #555;
-            color: white;
-            border: none;
-            padding: 15px 25px;
-            border-radius: 10px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            text-decoration: none;
-            display: block;
-            text-align: center;
-        }
-
-        .btn-new:hover {
-            background: #444;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .btn-new.order {
-            background: #555;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-new.order:hover {
-            background: #444;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .report-list {
-            max-height: 240px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        .report-list::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .report-list::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-
-        .report-list::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
-            border-radius: 10px;
-        }
-
-        .report-list::-webkit-scrollbar-thumb:hover {
-            background: #a0aec0;
-        }
-
-        .report-item {
-            background: white;
-            border: 1px solid #e8ecef;
-            border-radius: 8px;
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-        }
-
-        .report-item:hover {
-            border-color: #cbd5e0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-
-        .report-item-link {
-            flex: 1;
-            cursor: pointer;
-            text-decoration: none;
-            color: inherit;
-            transition: transform 0.2s ease;
-        }
-
-        .report-item-link:hover {
-            transform: translateX(5px);
-        }
-
-        .btn-delete-report {
-            background: none;
-            border: none;
-            color: #a0aec0;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .btn-delete-report:hover {
-            background-color: #fee2e2;
-            color: #ef4444;
-        }
-
-        .btn-delete-report svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .btn-delete-all {
-            background: none;
-            color: #a0aec0;
-            border: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.75em;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 10px;
-        }
-
-        .btn-delete-all:hover {
-            color: #ef4444;
-            background-color: #fee2e2;
-        }
-
-        .btn-delete-all:disabled {
-            color: #cbd5e0;
-            cursor: not-allowed;
-        }
-
-        .report-item-time {
-            font-size: 0.8em;
-            color: #718096;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .report-item-type {
-            font-size: 0.95em;
-            font-weight: 600;
-            color: #2d3748;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-        }
-
-        .report-item-type.dispense::before {
-            content: "💊";
-        }
-
-        .report-item-type.sale::before {
-            content: "🛒";
-        }
-
-        .report-item-type.order::before {
-            content: "📦";
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #a0aec0;
-        }
-
-        .empty-state-icon {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-
-        .loading-state {
-            text-align: center;
-            padding: 30px;
-            color: #718096;
-        }
-
-        .workflow-card {
-            background: #555;
-            border-radius: 15px;
-            padding: 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            color: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-
-        .workflow-card:hover {
-            background: #444;
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-        }
-
-        .workflow-card.timeseries {
-            background: #555;
-        }
-
-        .workflow-card.order {
-            background: #555;
-        }
-
-        .workflow-card .icon {
-            font-size: 3em;
-            margin-bottom: 15px;
-        }
-
-        .workflow-card h2 {
-            font-size: 1.3em;
-            margin-bottom: 10px;
-        }
-
-        .workflow-card p {
-            font-size: 0.9em;
-            opacity: 0.9;
-        }
-
-        .workflow-wrapper {
-            position: relative;
-        }
-
-        .workflow-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 25px;
-        }
-
-        .btn-primary {
-            width: 100%;
-            background-color: rgba(255, 255, 255, 0.95);
-            border: none;
-            color: inherit;
-            padding: 15px 24px;
-            border-radius: 10px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-
-        .workflow-card.timeseries .btn-primary {
-            color: #555;
-        }
-
-        .workflow-card.order .btn-primary {
-            color: #555;
-        }
-
-        .btn-primary:hover {
-            background-color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        .dropdown-container {
-            position: relative;
-            width: 100%;
-        }
-
-        .btn-dropdown {
-            width: 100%;
-            background-color: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-size: 0.95em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            white-space: nowrap;
-        }
-
-        .btn-dropdown:hover {
-            background-color: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.6);
-        }
-
-        .btn-dropdown-content {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-dropdown-arrow {
-            font-size: 0.8em;
-            transition: transform 0.3s ease;
-        }
-
-        .btn-dropdown-arrow.open {
-            transform: rotate(180deg);
-        }
-
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            margin-top: 10px;
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
-            z-index: 1000;
-            max-height: 320px;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        .dropdown-menu::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .dropdown-menu::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-
-        .dropdown-menu::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
-            border-radius: 10px;
-        }
-
-        .dropdown-menu::-webkit-scrollbar-thumb:hover {
-            background: #a0aec0;
-        }
-
-        .dropdown-menu.show {
-            display: block;
-            animation: dropdownFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes dropdownFadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-15px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        .dropdown-item {
-            padding: 14px 18px;
-            border-bottom: 1px solid #edf2f7;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #2d3748;
-            text-decoration: none;
-            display: block;
-        }
-
-        .dropdown-item:first-child {
-            border-radius: 12px 12px 0 0;
-        }
-
-        .dropdown-item:last-child {
-            border-bottom: none;
-            border-radius: 0 0 12px 12px;
-        }
-
-        .dropdown-item:hover {
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-            padding-left: 22px;
-        }
-
-        .dropdown-item-time {
-            font-size: 0.8em;
-            color: #718096;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .dropdown-item-time::before {
-            content: "🕐";
-            font-size: 0.9em;
-        }
-
-        .dropdown-item-type {
-            font-size: 0.95em;
-            font-weight: 600;
-            color: #2d3748;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .dropdown-item-type.dispense::before {
-            content: "💊";
-            font-size: 1em;
-        }
-
-        .dropdown-item-type.sale::before {
-            content: "🛒";
-            font-size: 1em;
-        }
-
-        .dropdown-item-type.order::before {
-            content: "📦";
-            font-size: 1em;
-        }
-
-        .dropdown-empty {
-            padding: 30px 20px;
-            text-align: center;
-            color: #a0aec0;
-            font-size: 0.9em;
-        }
-
-        .dropdown-empty::before {
-            content: "📭";
-            display: block;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        .loading {
-            padding: 20px;
-            text-align: center;
-            color: #718096;
-        }
-
-        .loading::after {
-            content: "...";
-            animation: loadingDots 1.5s infinite;
-        }
-
-        @keyframes loadingDots {
-            0%, 20% { content: "."; }
-            40% { content: ".."; }
-            60%, 100% { content: "..."; }
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 30px 20px;
-            }
-
-            .header h1 {
-                font-size: 1.8em;
-            }
-
-            .tabs {
-                flex-direction: column;
-            }
-
-            .tab-button {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .workflow-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .workflow-content {
-                padding: 20px;
-            }
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            color: #95a5a6;
-            font-size: 0.9em;
-        }
-
-        .btn-shutdown {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 0.95em;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 1000;
-        }
-
-        .btn-shutdown:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
-            background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
-        }
-
-        .btn-shutdown:active {
-            transform: translateY(0);
-        }
-
-        /* Custom Confirm Modal */
-        .confirm-modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 3000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .confirm-modal-overlay.visible {
-            display: flex;
-        }
-
-        .confirm-modal-box {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 360px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: modalSlideIn 0.2s ease;
-        }
-
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
-
-        .confirm-modal-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        .confirm-modal-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 8px;
-        }
-
-        .confirm-modal-message {
-            font-size: 14px;
-            color: #718096;
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
-
-        .confirm-modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .confirm-modal-buttons button {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            min-width: 80px;
-            transition: all 0.2s;
-        }
-
-        .confirm-modal-buttons .btn-cancel {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-
-        .confirm-modal-buttons .btn-cancel:hover {
-            background: #cbd5e0;
-        }
-
-        .confirm-modal-buttons .btn-confirm {
-            background: #48bb78;
-            color: white;
-        }
-
-        .confirm-modal-buttons .btn-confirm:hover {
-            background: #38a169;
-        }
-
-        .confirm-modal-buttons .btn-danger {
-            background: #f56565;
-            color: white;
-        }
-
-        .confirm-modal-buttons .btn-danger:hover {
-            background: #e53e3e;
-        }
-    </style>
-</head>
-<body>
-    <div class="title-container">
-        <h1 class="page-title">약국 적정 재고 솔루션</h1>
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="title-container">
+    <h1 class="page-title">약국 적정 재고 솔루션</h1>
+</div>
+
+<div class="container">
+    <div class="header">
+        <div class="header-toolbar">
+            <button class="toolbar-item db-status" onclick="toggleDbInfo()">
+                <span>✅</span>
+                <span>DB 준비 완료</span>
+                <span style="opacity: 0.8;">({{ db_stats.recent_count }}개)</span>
+                <span class="toolbar-arrow" id="db-info-arrow">▼</span>
+            </button>
+            <a href="/drug/manage" class="toolbar-item util-link">
+                <span>⚙️</span>
+                <span>약품 개별 관리</span>
+            </a>
+            <a href="/patient/manage" class="toolbar-item util-link">
+                <span>👤</span>
+                <span>환자 관리</span>
+            </a>
+        </div>
+
+        <div class="db-info-panel" id="db-info-content">
+            <div class="db-info-panel-body">
+                <div class="db-stats-grid">
+                    <div class="db-stat-card">
+                        <div class="stat-value" id="recent-count">{{ db_stats.recent_count }}</div>
+                        <div class="stat-label">최신 재고</div>
+                    </div>
+                    <div class="db-stat-card">
+                        <div class="stat-value" id="processed-total">{{ db_stats.processed_stats.total }}</div>
+                        <div class="stat-label">시계열 통계</div>
+                    </div>
+                    {% if db_stats.processed_stats.by_type %}
+                    {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
+                    <div class="db-stat-card">
+                        <div class="stat-value">{{ count }}</div>
+                        <div class="stat-label">{{ drug_type }}</div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+
+                <div class="db-bottom-row">
+                    {% if db_stats.data_period %}
+                    <div class="db-stat-card period">
+                        <div class="stat-label">📅 데이터 기간</div>
+                        <div class="stat-value" id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</div>
+                    </div>
+                    {% endif %}
+                    <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
+                        <span>🔄</span>
+                        <span>DB 재생성</span>
+                    </button>
+                </div>
+
+                <div class="rebuild-status" id="rebuild-status"></div>
+            </div>
+        </div>
     </div>
 
-    <div class="container">
-        <div class="header">
-            <div class="header-toolbar">
-                <button class="toolbar-item db-status" onclick="toggleDbInfo()">
-                    <span>✅</span>
-                    <span>DB 준비 완료</span>
-                    <span style="opacity: 0.8;">({{ db_stats.recent_count }}개)</span>
-                    <span class="toolbar-arrow" id="db-info-arrow">▼</span>
-                </button>
-                <a href="/drug/manage" class="toolbar-item util-link">
-                    <span>⚙️</span>
-                    <span>약품 개별 관리</span>
-                </a>
-                <a href="/patient/manage" class="toolbar-item util-link">
-                    <span>👤</span>
-                    <span>환자 관리</span>
-                </a>
-            </div>
+    <div class="tabs-container">
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('timeseries')">
+                <span>📊</span>
+                <span>분석 보고서</span>
+            </button>
+            <button class="tab-button order-tab" onclick="switchTab('order')">
+                <span>📦</span>
+                <span>주문 수량 산출</span>
+            </button>
+        </div>
 
-            <div class="db-info-panel" id="db-info-content">
-                <div class="db-info-panel-body">
-                    <div class="db-stats-grid">
-                        <div class="db-stat-card">
-                            <div class="stat-value" id="recent-count">{{ db_stats.recent_count }}</div>
-                            <div class="stat-label">최신 재고</div>
+        <div id="tab-timeseries" class="tab-content active">
+            <div class="workflow-content">
+                <div class="workflow-grid">
+                    <div class="workflow-section section-new">
+                        <h3>✨ 새로 생성하기</h3>
+                        <div class="action-buttons">
+                            <a href="/workflow/simple" class="btn-new">📊 재고 관리 보고서</a>
+                            <a href="/workflow/volatility" class="btn-new">📈 고변동성 약품 보고서</a>
                         </div>
-                        <div class="db-stat-card">
-                            <div class="stat-value" id="processed-total">{{ db_stats.processed_stats.total }}</div>
-                            <div class="stat-label">시계열 통계</div>
-                        </div>
-                        {% if db_stats.processed_stats.by_type %}
-                        {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
-                        <div class="db-stat-card">
-                            <div class="stat-value">{{ count }}</div>
-                            <div class="stat-label">{{ drug_type }}</div>
-                        </div>
-                        {% endfor %}
-                        {% endif %}
                     </div>
 
-                    <div class="db-bottom-row">
-                        {% if db_stats.data_period %}
-                        <div class="db-stat-card period">
-                            <div class="stat-label">📅 데이터 기간</div>
-                            <div class="stat-value" id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</div>
+                    <div class="workflow-section section-history">
+                        <h3>📁 과거 보고서</h3>
+                        <div id="timeseries-reports" class="report-list">
+                            <div class="loading-state">로딩 중...</div>
                         </div>
-                        {% endif %}
-                        <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
-                            <span>🔄</span>
-                            <span>DB 재생성</span>
+                        <button class="btn-delete-all" id="btn-delete-all-timeseries" onclick="deleteAllReports('timeseries')" style="display: none;">
+                            <span>전체 삭제</span>
                         </button>
                     </div>
-
-                    <div class="rebuild-status" id="rebuild-status"></div>
                 </div>
             </div>
         </div>
 
-        <div class="tabs-container">
-            <div class="tabs">
-                <button class="tab-button active" onclick="switchTab('timeseries')">
-                    <span>📊</span>
-                    <span>분석 보고서</span>
-                </button>
-                <button class="tab-button order-tab" onclick="switchTab('order')">
-                    <span>📦</span>
-                    <span>주문 수량 산출</span>
-                </button>
-            </div>
-
-            <!-- 분석 보고서 탭 -->
-            <div id="tab-timeseries" class="tab-content active">
-                <div class="workflow-content">
-                    <div class="workflow-grid">
-                        <!-- 새로 생성 섹션 -->
-                        <div class="workflow-section section-new">
-                            <h3>✨ 새로 생성하기</h3>
-                            <div class="action-buttons">
-                                <a href="/workflow/simple" class="btn-new">📊 재고 관리 보고서</a>
-                                <a href="/workflow/volatility" class="btn-new">📈 고변동성 약품 보고서</a>
-                            </div>
-                        </div>
-
-                        <!-- 과거 보고서 섹션 -->
-                        <div class="workflow-section section-history">
-                            <h3>📁 과거 보고서</h3>
-                            <div id="timeseries-reports" class="report-list">
-                                <div class="loading-state">로딩 중...</div>
-                            </div>
-                            <button class="btn-delete-all" id="btn-delete-all-timeseries" onclick="deleteAllReports('timeseries')" style="display: none;">
-                                <span>전체 삭제</span>
-                            </button>
+        <div id="tab-order" class="tab-content">
+            <div class="workflow-content">
+                <div class="workflow-grid">
+                    <div class="workflow-section section-new">
+                        <h3>✨ 새로 생성하기</h3>
+                        <div class="action-buttons">
+                            <a href="/workflow/order" class="btn-new order">📦 주문 수량 산출</a>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- 주문 수량 산출 탭 -->
-            <div id="tab-order" class="tab-content">
-                <div class="workflow-content">
-                    <div class="workflow-grid">
-                        <!-- 새로 생성 섹션 -->
-                        <div class="workflow-section section-new">
-                            <h3>✨ 새로 생성하기</h3>
-                            <div class="action-buttons">
-                                <a href="/workflow/order" class="btn-new order">📦 주문 수량 산출</a>
-                            </div>
+                    <div class="workflow-section section-history">
+                        <h3>📁 과거 보고서</h3>
+                        <div id="order-reports" class="report-list">
+                            <div class="loading-state">로딩 중...</div>
                         </div>
-
-                        <!-- 과거 보고서 섹션 -->
-                        <div class="workflow-section section-history">
-                            <h3>📁 과거 보고서</h3>
-                            <div id="order-reports" class="report-list">
-                                <div class="loading-state">로딩 중...</div>
-                            </div>
-                            <button class="btn-delete-all" id="btn-delete-all-order" onclick="deleteAllReports('order')" style="display: none;">
-                                <span>전체 삭제</span>
-                            </button>
-                        </div>
+                        <button class="btn-delete-all" id="btn-delete-all-order" onclick="deleteAllReports('order')" style="display: none;">
+                            <span>전체 삭제</span>
+                        </button>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>약국 적정 재고 솔루션 v3.0</p>
-        </div>
-    </div>
-
-    <button class="btn-shutdown" onclick="shutdownServer()">⏻ 종료</button>
-
-    <!-- Custom Confirm Modal -->
-    <div id="confirmModal" class="confirm-modal-overlay">
-        <div class="confirm-modal-box">
-            <div class="confirm-modal-icon" id="confirmModalIcon">⚠️</div>
-            <div class="confirm-modal-title" id="confirmModalTitle">확인</div>
-            <div class="confirm-modal-message" id="confirmModalMessage">진행하시겠습니까?</div>
-            <div class="confirm-modal-buttons">
-                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
-                <button class="btn-confirm" id="confirmModalBtn" onclick="closeConfirmModal(true)">확인</button>
             </div>
         </div>
     </div>
 
-    <script>
-        // Custom Confirm Modal
-        let confirmCallback = null;
+    <div class="footer">
+        <p>약국 적정 재고 솔루션 v3.0</p>
+    </div>
+</div>
+{% endblock %}
 
-        function showConfirmModal(options) {
-            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+{% block component_scripts %}
+<script src="{{ url_for('static', filename='js/components/toast.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+<script src="{{ url_for('static', filename='js/components/shutdown.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+{% endblock %}
 
-            document.getElementById('confirmModalIcon').textContent = icon;
-            document.getElementById('confirmModalTitle').textContent = title;
-            document.getElementById('confirmModalMessage').innerHTML = message;
+{% block page_scripts %}
+<script>
+    function toggleDbInfo() {
+        var content = document.getElementById('db-info-content');
+        var arrow = document.getElementById('db-info-arrow');
+        content.classList.toggle('open');
+        arrow.classList.toggle('open');
+    }
 
-            const confirmBtn = document.getElementById('confirmModalBtn');
-            confirmBtn.textContent = confirmText;
-            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
-
-            document.getElementById('confirmModal').classList.add('visible');
-
-            return new Promise(resolve => {
-                confirmCallback = resolve;
-            });
-        }
-
-        function closeConfirmModal(result) {
-            document.getElementById('confirmModal').classList.remove('visible');
-            if (confirmCallback) {
-                confirmCallback(result);
-                confirmCallback = null;
-            }
-        }
-
-        // ESC 키로 모달 닫기
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && document.getElementById('confirmModal').classList.contains('visible')) {
-                closeConfirmModal(false);
-            }
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-button').forEach(function(btn) {
+            btn.classList.remove('active');
         });
 
-        // DB 정보 토글
-        function toggleDbInfo() {
-            const content = document.getElementById('db-info-content');
-            const arrow = document.getElementById('db-info-arrow');
-
-            content.classList.toggle('open');
-            arrow.classList.toggle('open');
-        }
-
-        // 탭 전환
-        function switchTab(tabName) {
-            // 모든 탭 버튼 비활성화
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-
-            // 모든 탭 컨텐츠 숨기기
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-
-            // 선택한 탭 활성화
-            const tabButton = event.target.closest('.tab-button');
-            if (tabButton) {
-                tabButton.classList.add('active');
-            }
-
-            const tabContent = document.getElementById(`tab-${tabName}`);
-            if (tabContent) {
-                tabContent.classList.add('active');
-            }
-
-            // 해당 탭의 보고서가 아직 로드되지 않았으면 로드
-            if (!reportsLoaded[tabName]) {
-                loadReports(tabName);
-                reportsLoaded[tabName] = true;
-            }
-        }
-
-        // 보고서 로드 상태 추적
-        const reportsLoaded = {
-            timeseries: false,
-            order: false
-        };
-
-        // 보고서 목록 로드
-        async function loadReports(type) {
-            const container = document.getElementById(`${type}-reports`);
-
-            try {
-                const response = await fetch(`/api/list-reports/${type}`);
-                const data = await response.json();
-
-                if (data.error) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">⚠️</div>
-                            <div>오류: ${data.error}</div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                if (!data.reports || data.reports.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📭</div>
-                            <div>생성된 보고서가 없습니다</div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // 보고서 목록 렌더링
-                let html = '';
-                data.reports.forEach(report => {
-                    let typeClass = '';
-                    let typeText = '';
-                    let styleText = '';
-
-                    if (type === 'timeseries') {
-                        typeText = report.drug_type;
-                        typeClass = report.drug_type === '전문약' ? 'dispense' : 'sale';
-
-                        // 단순/상세 보고서 표시
-                        if (report.report_style) {
-                            styleText = `<span style="font-size: 0.85em; opacity: 0.8;">[${report.report_style}]</span> `;
-                            if (report.ma_months) {
-                                styleText += `<span style="font-size: 0.75em; opacity: 0.7;">(${report.ma_months})</span>`;
-                            }
-                        }
-                    } else {
-                        typeText = '주문 수량 산출';
-                        typeClass = 'order';
-                    }
-
-                    html += `
-                        <div class="report-item" data-filename="${report.filename}" data-type="${type}">
-                            <a href="/reports/${report.filename}" target="_blank" class="report-item-link">
-                                <div class="report-item-time">🕐 ${report.created_at}</div>
-                                <div class="report-item-type ${typeClass}">
-                                    ${styleText}${typeText}
-                                </div>
-                            </a>
-                            <button class="btn-delete-report" onclick="deleteReport('${report.filename}', '${type}')" title="보고서 삭제">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    `;
-                });
-
-                container.innerHTML = html;
-
-                // 보고서가 있으면 전체 삭제 버튼 표시
-                const deleteAllBtn = document.getElementById(`btn-delete-all-${type}`);
-                if (deleteAllBtn) {
-                    deleteAllBtn.style.display = 'flex';
-                }
-            } catch (error) {
-                console.error('보고서 로드 실패:', error);
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">❌</div>
-                        <div>보고서를 불러오는데 실패했습니다</div>
-                    </div>
-                `;
-            }
-        }
-
-        // 페이지 로드 시 첫 번째 탭의 보고서 로드
-        document.addEventListener('DOMContentLoaded', function() {
-            loadReports('timeseries');
-            reportsLoaded.timeseries = true;
+        document.querySelectorAll('.tab-content').forEach(function(content) {
+            content.classList.remove('active');
         });
 
-        // DB 재생성
-        async function rebuildDatabase() {
-            const confirmed = await showConfirmModal({
-                icon: '⚠️',
-                title: 'DB 재생성',
-                message: '기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>이 작업은 수 분이 소요될 수 있습니다.',
-                confirmText: '재생성',
-                isDanger: true
-            });
-            if (!confirmed) {
+        var tabButton = event.target.closest('.tab-button');
+        if (tabButton) {
+            tabButton.classList.add('active');
+        }
+
+        var tabContent = document.getElementById('tab-' + tabName);
+        if (tabContent) {
+            tabContent.classList.add('active');
+        }
+
+        if (!reportsLoaded[tabName]) {
+            loadReports(tabName);
+            reportsLoaded[tabName] = true;
+        }
+    }
+
+    var reportsLoaded = {
+        timeseries: false,
+        order: false
+    };
+
+    async function loadReports(type) {
+        var container = document.getElementById(type + '-reports');
+
+        try {
+            var response = await fetch('/api/list-reports/' + type);
+            var data = await response.json();
+
+            if (data.error) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\u26A0\uFE0F</div><div>\uC624\uB958: ' + data.error + '</div></div>';
                 return;
             }
 
-            const button = document.getElementById('btn-rebuild-db');
-            const statusDiv = document.getElementById('rebuild-status');
+            if (!data.reports || data.reports.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\uD83D\uDCED</div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
+                return;
+            }
 
-            // 버튼 비활성화
-            button.disabled = true;
-            button.innerHTML = '<span>⏳</span><span>DB 재생성 중...</span>';
+            var html = '';
+            data.reports.forEach(function(report) {
+                var typeClass = '';
+                var typeText = '';
+                var styleText = '';
 
-            // 로딩 상태 표시
-            statusDiv.className = 'rebuild-status loading';
-            statusDiv.innerHTML = '🔄 DB 재생성 중입니다. 잠시만 기다려주세요...';
+                if (type === 'timeseries') {
+                    typeText = report.drug_type;
+                    typeClass = report.drug_type === '\uC804\uBB38\uC57D' ? 'dispense' : 'sale';
 
-            try {
-                const response = await fetch('/api/rebuild-db', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    // 성공 상태 표시
-                    statusDiv.className = 'rebuild-status success';
-                    statusDiv.innerHTML = '✅ ' + data.message;
-
-                    // DB 통계 업데이트
-                    if (data.stats) {
-                        document.getElementById('recent-count').textContent = data.stats.recent_count;
-                        document.getElementById('processed-total').textContent = data.stats.processed_stats.total;
-
-                        // 약품 유형별 통계 업데이트
-                        const drugTypeStats = document.getElementById('drug-type-stats');
-                        if (drugTypeStats && data.stats.processed_stats.by_type) {
-                            let html = '';
-                            for (const [drugType, count] of Object.entries(data.stats.processed_stats.by_type)) {
-                                html += `<p style="margin-left: 20px;">• ${drugType}: ${count}개</p>`;
-                            }
-                            drugTypeStats.innerHTML = html;
-                        }
-
-                        // 데이터 기간 업데이트
-                        if (data.stats.data_period) {
-                            const dataPeriod = document.getElementById('data-period');
-                            if (dataPeriod) {
-                                dataPeriod.textContent = `${data.stats.data_period.start_month} ~ ${data.stats.data_period.end_month} (${data.stats.data_period.total_months}개월)`;
-                            }
+                    if (report.report_style) {
+                        styleText = '<span style="font-size: 0.85em; opacity: 0.8;">[' + report.report_style + ']</span> ';
+                        if (report.ma_months) {
+                            styleText += '<span style="font-size: 0.75em; opacity: 0.7;">(' + report.ma_months + ')</span>';
                         }
                     }
-
-                    // 3초 후 상태 메시지 숨기기
-                    setTimeout(() => {
-                        statusDiv.className = 'rebuild-status';
-                        statusDiv.innerHTML = '';
-                    }, 5000);
                 } else {
-                    // 에러 상태 표시
-                    statusDiv.className = 'rebuild-status error';
-                    statusDiv.innerHTML = '❌ ' + (data.error || '알 수 없는 오류가 발생했습니다.');
+                    typeText = '\uC8FC\uBB38 \uC218\uB7C9 \uC0B0\uCD9C';
+                    typeClass = 'order';
                 }
-            } catch (error) {
-                console.error('DB 재생성 실패:', error);
-                statusDiv.className = 'rebuild-status error';
-                statusDiv.innerHTML = '❌ DB 재생성 중 오류가 발생했습니다: ' + error.message;
-            } finally {
-                // 버튼 다시 활성화
-                button.disabled = false;
-                button.innerHTML = '<span>🔄</span><span>DB 재생성 (새 데이터 반영)</span>';
-            }
-        }
 
-        // 전체 보고서 삭제
-        async function deleteAllReports(reportType) {
-            const container = document.getElementById(`${reportType}-reports`);
-            const reportItems = container.querySelectorAll('.report-item');
-            const count = reportItems.length;
-
-            if (count === 0) {
-                alert('삭제할 보고서가 없습니다.');
-                return;
-            }
-
-            const confirmed = await showConfirmModal({
-                icon: '🗑️',
-                title: '전체 보고서 삭제',
-                message: `정말 <strong>${count}개</strong>의 보고서를 모두 삭제하시겠습니까?<br><br>삭제된 보고서는 복구할 수 없습니다.`,
-                confirmText: '전체 삭제',
-                isDanger: true
+                html += '<div class="report-item" data-filename="' + report.filename + '" data-type="' + type + '">' +
+                    '<a href="/reports/' + report.filename + '" target="_blank" class="report-item-link">' +
+                    '<div class="report-item-time">\uD83D\uDD50 ' + report.created_at + '</div>' +
+                    '<div class="report-item-type ' + typeClass + '">' + styleText + typeText + '</div>' +
+                    '</a>' +
+                    '<button class="btn-delete-report" onclick="deleteReport(\'' + report.filename + '\', \'' + type + '\')" title="\uBCF4\uACE0\uC11C \uC0AD\uC81C">' +
+                    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />' +
+                    '</svg></button></div>';
             });
-            if (!confirmed) {
-                return;
+
+            container.innerHTML = html;
+
+            var deleteAllBtn = document.getElementById('btn-delete-all-' + type);
+            if (deleteAllBtn) {
+                deleteAllBtn.style.display = 'flex';
             }
+        } catch (error) {
+            console.error('\uBCF4\uACE0\uC11C \uB85C\uB4DC \uC2E4\uD328:', error);
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\u274C</div><div>\uBCF4\uACE0\uC11C\uB97C \uBD88\uB7EC\uC624\uB294\uB370 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4</div></div>';
+        }
+    }
 
-            const deleteAllBtn = document.getElementById(`btn-delete-all-${reportType}`);
-            deleteAllBtn.disabled = true;
-            deleteAllBtn.innerHTML = '<span>⏳</span><span>삭제 중...</span>';
+    document.addEventListener('DOMContentLoaded', function() {
+        loadReports('timeseries');
+        reportsLoaded.timeseries = true;
+    });
 
-            let successCount = 0;
-            let failCount = 0;
+    async function rebuildDatabase() {
+        var confirmed = await showConfirmModal({
+            icon: '\u26A0\uFE0F',
+            title: 'DB \uC7AC\uC0DD\uC131',
+            message: '\uAE30\uC874 DB\uAC00 \uC0AD\uC81C\uB418\uACE0 data/ \uD3F4\uB354\uC758 \uBAA8\uB4E0 \uD30C\uC77C\uC744 \uAE30\uBC18\uC73C\uB85C \uC0C8\uB85C\uC6B4 DB\uAC00 \uC0DD\uC131\uB429\uB2C8\uB2E4.<br><br>\uC774 \uC791\uC5C5\uC740 \uC218 \uBD84\uC774 \uC18C\uC694\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
+            confirmText: '\uC7AC\uC0DD\uC131',
+            isDanger: true
+        });
+        if (!confirmed) return;
 
-            for (const item of reportItems) {
-                const filename = item.dataset.filename;
-                try {
-                    const response = await fetch('/api/delete-report', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ filename, report_type: reportType })
-                    });
+        var button = document.getElementById('btn-rebuild-db');
+        var statusDiv = document.getElementById('rebuild-status');
 
-                    if (response.ok) {
-                        successCount++;
-                        item.remove();
-                    } else {
-                        failCount++;
+        button.disabled = true;
+        button.innerHTML = '<span>\u23F3</span><span>DB \uC7AC\uC0DD\uC131 \uC911...</span>';
+
+        statusDiv.className = 'rebuild-status loading';
+        statusDiv.innerHTML = '\uD83D\uDD04 DB \uC7AC\uC0DD\uC131 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC\uB9CC \uAE30\uB2E4\uB824\uC8FC\uC138\uC694...';
+
+        try {
+            var response = await fetch('/api/rebuild-db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            var data = await response.json();
+
+            if (response.ok && data.success) {
+                statusDiv.className = 'rebuild-status success';
+                statusDiv.innerHTML = '\u2705 ' + data.message;
+
+                if (data.stats) {
+                    document.getElementById('recent-count').textContent = data.stats.recent_count;
+                    document.getElementById('processed-total').textContent = data.stats.processed_stats.total;
+
+                    if (data.stats.data_period) {
+                        var dataPeriod = document.getElementById('data-period');
+                        if (dataPeriod) {
+                            dataPeriod.textContent = data.stats.data_period.start_month + ' ~ ' + data.stats.data_period.end_month + ' (' + data.stats.data_period.total_months + '\uAC1C\uC6D4)';
+                        }
                     }
-                } catch (error) {
-                    failCount++;
                 }
-            }
 
-            // 결과 표시
-            if (failCount === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <div>생성된 보고서가 없습니다</div>
-                    </div>
-                `;
-                deleteAllBtn.style.display = 'none';
+                setTimeout(function() {
+                    statusDiv.className = 'rebuild-status';
+                    statusDiv.innerHTML = '';
+                }, 5000);
             } else {
-                alert(`${successCount}개 삭제 완료, ${failCount}개 실패`);
-                deleteAllBtn.disabled = false;
-                deleteAllBtn.innerHTML = '<span>🗑️</span><span>전체 삭제</span>';
+                statusDiv.className = 'rebuild-status error';
+                statusDiv.innerHTML = '\u274C ' + (data.error || '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
             }
+        } catch (error) {
+            console.error('DB \uC7AC\uC0DD\uC131 \uC2E4\uD328:', error);
+            statusDiv.className = 'rebuild-status error';
+            statusDiv.innerHTML = '\u274C DB \uC7AC\uC0DD\uC131 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: ' + error.message;
+        } finally {
+            button.disabled = false;
+            button.innerHTML = '<span>\uD83D\uDD04</span><span>DB \uC7AC\uC0DD\uC131</span>';
+        }
+    }
+
+    async function deleteAllReports(reportType) {
+        var container = document.getElementById(reportType + '-reports');
+        var reportItems = container.querySelectorAll('.report-item');
+        var count = reportItems.length;
+
+        if (count === 0) {
+            showToast('삭제할 보고서가 없습니다.', 'info');
+            return;
         }
 
-        // 보고서 삭제
-        async function deleteReport(filename, reportType) {
-            const confirmed = await showConfirmModal({
-                icon: '🗑️',
-                title: '보고서 삭제',
-                message: '이 보고서를 삭제하시겠습니까?<br><br>삭제된 보고서는 복구할 수 없습니다.',
-                confirmText: '삭제',
-                isDanger: true
-            });
-            if (!confirmed) {
-                return;
-            }
+        var confirmed = await showConfirmModal({
+            icon: '\uD83D\uDDD1\uFE0F',
+            title: '\uC804\uCCB4 \uBCF4\uACE0\uC11C \uC0AD\uC81C',
+            message: '\uC815\uB9D0 <strong>' + count + '\uAC1C</strong>\uC758 \uBCF4\uACE0\uC11C\uB97C \uBAA8\uB450 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?<br><br>\uC0AD\uC81C\uB41C \uBCF4\uACE0\uC11C\uB294 \uBCF5\uAD6C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.',
+            confirmText: '\uC804\uCCB4 \uC0AD\uC81C',
+            isDanger: true
+        });
+        if (!confirmed) return;
 
+        var deleteAllBtn = document.getElementById('btn-delete-all-' + reportType);
+        deleteAllBtn.disabled = true;
+        deleteAllBtn.innerHTML = '<span>\u23F3</span><span>\uC0AD\uC81C \uC911...</span>';
+
+        var successCount = 0;
+        var failCount = 0;
+
+        for (var i = 0; i < reportItems.length; i++) {
+            var item = reportItems[i];
+            var filename = item.dataset.filename;
             try {
-                const response = await fetch('/api/delete-report', {
+                var response = await fetch('/api/delete-report', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        filename: filename,
-                        report_type: reportType
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    // 해당 보고서 항목을 DOM에서 제거
-                    const reportItem = document.querySelector(`.report-item[data-filename="${filename}"]`);
-                    if (reportItem) {
-                        reportItem.style.transition = 'all 0.3s ease';
-                        reportItem.style.opacity = '0';
-                        reportItem.style.transform = 'translateX(-20px)';
-                        setTimeout(() => {
-                            reportItem.remove();
-
-                            // 목록이 비었으면 빈 상태 표시
-                            const container = document.getElementById(`${reportType}-reports`);
-                            if (container && container.querySelectorAll('.report-item').length === 0) {
-                                container.innerHTML = `
-                                    <div class="empty-state">
-                                        <div class="empty-state-icon">📭</div>
-                                        <div>생성된 보고서가 없습니다</div>
-                                    </div>
-                                `;
-                            }
-                        }, 300);
-                    }
-                } else {
-                    alert('삭제 실패: ' + (data.error || '알 수 없는 오류'));
-                }
-            } catch (error) {
-                console.error('보고서 삭제 실패:', error);
-                alert('보고서 삭제 중 오류가 발생했습니다.');
-            }
-        }
-
-        // 서버 종료
-        async function shutdownServer() {
-            const confirmed = await showConfirmModal({
-                icon: '⏻',
-                title: '애플리케이션 종료',
-                message: '정말 애플리케이션을 종료하시겠습니까?',
-                confirmText: '종료',
-                isDanger: true
-            });
-            if (!confirmed) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/shutdown', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename, report_type: reportType })
                 });
 
                 if (response.ok) {
-                    // 페이지 비활성화
-                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                    successCount++;
+                    item.remove();
                 } else {
-                    console.error('종료 요청에 실패했습니다.');
+                    failCount++;
                 }
             } catch (error) {
-                // 서버가 종료되면서 fetch가 실패할 수 있음 (정상 동작)
-                console.log('서버 종료됨');
-                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                failCount++;
             }
         }
-    </script>
-</body>
-</html>
+
+        if (failCount === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\uD83D\uDCED</div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
+            deleteAllBtn.style.display = 'none';
+        } else {
+            showToast(successCount + '개 삭제 완료, ' + failCount + '개 실패', 'warning');
+            deleteAllBtn.disabled = false;
+            deleteAllBtn.innerHTML = '<span>\uD83D\uDDD1\uFE0F</span><span>\uC804\uCCB4 \uC0AD\uC81C</span>';
+        }
+    }
+
+    async function deleteReport(filename, reportType) {
+        var confirmed = await showConfirmModal({
+            icon: '\uD83D\uDDD1\uFE0F',
+            title: '\uBCF4\uACE0\uC11C \uC0AD\uC81C',
+            message: '\uC774 \uBCF4\uACE0\uC11C\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?<br><br>\uC0AD\uC81C\uB41C \uBCF4\uACE0\uC11C\uB294 \uBCF5\uAD6C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.',
+            confirmText: '\uC0AD\uC81C',
+            isDanger: true
+        });
+        if (!confirmed) return;
+
+        try {
+            var response = await fetch('/api/delete-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename, report_type: reportType })
+            });
+
+            var data = await response.json();
+
+            if (response.ok && data.success) {
+                var reportItem = document.querySelector('.report-item[data-filename="' + filename + '"]');
+                if (reportItem) {
+                    reportItem.style.transition = 'all 0.3s ease';
+                    reportItem.style.opacity = '0';
+                    reportItem.style.transform = 'translateX(-20px)';
+                    setTimeout(function() {
+                        reportItem.remove();
+
+                        var container = document.getElementById(reportType + '-reports');
+                        if (container && container.querySelectorAll('.report-item').length === 0) {
+                            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\uD83D\uDCED</div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
+                        }
+                    }, 300);
+                }
+            } else {
+                showToast('삭제 실패: ' + (data.error || '알 수 없는 오류'), 'error');
+            }
+        } catch (error) {
+            console.error('\uBCF4\uACE0\uC11C \uC0AD\uC81C \uC2E4\uD328:', error);
+            showToast('보고서 삭제 중 오류가 발생했습니다.', 'error');
+        }
+    }
+</script>
+{% endblock %}

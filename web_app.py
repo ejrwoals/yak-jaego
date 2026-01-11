@@ -39,6 +39,7 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
 app.config['UPLOAD_FOLDER'] = 'uploads'  # 임시 업로드 폴더
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 제한
+app.config['VERSION'] = os.getenv('APP_VERSION', str(int(datetime.now().timestamp())))  # 캐시 버스팅용 버전
 
 # 허용된 파일 확장자
 ALLOWED_EXTENSIONS = {'csv', 'xls', 'xlsx'}

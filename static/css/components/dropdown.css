@@ -1,0 +1,94 @@
+/* Jaego - Custom Dropdown Component CSS */
+
+.custom-dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.custom-dropdown-selected {
+    width: 100%;
+    padding: 15px 40px 15px 15px;
+    border: 2px solid var(--color-border, #e2e8f0);
+    border-radius: 10px;
+    font-size: 1em;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+}
+
+.custom-dropdown-selected:hover {
+    border-color: var(--color-border-hover, #cbd5e0);
+}
+
+.custom-dropdown-selected.open {
+    border-color: var(--color-primary, #555);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+    border-radius: 10px 10px 0 0;
+}
+
+.custom-dropdown-selected::after {
+    content: '\25BC';
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #718096;
+    font-size: 0.8em;
+    transition: transform 0.3s;
+}
+
+.custom-dropdown-selected.open::after {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.custom-dropdown-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid var(--color-primary, #555);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+    z-index: var(--z-dropdown, 100);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.custom-dropdown-options.open {
+    max-height: 300px;
+    overflow-y: auto;
+    opacity: 1;
+}
+
+.custom-dropdown-option {
+    padding: 12px 15px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.custom-dropdown-option:hover {
+    background: var(--color-surface-hover, #f7fafc);
+}
+
+.custom-dropdown-option.selected {
+    background: var(--color-surface-active, #edf2f7);
+    font-weight: 600;
+}
+
+.custom-dropdown-option.selected::before {
+    content: '\2713';
+    color: var(--color-primary, #555);
+    font-weight: bold;
+}
+
+.custom-dropdown-option:last-child {
+    border-radius: 0 0 8px 8px;
+}
