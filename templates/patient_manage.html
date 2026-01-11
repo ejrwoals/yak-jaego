@@ -798,6 +798,109 @@
         .modal-error-message::before {
             content: '⚠️';
         }
+
+        /* Confirm Modal */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .confirm-modal-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-modal-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: confirmModalSlideIn 0.2s ease;
+        }
+
+        @keyframes confirmModalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .confirm-modal-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .confirm-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            min-width: 80px;
+            transition: all 0.2s;
+        }
+
+        .confirm-modal-buttons .btn-cancel {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .confirm-modal-buttons .btn-cancel:hover {
+            background: #cbd5e0;
+        }
+
+        .confirm-modal-buttons .btn-confirm {
+            background: #48bb78;
+            color: white;
+        }
+
+        .confirm-modal-buttons .btn-confirm:hover {
+            background: #38a169;
+        }
+
+        .confirm-modal-buttons .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .confirm-modal-buttons .btn-danger:hover {
+            background: #e53e3e;
+        }
     </style>
 </head>
 <body>
@@ -1522,9 +1625,15 @@
         async function deletePatient() {
             if (!currentPatientId) return;
 
-            if (!confirm('이 환자를 삭제하시겠습니까?\n연결된 모든 약품 정보도 함께 삭제됩니다.')) {
-                return;
-            }
+            const confirmed = await showConfirmModal({
+                icon: '🗑️',
+                title: '환자 삭제',
+                message: '이 환자를 삭제하시겠습니까?<br><br>연결된 모든 약품 정보도 함께 삭제됩니다.',
+                confirmText: '삭제',
+                isDanger: true
+            });
+
+            if (!confirmed) return;
 
             try {
                 const response = await fetch(`/api/patient/${currentPatientId}`, {
@@ -1561,16 +1670,53 @@
             }[m]));
         }
 
-        function shutdownServer() {
-            if (!confirm('애플리케이션을 종료하시겠습니까?')) return;
+        async function shutdownServer() {
+            const confirmed = await showConfirmModal({
+                icon: '⏻',
+                title: '앱 종료',
+                message: '애플리케이션을 종료하시겠습니까?',
+                confirmText: '종료',
+                isDanger: true
+            });
+
+            if (!confirmed) return;
 
             fetch('/api/shutdown', { method: 'POST' })
                 .then(() => {
-                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">&#9989; 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
                 })
                 .catch(() => {
-                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">&#9989; 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
+                    document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 1.5em; color: #2c3e50;">✅ 애플리케이션이 종료되었습니다. 이 창을 닫아주세요.</div>';
                 });
+        }
+
+        // Confirm Modal Functions
+        let confirmCallback = null;
+
+        function showConfirmModal(options) {
+            const { icon = '⚠️', title, message, confirmText = '확인', isDanger = false } = options;
+
+            document.getElementById('confirmModalIcon').textContent = icon;
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').innerHTML = message;
+
+            const confirmBtn = document.getElementById('confirmModalBtn');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+
+            document.getElementById('confirmModal').classList.add('visible');
+
+            return new Promise(resolve => {
+                confirmCallback = resolve;
+            });
+        }
+
+        function closeConfirmModal(result) {
+            document.getElementById('confirmModal').classList.remove('visible');
+            if (confirmCallback) {
+                confirmCallback(result);
+                confirmCallback = null;
+            }
         }
 
         // Modal content check functions
@@ -1655,7 +1801,14 @@
         // ESC to close modal
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                // 커스텀 확인 모달이 열려있으면 취소
+                // 새 커스텀 확인 모달이 열려있으면 취소
+                const customConfirmModal = document.getElementById('confirmModal');
+                if (customConfirmModal && customConfirmModal.classList.contains('visible')) {
+                    closeConfirmModal(false);
+                    return;
+                }
+
+                // 기존 커스텀 확인 모달이 열려있으면 취소
                 const confirmCloseModal = document.getElementById('confirmCloseModal');
                 if (confirmCloseModal.classList.contains('visible')) {
                     cancelCloseConfirm();
@@ -1664,9 +1817,9 @@
 
                 const patientModal = document.getElementById('patientModal');
                 const dosageModal = document.getElementById('dosageModal');
-                const confirmModal = document.getElementById('confirmDrugModal');
+                const confirmDrugModal = document.getElementById('confirmDrugModal');
 
-                if (confirmModal.classList.contains('visible')) {
+                if (confirmDrugModal.classList.contains('visible')) {
                     closeConfirmDrugModal(false);  // 약품 등록 확인 모달은 그냥 닫기
                 } else if (dosageModal.classList.contains('visible')) {
                     tryCloseDosageModal();
@@ -1681,5 +1834,18 @@
             if (e.target === this) closeConfirmDrugModal(false);
         });
     </script>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon" id="confirmModalIcon">⚠️</div>
+            <div class="confirm-modal-title" id="confirmModalTitle">확인</div>
+            <div class="confirm-modal-message" id="confirmModalMessage">진행하시겠습니까?</div>
+            <div class="confirm-modal-buttons">
+                <button class="btn-cancel" onclick="closeConfirmModal(false)">취소</button>
+                <button class="btn-confirm" id="confirmModalBtn" onclick="closeConfirmModal(true)">확인</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
