@@ -387,9 +387,9 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             tooltip_text = html_escape(' | '.join(tooltip_parts))
             threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 

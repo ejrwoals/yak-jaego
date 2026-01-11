@@ -1076,9 +1076,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
@@ -2146,9 +2146,9 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
@@ -2308,9 +2308,9 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
@@ -2450,9 +2450,9 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
@@ -2598,9 +2598,9 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
@@ -2741,9 +2741,9 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
@@ -3048,9 +3048,9 @@ def generate_hidden_drugs_section(df, ma_months, months):
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"재고 임계값: {th['절대재고_임계값']}개 이하")
+                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"런웨이 임계값: {th['런웨이_임계값']}개월 미만")
+                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
             if tooltip_parts:
                 tooltip_text = html_escape(' | '.join(tooltip_parts))
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
