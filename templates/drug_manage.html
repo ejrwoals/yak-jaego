@@ -1199,9 +1199,9 @@
                     <!-- 3. Threshold -->
                     <div class="form-section" id="sectionThreshold">
                         <div class="form-section-title">
-                            ⚙️ 재고 부족 감지 임계값 설정
+                            ⚙️ 최소 안전 재고량 개별 설정
                             <span class="help-icon">?
-                                <span class="tooltip">설정한 임계값 이하로 재고가 떨어지면 재고 현황 리포트에서 해당 약품이 강조 표시됩니다. 재고 임계값은 수량 기준, 런웨이 임계값은 현재 사용 속도 대비 남은 개월 수 기준입니다.</span>
+                                <span class="tooltip">설정한 임계값 이하로 재고가 떨어지면 재고 현황 리포트에서 해당 약품이 강조 표시됩니다. 재고 임계값은 수량 기준, 런웨이 임계값은 현재 사용 속도 대비 남은 개월 수 기준입니다. 환자 등록 시 1회 최대 처방량으로 자동 설정됩니다.</span>
                             </span>
                         </div>
                         <div class="current-value-display" id="currentThreshold">현재 설정: 디폴트 기준값 사용</div>
@@ -1226,7 +1226,7 @@
                         <div class="form-section-title">
                             👤 환자 태그
                             <span class="help-icon">?
-                                <span class="tooltip">특정 환자에게만 처방되는 약품에 환자를 태그하고 방문 주기와 1회 처방량을 입력하면, 최소 재고 버퍼를 계산할 수 있습니다.</span>
+                                <span class="tooltip">특정 환자에게만 처방되는 약품에 환자를 태그하세요. 환자 등록 시 1회 최대 처방량이 최소 안전 재고량으로 자동 설정됩니다. 방문 주기와 처방량을 입력하면 동시 방문 대비용 재고도 계산할 수 있습니다.</span>
                             </span>
                         </div>
                         <div class="patient-tags" id="patientTags">
@@ -1246,9 +1246,9 @@
                     <!-- 5. Buffer Calculation -->
                     <div class="form-section" id="sectionBuffer">
                         <div class="form-section-title">
-                            📊 최소 재고 버퍼 계산
+                            📊 동시 방문 대비용 재고 계산
                             <span class="help-icon">?
-                                <span class="tooltip">연결된 환자들의 방문 주기와 처방량을 기반으로, 동시 방문 확률을 계산하여 필요한 최소 재고 버퍼를 산출합니다. 포아송 이항분포 모델을 사용합니다.</span>
+                                <span class="tooltip">연결된 환자들의 방문 주기와 처방량을 기반으로, 동시 방문 확률을 계산하여 필요한 안전 재고량을 산출합니다. 포아송 이항분포 모델을 사용합니다.</span>
                             </span>
                         </div>
                         <div class="buffer-calc-container">
@@ -1695,11 +1695,12 @@
                         lastCalculatedBuffer = null;
                         document.getElementById('bufferResult').style.display = 'none';
                         updateBufferCalcButton();
-                        checkMinThreshold();  // 최소 임계값 체크
 
-                        // Disable save button initially
+                        // Disable save button initially (checkMinThreshold 전에 실행해야 자동 설정 시 활성화됨)
                         document.getElementById('saveBtn').disabled = true;
                         clearAllChangedMarkers();
+
+                        checkMinThreshold();  // 최소 임계값 체크 (자동 설정 시 저장 버튼 활성화)
 
                         document.getElementById('drugModal').classList.add('visible');
                     }

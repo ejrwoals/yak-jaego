@@ -1809,6 +1809,27 @@ def link_drug_to_patient(patient_id):
         result = drug_patient_map_db.link_patient(drug_code, patient_id, dosage)
 
         if result['success']:
+            # 자동 임계값 설정: 연결된 환자들의 최대 처방량으로 임계값 자동 설정
+            try:
+                patients_with_dosage = drug_patient_map_db.get_patients_for_drug_with_dosage(drug_code)
+                if patients_with_dosage:
+                    max_dosage = max(p.get('1회_처방량', 1) for p in patients_with_dosage)
+                    current_threshold = drug_thresholds_db.get_threshold(drug_code)
+
+                    # 임계값이 없거나 최대 처방량보다 낮으면 자동 설정
+                    if current_threshold is None or current_threshold.get('절대재고_임계값') is None:
+                        drug_thresholds_db.upsert_threshold(drug_code, 절대재고_임계값=max_dosage)
+                    elif current_threshold.get('절대재고_임계값', 0) < max_dosage:
+                        # 기존 런웨이 임계값 유지하면서 재고 임계값만 업데이트
+                        drug_thresholds_db.upsert_threshold(
+                            drug_code,
+                            절대재고_임계값=max_dosage,
+                            런웨이_임계값=current_threshold.get('런웨이_임계값')
+                        )
+            except Exception as threshold_error:
+                # 임계값 자동 설정 실패해도 연결은 성공으로 처리
+                print(f"자동 임계값 설정 실패 (무시됨): {threshold_error}")
+
             return jsonify({
                 'status': 'success',
                 'message': result['message']
