@@ -131,9 +131,10 @@ def get_all_thresholds():
 def get_threshold_dict():
     """
     전체 임계값을 {약품코드: 설정} 딕셔너리로 반환 (빠른 조회용)
+    환자 이름 목록도 함께 포함
 
     Returns:
-        dict: {약품코드: {'절대재고_임계값': N, '런웨이_임계값': M, ...}}
+        dict: {약품코드: {'절대재고_임계값': N, '런웨이_임계값': M, '환자목록': [...], ...}}
     """
     try:
         conn = get_connection()
@@ -148,12 +149,25 @@ def get_threshold_dict():
         rows = cursor.fetchall()
         conn.close()
 
+        # 환자 정보 가져오기
+        drug_patients = {}
+        try:
+            import drug_patient_map_db
+            for row in rows:
+                drug_code = row[0]
+                patients = drug_patient_map_db.get_patients_for_drug(drug_code)
+                drug_patients[drug_code] = [p.get('환자명', '') for p in patients if p.get('환자명')]
+        except ImportError:
+            pass
+
         result = {}
         for row in rows:
-            result[row[0]] = {
+            drug_code = row[0]
+            result[drug_code] = {
                 '절대재고_임계값': row[1],
                 '런웨이_임계값': row[2],
-                '활성화': bool(row[3])
+                '활성화': bool(row[3]),
+                '환자목록': drug_patients.get(drug_code, [])
             }
         return result
     except Exception as e:

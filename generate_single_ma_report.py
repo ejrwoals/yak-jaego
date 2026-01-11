@@ -399,7 +399,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 padding: 10px 14px;
                 border-radius: 8px;
                 font-size: 12px;
-                white-space: nowrap;
+                white-space: pre-line;
                 font-weight: normal;
                 line-height: 1.5;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -1076,11 +1076,14 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 상태 확인
@@ -1154,7 +1157,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 var tooltipText = element.getAttribute('data-tooltip');
                 floatingTooltip = document.createElement('div');
                 floatingTooltip.className = 'threshold-tooltip-floating';
-                floatingTooltip.textContent = tooltipText;
+                floatingTooltip.innerHTML = tooltipText;
                 document.body.appendChild(floatingTooltip);
 
                 // 위치 계산 (아이콘 아래에 표시)
@@ -2146,11 +2149,14 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 인라인 차트용 데이터 생성
@@ -2308,11 +2314,14 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
@@ -2450,11 +2459,14 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
@@ -2598,11 +2610,14 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
@@ -2741,11 +2756,14 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 숨김 버튼 상태
@@ -3048,11 +3066,14 @@ def generate_hidden_drugs_section(df, ma_months, months):
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
-                tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         html += f"""

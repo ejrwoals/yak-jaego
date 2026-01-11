@@ -387,10 +387,13 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 재고 수준: {th['절대재고_임계값']}개")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"개별 설정된 최소 안전 런웨이: {th['런웨이_임계값']}개월")
-            tooltip_text = html_escape(' | '.join(tooltip_parts))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+            if th.get('환자목록'):
+                patient_names = html_escape(', '.join(th['환자목록']))
+                tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
+            tooltip_text = '<br>'.join(tooltip_parts)
             threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
         # 메모 버튼 생성
@@ -1042,7 +1045,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     # 개별 설정 모달 HTML (상태 카드 섹션 + 테이블)
     custom_threshold_modal = f"""
     <div id="customThresholdModal" class="modal">
-        <div class="modal-content" style="max-width: 1100px;">
+        <div class="modal-content" style="max-width: 1200px;">
             <div class="modal-header" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
                 <h3>⚙️ 개별 임계값 설정 약품 (<span id="customThresholdModalCount">{custom_threshold_count}</span>개)</h3>
                 <span class="modal-close" onclick="closeCustomThresholdModal()">&times;</span>
@@ -1723,11 +1726,11 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         }}
         /* 개별 임계값 모달 (8컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 재고임계값, 런웨이임계값, 메모 */
         .modal-table-threshold th:nth-child(1),
-        .modal-table-threshold td:nth-child(1) {{ width: 22%; }}  /* 약품명 */
+        .modal-table-threshold td:nth-child(1) {{ width: 22%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }}  /* 약품명 */
         .modal-table-threshold th:nth-child(2),
         .modal-table-threshold td:nth-child(2) {{ width: 10%; white-space: nowrap; }}  /* 약품코드 */
         .modal-table-threshold th:nth-child(3),
-        .modal-table-threshold td:nth-child(3) {{ width: 10%; }}  /* 제약회사 */
+        .modal-table-threshold td:nth-child(3) {{ width: 10%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }}  /* 제약회사 */
         .modal-table-threshold th:nth-child(4),
         .modal-table-threshold td:nth-child(4) {{ width: 8%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
         .modal-table-threshold th:nth-child(5),
@@ -1992,10 +1995,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         }}
         .ct-table-content {{
             margin-top: 12px;
+            overflow-x: auto;
         }}
         .modal-table-threshold {{
             table-layout: fixed;
             width: 100%;
+            min-width: 1000px;
         }}
         /* 테이블 상태 행 스타일 */
         .modal-table-threshold tr.status-urgent {{
@@ -2180,7 +2185,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             padding: 10px 14px;
             border-radius: 8px;
             font-size: 12px;
-            white-space: nowrap;
+            white-space: pre-line;
             font-weight: normal;
             line-height: 1.5;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -2710,7 +2715,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             var tooltipText = element.getAttribute('data-tooltip');
             floatingTooltip = document.createElement('div');
             floatingTooltip.className = 'threshold-tooltip-floating';
-            floatingTooltip.textContent = tooltipText;
+            floatingTooltip.innerHTML = tooltipText;
             document.body.appendChild(floatingTooltip);
 
             // 위치 계산 (아이콘 아래에 표시)
