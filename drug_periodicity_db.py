@@ -15,7 +15,11 @@ drug_periodicity_db.py
 
 import os
 import sqlite3
+import math
+import json
 from datetime import datetime
+
+import processed_inventory_db
 
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'drug_periodicity.sqlite3')
@@ -233,38 +237,97 @@ def normalize_feature(value, feature_name):
     elif feature_name == 'periodicity_score':
         # 0 ~ 100+ → 0 ~ 1
         return min(1, value / 50)
+    elif feature_name == 'avg_interval':
+        # 로그 변환으로 짧은 주기에서 더 세밀한 구분
+        # 1개월: 0.0, 2개월: 0.39, 3개월: 0.61, 6개월+: 1.0
+        max_interval = 6.0
+        if value <= 1:
+            return 0.0
+        if value >= max_interval:
+            return 1.0
+        return math.log(value) / math.log(max_interval)
+    elif feature_name == 'peak_count':
+        # 0 ~ 15+ → 0 ~ 1 (피크 수 정규화)
+        return min(1.0, value / 15.0)
     else:
         return value
 
 
-def get_feature_vector(약품코드):
+def calculate_active_months_ratio(약품코드):
     """
-    약품의 정규화된 Feature Vector 반환
+    약품의 활성 월 비율 계산 (0이 아닌 달의 비율)
 
     Args:
         약품코드 (str): 약품 코드
 
     Returns:
-        list[float] 또는 None: [interval_cv_norm, height_cv_norm, acf_max_norm, periodicity_score_norm]
+        float: 활성 월 비율 (0~1)
+    """
+    try:
+        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        if not processed:
+            return 0.5  # 기본값
+
+        usage_json = processed.get('월별_조제수량_리스트', '[]')
+
+        # JSON 파싱
+        if isinstance(usage_json, str):
+            usage_list = json.loads(usage_json)
+        else:
+            usage_list = usage_json
+
+        if not usage_list:
+            return 0.5
+
+        # 0이 아닌 달 수 계산
+        total_months = len(usage_list)
+        active_months = sum(1 for u in usage_list if u > 0)
+
+        return active_months / total_months if total_months > 0 else 0.5
+
+    except Exception as e:
+        print(f"활성 월 비율 계산 실패: {e}")
+        return 0.5
+
+
+def get_feature_vector(약품코드):
+    """
+    약품의 정규화된 Feature Vector 반환 (6차원)
+
+    Args:
+        약품코드 (str): 약품 코드
+
+    Returns:
+        list[float] 또는 None: [
+            avg_interval_norm,      # 방문 주기 (로그 변환)
+            interval_cv_norm,       # 간격 규칙성
+            height_cv_norm,         # 사용량 일관성
+            acf_max_norm,           # 자기상관
+            peak_count_norm,        # 피크 밀도
+            active_months_ratio     # 활동 비율
+        ]
     """
     metrics = get_periodicity(약품코드)
     if not metrics:
         return None
 
     return [
+        normalize_feature(metrics['avg_interval'], 'avg_interval'),
         normalize_feature(metrics['interval_cv'], 'interval_cv'),
         normalize_feature(metrics['height_cv'], 'height_cv'),
         normalize_feature(metrics['acf_max'], 'acf_max'),
-        normalize_feature(metrics['periodicity_score'], 'periodicity_score')
+        normalize_feature(metrics['peak_count'], 'peak_count'),
+        calculate_active_months_ratio(약품코드)
     ]
 
 
 def get_all_feature_vectors():
     """
-    전체 약품의 Feature Vector 딕셔너리 반환
+    전체 약품의 Feature Vector 딕셔너리 반환 (6차원)
 
     Returns:
-        dict: {약품코드: [interval_cv_norm, height_cv_norm, acf_max_norm, periodicity_score_norm], ...}
+        dict: {약품코드: [avg_interval_norm, interval_cv_norm, height_cv_norm,
+                         acf_max_norm, peak_count_norm, active_months_ratio], ...}
     """
     all_data = get_all_periodicity()
 
@@ -272,10 +335,12 @@ def get_all_feature_vectors():
     for item in all_data:
         약품코드 = item['약품코드']
         result[약품코드] = [
+            normalize_feature(item['avg_interval'], 'avg_interval'),
             normalize_feature(item['interval_cv'], 'interval_cv'),
             normalize_feature(item['height_cv'], 'height_cv'),
             normalize_feature(item['acf_max'], 'acf_max'),
-            normalize_feature(item['periodicity_score'], 'periodicity_score')
+            normalize_feature(item['peak_count'], 'peak_count'),
+            calculate_active_months_ratio(약품코드)
         ]
 
     return result

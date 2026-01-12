@@ -10,7 +10,7 @@ suggestion_engine.py
 
 import json
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine_similarity
+from scipy.spatial.distance import cdist
 
 import drug_periodicity_db
 import suggestion_db
@@ -23,8 +23,19 @@ import inventory_db
 # 상수
 MIN_PATIENTS_FOR_ACTIVATION = 5  # 제안 기능 활성화에 필요한 최소 환자 수
 MIN_PEAKS_FOR_SUGGESTION = 3     # 제안 대상 최소 피크 수
-SKIP_PENALTY = 0.5               # 건너뛰기당 페널티
-REGISTERED_PENALTY = 0.3         # 이미 등록된 약품당 페널티
+DEFAULT_K = 3                    # KNN의 K값
+MAX_MONTHLY_USAGE = 200          # 월평균 사용량 임계값 (이 이상이면 추천 제외)
+
+# Feature 가중치 (6차원)
+# 순서: avg_interval, interval_cv, height_cv, acf_max, peak_count, active_months_ratio
+FEATURE_WEIGHTS = np.array([
+    2.0,   # avg_interval_norm: 방문 주기 (최우선)
+    1.5,   # interval_cv_norm: 규칙성
+    1.0,   # height_cv_norm: 사용량 일관성
+    0.8,   # acf_max_norm: 자기상관
+    0.5,   # peak_count_norm: 피크 밀도
+    0.5,   # active_months_ratio: 활동 비율
+])
 
 
 def get_activation_status():
@@ -92,17 +103,55 @@ def get_registered_drug_codes():
     return drug_patient_map_db.get_all_drugs_with_patients()
 
 
-def calculate_centroid():
+def weighted_euclidean_knn(candidate_vectors, registered_vectors, k=DEFAULT_K):
     """
-    등록된 약품들의 평균 Feature Vector (centroid) 계산
+    Weighted Euclidean Distance + KNN 기반 유사도 계산
+
+    Args:
+        candidate_vectors: (N, 6) 후보 약품 Feature Matrix
+        registered_vectors: (M, 6) 등록 약품 Feature Matrix
+        k: KNN의 K값 (기본 3)
 
     Returns:
-        numpy.array 또는 None: [4] 크기의 평균 벡터
+        numpy.array: (N,) 각 후보의 유사도 점수 (0~1)
+    """
+    if len(registered_vectors) == 0:
+        return np.zeros(len(candidate_vectors))
+
+    # numpy 배열로 변환
+    candidate_vectors = np.array(candidate_vectors)
+    registered_vectors = np.array(registered_vectors)
+
+    # 가중치 적용 (sqrt를 곱해서 거리 계산에 제곱이 들어가면 원래 가중치가 됨)
+    weights = np.sqrt(FEATURE_WEIGHTS)
+    weighted_candidates = candidate_vectors * weights
+    weighted_registered = registered_vectors * weights
+
+    # 거리 행렬 계산 (N x M)
+    distances = cdist(weighted_candidates, weighted_registered, 'euclidean')
+
+    # KNN: 가장 가까운 K개의 평균 거리
+    k = min(k, distances.shape[1])
+    sorted_distances = np.sort(distances, axis=1)
+    knn_distances = np.mean(sorted_distances[:, :k], axis=1)
+
+    # 거리 → 유사도 변환 (0~1)
+    similarities = 1 / (1 + knn_distances)
+
+    return similarities
+
+
+def get_registered_feature_vectors():
+    """
+    등록된 약품들의 Feature Vector 목록 반환
+
+    Returns:
+        list[list[float]]: Feature Vector 목록 (6차원)
     """
     registered_codes = get_registered_drug_codes()
 
     if not registered_codes:
-        return None
+        return []
 
     vectors = []
     for code in registered_codes:
@@ -110,36 +159,12 @@ def calculate_centroid():
         if fv:
             vectors.append(fv)
 
-    if not vectors:
-        return None
-
-    # 평균 계산
-    return np.mean(vectors, axis=0)
-
-
-def cosine_sim(vec_a, vec_b):
-    """
-    코사인 유사도 계산
-
-    Args:
-        vec_a: 벡터 A
-        vec_b: 벡터 B
-
-    Returns:
-        float: 유사도 (0 ~ 1)
-    """
-    if vec_a is None or vec_b is None:
-        return 0.0
-
-    vec_a = np.array(vec_a).reshape(1, -1)
-    vec_b = np.array(vec_b).reshape(1, -1)
-
-    return float(sklearn_cosine_similarity(vec_a, vec_b)[0][0])
+    return vectors
 
 
 def get_suggestion_candidates():
     """
-    제안 후보 약품 목록 생성
+    제안 후보 약품 목록 생성 (KNN 기반)
 
     Returns:
         list[dict]: 후보 약품 정보 목록
@@ -156,51 +181,64 @@ def get_suggestion_candidates():
     # 건너뛰기 기록
     skip_counts = suggestion_db.get_all_skips()
 
-    # centroid 계산
-    centroid = calculate_centroid()
+    # 등록된 약품들의 Feature Vector
+    registered_vectors = get_registered_feature_vectors()
 
-    candidates = []
+    # 후보 약품들의 Feature Vector 수집
+    # 월평균 사용량이 높은 약품은 제외 (정규분포로 근사 가능한 수준)
+    candidate_codes = []
+    candidate_vectors = []
 
     for 약품코드 in periodic_drugs:
-        # Feature Vector 조회
+        # 월평균 사용량 확인 (임계값 이상이면 제외)
+        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        if processed:
+            monthly_avg = processed.get('1년_이동평균', 0) or 0
+            if monthly_avg >= MAX_MONTHLY_USAGE:
+                continue  # 월평균 사용량이 높으면 추천 대상에서 제외
+
         fv = drug_periodicity_db.get_feature_vector(약품코드)
-        if not fv:
-            continue
+        if fv:
+            candidate_codes.append(약품코드)
+            candidate_vectors.append(fv)
 
-        # 유사도 계산
-        if centroid is not None:
-            similarity = cosine_sim(centroid, fv)
-        else:
-            # centroid가 없으면 주기성 점수로 대체
-            periodicity = drug_periodicity_db.get_periodicity(약품코드)
-            similarity = periodicity['periodicity_score'] / 100 if periodicity else 0
+    if not candidate_codes:
+        return []
 
+    # KNN 기반 유사도 계산
+    if registered_vectors:
+        similarities = weighted_euclidean_knn(candidate_vectors, registered_vectors)
+    else:
+        # 등록된 약품이 없으면 주기성 점수로 대체
+        similarities = np.zeros(len(candidate_codes))
+        for i, code in enumerate(candidate_codes):
+            periodicity = drug_periodicity_db.get_periodicity(code)
+            if periodicity and periodicity['periodicity_score']:
+                similarities[i] = periodicity['periodicity_score'] / 100
+
+    # 결과 구성
+    candidates = []
+    for i, 약품코드 in enumerate(candidate_codes):
         # 이미 등록된 환자 수
         registered_count = drug_patient_map_db.get_patient_count_for_drug(약품코드)
 
         # 건너뛰기 횟수
         skip_count = skip_counts.get(약품코드, 0)
 
-        # 페널티 적용
-        registered_penalty = min(registered_count, 3) * REGISTERED_PENALTY / 3  # 최대 0.3
-        skip_penalty = min(skip_count, 3) * SKIP_PENALTY / 3  # 최대 0.5
-
-        adjusted_similarity = max(0, similarity - registered_penalty - skip_penalty)
-
         candidates.append({
             '약품코드': 약품코드,
-            'similarity': similarity,
-            'adjusted_similarity': adjusted_similarity,
+            'similarity': float(similarities[i]),
             'registered_count': registered_count,
             'skip_count': skip_count,
             'is_registered': 약품코드 in registered_codes
         })
 
     # 정렬: 건너뛰기 안 한 것 → 미등록 → 유사도 높은 순
+    # (skip_count, registered_count는 UI 편의성을 위한 정렬)
     candidates.sort(key=lambda x: (
-        x['skip_count'],           # 건너뛰기 적은 순
+        x['skip_count'],           # 건너뛰기 적은 순 (피로감 방지)
         x['registered_count'],     # 등록 환자 적은 순
-        -x['adjusted_similarity']  # 유사도 높은 순
+        -x['similarity']           # 유사도 높은 순 (KNN 기반)
     ))
 
     return candidates
@@ -438,11 +476,12 @@ def get_drug_suggestion(약품코드):
     # 등록된 환자 수
     registered_count = drug_patient_map_db.get_patient_count_for_drug(약품코드)
 
-    # 유사도 계산
-    centroid = calculate_centroid()
+    # KNN 기반 유사도 계산
+    registered_vectors = get_registered_feature_vectors()
     fv = drug_periodicity_db.get_feature_vector(약품코드)
-    if centroid is not None and fv:
-        similarity = cosine_sim(centroid, fv)
+    if registered_vectors and fv:
+        similarities = weighted_euclidean_knn([fv], registered_vectors)
+        similarity = float(similarities[0])
     else:
         similarity = periodicity['periodicity_score'] / 100 if periodicity else 0
 
