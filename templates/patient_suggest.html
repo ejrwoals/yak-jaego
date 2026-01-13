@@ -205,6 +205,74 @@
         margin-bottom: 8px;
     }
 
+    /* 유사 약품 섹션 */
+    .similar-drugs-container {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+
+    .similar-drugs-title {
+        font-size: 12px;
+        color: #6b7280;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .similar-drugs-title .icon {
+        font-size: 14px;
+    }
+
+    .similar-drug-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: #f8fafc;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        border-left: 3px solid #10b981;
+    }
+
+    .similar-drug-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .similar-drug-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .similar-drug-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: #1f2937;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 280px;
+    }
+
+    .similar-drug-interval {
+        font-size: 11px;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+
+    .similar-drug-badge {
+        flex-shrink: 0;
+        background: #ecfdf5;
+        color: #059669;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-left: 10px;
+    }
+
     /* 등록 폼 */
     .register-form {
         background: white;
@@ -1757,6 +1825,7 @@
                     '<div class="sparkline-title">월별 사용량 추이</div>' +
                     sparklineSvg +
                 '</div>' +
+                buildSimilarDrugsSection(suggestion.nearest_k_drugs) +
                 '<div class="register-form">' +
                     '<div class="form-title">환자 등록</div>' +
                     '<div class="form-row">' +
@@ -1982,6 +2051,36 @@
             console.error('환자 등록 실패:', error);
             showToast('환자 등록 중 오류가 발생했습니다.', 'error');
         }
+    }
+
+    // 유사 약품 섹션 생성
+    function buildSimilarDrugsSection(nearestDrugs) {
+        if (!nearestDrugs || nearestDrugs.length === 0) {
+            return '';
+        }
+
+        var html = '<div class="similar-drugs-container">' +
+            '<div class="similar-drugs-title">' +
+                '<span class="icon">🔗</span>' +
+                '유사한 패턴의 등록 약품 (KNN K=' + nearestDrugs.length + ')' +
+            '</div>';
+
+        for (var i = 0; i < nearestDrugs.length; i++) {
+            var drug = nearestDrugs[i];
+            var intervalText = drug.avg_interval ? drug.avg_interval.toFixed(1) + '개월 주기' : '-';
+            var rankBadge = (i + 1) + '위';
+
+            html += '<div class="similar-drug-item">' +
+                '<div class="similar-drug-info">' +
+                    '<div class="similar-drug-name">' + drug.drug_name + '</div>' +
+                    '<div class="similar-drug-interval">' + intervalText + '</div>' +
+                '</div>' +
+                '<div class="similar-drug-badge">' + rankBadge + '</div>' +
+            '</div>';
+        }
+
+        html += '</div>';
+        return html;
     }
 
     // 스파크라인 SVG 생성

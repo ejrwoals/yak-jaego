@@ -162,6 +162,64 @@ def get_registered_feature_vectors():
     return vectors
 
 
+def get_nearest_k_drugs(candidate_code, k=DEFAULT_K):
+    """
+    후보 약품과 가장 가까운 K개의 등록 약품 반환
+
+    Args:
+        candidate_code (str): 후보 약품 코드
+        k (int): 반환할 약품 수
+
+    Returns:
+        list[dict]: 가장 가까운 K개 등록 약품 정보
+            [{
+                'drug_code': str,
+                'drug_name': str,
+                'avg_interval': float,
+                'distance': float
+            }, ...]
+    """
+    # 후보 약품의 Feature Vector
+    candidate_fv = drug_periodicity_db.get_feature_vector(candidate_code)
+    if not candidate_fv:
+        return []
+
+    # 등록된 약품들의 정보
+    registered_codes = get_registered_drug_codes()
+    if not registered_codes:
+        return []
+
+    # 각 등록 약품과의 거리 계산
+    candidate_fv = np.array(candidate_fv)
+    weights = np.sqrt(FEATURE_WEIGHTS)
+    weighted_candidate = candidate_fv * weights
+
+    distances_info = []
+    for code in registered_codes:
+        fv = drug_periodicity_db.get_feature_vector(code)
+        if fv:
+            weighted_fv = np.array(fv) * weights
+            distance = np.linalg.norm(weighted_candidate - weighted_fv)
+
+            # 약품 정보 조회
+            processed = processed_inventory_db.get_drug_by_code(code)
+            periodicity = drug_periodicity_db.get_periodicity(code)
+
+            drug_name = processed.get('약품명', '') if processed else code
+            avg_interval = periodicity['avg_interval'] if periodicity else None
+
+            distances_info.append({
+                'drug_code': code,
+                'drug_name': drug_name,
+                'avg_interval': avg_interval,
+                'distance': float(distance)
+            })
+
+    # 거리 순으로 정렬하여 K개 반환
+    distances_info.sort(key=lambda x: x['distance'])
+    return distances_info[:k]
+
+
 def get_suggestion_candidates():
     """
     제안 후보 약품 목록 생성 (KNN 기반)
@@ -196,6 +254,11 @@ def get_suggestion_candidates():
             monthly_avg = processed.get('1년_이동평균', 0) or 0
             if monthly_avg >= MAX_MONTHLY_USAGE:
                 continue  # 월평균 사용량이 높으면 추천 대상에서 제외
+
+        # avg_interval == 1인 약품 제외 (매달 사용되는 약품은 개별 환자 등록 불필요)
+        periodicity = drug_periodicity_db.get_periodicity(약품코드)
+        if periodicity and periodicity['avg_interval'] == 1.0:
+            continue
 
         fv = drug_periodicity_db.get_feature_vector(약품코드)
         if fv:
@@ -311,6 +374,9 @@ def get_next_suggestion():
         except:
             monthly_usage = []
 
+    # 가장 가까운 K개 등록 약품
+    nearest_k_drugs = get_nearest_k_drugs(약품코드)
+
     return {
         'drug_code': 약품코드,
         'drug_name': drug_name,
@@ -326,7 +392,8 @@ def get_next_suggestion():
         'monthly_usage': monthly_usage,
         'skip_count': best['skip_count'],
         'registered_count': best['registered_count'],
-        'remaining_count': len(candidates) - 1
+        'remaining_count': len(candidates) - 1,
+        'nearest_k_drugs': nearest_k_drugs  # KNN에서 가장 가까운 K개 등록 약품
     }
 
 
