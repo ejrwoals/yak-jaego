@@ -50,7 +50,9 @@ def get_activation_status():
             'active': bool,
             'patient_count': int,
             'patients_with_drugs': int,
+            'drugs_with_patients': int,
             'required_count': int,
+            'required_drugs': int,
             'message': str
         }
     """
@@ -66,6 +68,9 @@ def get_activation_status():
             if drugs:
                 patients_with_drugs += 1
 
+        # 환자가 등록된 약품 수
+        drugs_with_patients = len(drug_patient_map_db.get_all_drugs_with_patients())
+
         is_active = patients_with_drugs >= MIN_PATIENTS_FOR_ACTIVATION
 
         if is_active:
@@ -78,7 +83,9 @@ def get_activation_status():
             'active': is_active,
             'patient_count': patient_count,
             'patients_with_drugs': patients_with_drugs,
+            'drugs_with_patients': drugs_with_patients,
             'required_count': MIN_PATIENTS_FOR_ACTIVATION,
+            'required_drugs': DEFAULT_K,
             'message': message
         }
 
@@ -88,7 +95,9 @@ def get_activation_status():
             'active': False,
             'patient_count': 0,
             'patients_with_drugs': 0,
+            'drugs_with_patients': 0,
             'required_count': MIN_PATIENTS_FOR_ACTIVATION,
+            'required_drugs': DEFAULT_K,
             'message': f'오류: {str(e)}'
         }
 
@@ -248,16 +257,28 @@ def get_suggestion_candidates():
     candidate_vectors = []
 
     for 약품코드 in periodic_drugs:
-        # 월평균 사용량 확인 (임계값 이상이면 제외)
+        # 약품 정보 조회
         processed = processed_inventory_db.get_drug_by_code(약품코드)
-        if processed:
-            monthly_avg = processed.get('1년_이동평균', 0) or 0
-            if monthly_avg >= MAX_MONTHLY_USAGE:
-                continue  # 월평균 사용량이 높으면 추천 대상에서 제외
+        if not processed:
+            continue
+
+        # 전문약만 추천 대상 (일반약 제외)
+        drug_type = processed.get('약품유형', '')
+        if drug_type != '전문약':
+            continue
+
+        # 월평균 사용량 확인 (임계값 이상이면 제외)
+        monthly_avg = processed.get('1년_이동평균', 0) or 0
+        if monthly_avg >= MAX_MONTHLY_USAGE:
+            continue  # 월평균 사용량이 높으면 추천 대상에서 제외
 
         # avg_interval == 1인 약품 제외 (매달 사용되는 약품은 개별 환자 등록 불필요)
         periodicity = drug_periodicity_db.get_periodicity(약품코드)
         if periodicity and periodicity['avg_interval'] == 1.0:
+            continue
+
+        # 건너뛴 약품 제외 (건너뛴 약품 목록에서 별도 확인 가능)
+        if skip_counts.get(약품코드, 0) > 0:
             continue
 
         fv = drug_periodicity_db.get_feature_vector(약품코드)
@@ -352,10 +373,12 @@ def get_next_suggestion():
     company = ''
     drug_type = ''
 
+    monthly_avg = 0
     if processed:
         drug_name = processed.get('약품명', '')
         company = processed.get('제약회사', '')
         drug_type = processed.get('약품유형', '')
+        monthly_avg = processed.get('1년_이동평균', 0) or 0
 
     # 현재 재고
     current_stock = 0
@@ -374,6 +397,11 @@ def get_next_suggestion():
         except:
             monthly_usage = []
 
+    # 평균 피크 높이 계산 (0이 아닌 값들의 평균)
+    non_zero_usage = [v for v in monthly_usage if v > 0]
+    avg_peak_height = sum(non_zero_usage) / len(non_zero_usage) if non_zero_usage else 0
+    active_months = len(non_zero_usage)
+
     # 가장 가까운 K개 등록 약품
     nearest_k_drugs = get_nearest_k_drugs(약품코드)
 
@@ -383,11 +411,12 @@ def get_next_suggestion():
         'company': company,
         'drug_type': drug_type,
         'similarity': round(best['similarity'] * 100, 1),  # 퍼센트로
-        'periodicity_score': periodicity['periodicity_score'] if periodicity else 0,
         'avg_interval': periodicity['avg_interval'] if periodicity else None,
         'interval_cv': periodicity['interval_cv'] if periodicity else None,
+        'avg_peak_height': round(avg_peak_height, 1),
         'height_cv': periodicity['height_cv'] if periodicity else None,
-        'peak_count': periodicity['peak_count'] if periodicity else 0,
+        'active_months': active_months,
+        'monthly_avg': round(monthly_avg, 1),
         'current_stock': current_stock,
         'monthly_usage': monthly_usage,
         'skip_count': best['skip_count'],
@@ -577,7 +606,7 @@ def get_suggestion_stats():
 
     Returns:
         dict: {
-            'total_periodic': int,       # 주기적 약품 총 수
+            'total_periodic': int,       # 주기적 약품 총 수 (전문약만)
             'already_registered': int,   # 이미 등록된 약품 수
             'pending': int,              # 미등록 약품 수
             'skipped': int,              # 건너뛴 약품 수
@@ -589,15 +618,38 @@ def get_suggestion_stats():
     skip_counts = suggestion_db.get_all_skips()
     new_drugs = drug_periodicity_db.get_new_drugs(max_peaks=MIN_PEAKS_FOR_SUGGESTION - 1)
 
-    already_registered = len([d for d in periodic_drugs if d in registered_codes])
-    skipped = len([d for d in periodic_drugs if skip_counts.get(d, 0) > 0])
-    pending = len(periodic_drugs) - already_registered
+    # 전문약만 필터링 (get_suggestion_candidates와 동일한 기준)
+    filtered_periodic_drugs = []
+    skipped_count = 0
+    for 약품코드 in periodic_drugs:
+        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        if not processed:
+            continue
+        # 전문약만
+        if processed.get('약품유형', '') != '전문약':
+            continue
+        # 월평균 사용량 임계값 초과 제외
+        monthly_avg = processed.get('1년_이동평균', 0) or 0
+        if monthly_avg >= MAX_MONTHLY_USAGE:
+            continue
+        # avg_interval == 1 제외
+        periodicity = drug_periodicity_db.get_periodicity(약품코드)
+        if periodicity and periodicity['avg_interval'] == 1.0:
+            continue
+        # 건너뛴 약품은 분모에서 제외 (gamification 효과)
+        if skip_counts.get(약품코드, 0) > 0:
+            skipped_count += 1
+            continue
+        filtered_periodic_drugs.append(약품코드)
+
+    already_registered = len([d for d in filtered_periodic_drugs if d in registered_codes])
+    pending = len(filtered_periodic_drugs) - already_registered
 
     return {
-        'total_periodic': len(periodic_drugs),
+        'total_periodic': len(filtered_periodic_drugs),
         'already_registered': already_registered,
         'pending': pending,
-        'skipped': skipped,
+        'skipped': skipped_count,
         'new_drugs': len(new_drugs)
     }
 

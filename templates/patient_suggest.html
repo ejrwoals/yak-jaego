@@ -205,6 +205,14 @@
         margin-bottom: 8px;
     }
 
+    .chart-container {
+        position: relative;
+    }
+
+    .chart-container svg {
+        display: block;
+    }
+
     /* 유사 약품 섹션 */
     .similar-drugs-container {
         background: white;
@@ -213,10 +221,21 @@
         margin-bottom: 20px;
     }
 
+    .similar-drugs-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .similar-drugs-header:hover {
+        opacity: 0.8;
+    }
+
     .similar-drugs-title {
         font-size: 12px;
         color: #6b7280;
-        margin-bottom: 12px;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -224,6 +243,16 @@
 
     .similar-drugs-title .icon {
         font-size: 14px;
+    }
+
+    .similar-drugs-toggle {
+        font-size: 10px;
+        color: #9ca3af;
+        transition: transform 0.2s;
+    }
+
+    .similar-drugs-list {
+        margin-top: 12px;
     }
 
     .similar-drug-item {
@@ -1748,14 +1777,14 @@
 
     // 비활성 상태 표시
     function showInactiveState(status) {
-        var remaining = status.required_count - status.patients_with_drugs;
         document.getElementById('mainContent').innerHTML =
             '<div class="inactive-state">' +
                 '<div class="inactive-icon">👥</div>' +
                 '<div class="inactive-title">약품 추천 기능을 사용하려면</div>' +
                 '<div class="inactive-message">' +
-                    '약품이 등록된 환자가 ' + remaining + '명 더 필요합니다.<br>' +
-                    '현재 ' + status.patients_with_drugs + '명의 환자에게 약품이 등록되어 있습니다.' +
+                    '약품 추천을 위해 더 많은 데이터가 필요합니다.<br><br>' +
+                    '<strong>현재:</strong> 환자 ' + status.patients_with_drugs + '명, 약품 ' + status.drugs_with_patients + '종<br>' +
+                    '<strong>권장:</strong> 환자 ' + status.required_count + '명 이상, 약품 ' + status.required_drugs + '종 이상' +
                 '</div>' +
                 '<a href="/patient/manage" class="btn btn-primary">환자 관리로 이동</a>' +
             '</div>';
@@ -1784,10 +1813,33 @@
     function renderSuggestionCard(suggestion) {
         selectedPatient = null;
 
-        var sparklineSvg = generateSparklineSVG(suggestion.monthly_usage || []);
+        // 평균 간격 ± 표준편차
         var avgInterval = suggestion.avg_interval ? suggestion.avg_interval.toFixed(1) : '-';
-        var periodicityScore = suggestion.periodicity_score ? suggestion.periodicity_score.toFixed(1) : '-';
+        var intervalStd = (suggestion.avg_interval && suggestion.interval_cv)
+            ? (suggestion.avg_interval * suggestion.interval_cv).toFixed(1)
+            : null;
+        var intervalDisplay = intervalStd ? avgInterval + '±' + intervalStd : avgInterval;
+
+        // 평균 사용량 ± 표준편차
+        var avgPeakHeight = suggestion.avg_peak_height ? suggestion.avg_peak_height.toFixed(1) : '-';
+        var heightStd = (suggestion.avg_peak_height && suggestion.height_cv)
+            ? (suggestion.avg_peak_height * suggestion.height_cv).toFixed(1)
+            : null;
+        var usageDisplay = heightStd ? avgPeakHeight + '±' + heightStd : avgPeakHeight;
+
+        // 활동률
+        var activeMonths = suggestion.active_months || 0;
+        var activityDisplay = activeMonths + '/12개월';
+
+        // 런웨이
+        var runway = (suggestion.monthly_avg && suggestion.monthly_avg > 0)
+            ? Math.round(suggestion.current_stock / suggestion.monthly_avg) + '개월'
+            : '-';
+
         var skipText = suggestion.skip_count > 0 ? ' (' + suggestion.skip_count + '회 건너뜀)' : '';
+
+        // 차트에 현재 재고 전달
+        var sparklineSvg = generateSparklineSVG(suggestion.monthly_usage || [], suggestion.current_stock);
 
         var registeredWarning = suggestion.registered_count > 0 ?
             '<div style="text-align: center; color: #f59e0b; font-size: 13px; margin-top: -12px; margin-bottom: 12px;">' +
@@ -1805,20 +1857,20 @@
                 '</div>' +
                 '<div class="metrics-grid">' +
                     '<div class="metric-card">' +
-                        '<div class="metric-value">' + periodicityScore + '</div>' +
-                        '<div class="metric-label">주기성 점수</div>' +
-                    '</div>' +
-                    '<div class="metric-card">' +
-                        '<div class="metric-value">' + avgInterval + '</div>' +
+                        '<div class="metric-value">' + intervalDisplay + '</div>' +
                         '<div class="metric-label">평균 간격 (개월)</div>' +
                     '</div>' +
                     '<div class="metric-card">' +
-                        '<div class="metric-value">' + suggestion.peak_count + '</div>' +
-                        '<div class="metric-label">피크 수</div>' +
+                        '<div class="metric-value">' + usageDisplay + '</div>' +
+                        '<div class="metric-label">평균 사용량 (개)</div>' +
                     '</div>' +
                     '<div class="metric-card">' +
-                        '<div class="metric-value">' + suggestion.current_stock + '</div>' +
-                        '<div class="metric-label">현재 재고</div>' +
+                        '<div class="metric-value">' + activityDisplay + '</div>' +
+                        '<div class="metric-label">활동률</div>' +
+                    '</div>' +
+                    '<div class="metric-card">' +
+                        '<div class="metric-value">' + runway + '</div>' +
+                        '<div class="metric-label">런웨이</div>' +
                     '</div>' +
                 '</div>' +
                 '<div class="sparkline-container">' +
@@ -2060,10 +2112,14 @@
         }
 
         var html = '<div class="similar-drugs-container">' +
-            '<div class="similar-drugs-title">' +
-                '<span class="icon">🔗</span>' +
-                '유사한 패턴의 등록 약품 (KNN K=' + nearestDrugs.length + ')' +
-            '</div>';
+            '<div class="similar-drugs-header" onclick="toggleSimilarDrugs()">' +
+                '<div class="similar-drugs-title">' +
+                    '<span class="icon">🔗</span>' +
+                    '유사한 패턴의 등록 약품 (KNN K=' + nearestDrugs.length + ')' +
+                '</div>' +
+                '<span class="similar-drugs-toggle">▶</span>' +
+            '</div>' +
+            '<div class="similar-drugs-list" style="display: none;">';
 
         for (var i = 0; i < nearestDrugs.length; i++) {
             var drug = nearestDrugs[i];
@@ -2079,42 +2135,103 @@
             '</div>';
         }
 
-        html += '</div>';
+        html += '</div></div>';
         return html;
     }
 
+    // 유사 약품 섹션 토글
+    function toggleSimilarDrugs() {
+        var list = document.querySelector('.similar-drugs-list');
+        var toggle = document.querySelector('.similar-drugs-toggle');
+        if (list && toggle) {
+            if (list.style.display === 'none') {
+                list.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                list.style.display = 'none';
+                toggle.textContent = '▶';
+            }
+        }
+    }
+
     // 스파크라인 SVG 생성
-    function generateSparklineSVG(data) {
+    function generateSparklineSVG(data, currentStock) {
         if (!data || data.length === 0) {
-            return '<svg width="100%" height="60"></svg>';
+            return '<div class="chart-container"><svg width="100%" height="80"></svg></div>';
         }
 
         var width = 700;
-        var height = 60;
+        var height = 80;
+        var paddingLeft = 35;
+        var paddingRight = 40;
+        var paddingTop = 15;
+        var paddingBottom = 5;
+        var chartWidth = width - paddingLeft - paddingRight;
+        var chartHeight = height - paddingTop - paddingBottom;
+
         var maxVal = Math.max.apply(null, data) || 1;
+        var minVal = Math.min.apply(null, data.filter(function(v) { return v > 0; })) || 0;
+        var avgVal = data.reduce(function(a, b) { return a + b; }, 0) / data.length;
+        var lastVal = data[data.length - 1];
         var n = data.length;
 
+        // Y 좌표 계산 함수 (0~maxVal 범위)
+        function getY(v) {
+            return paddingTop + chartHeight - (v / maxVal) * chartHeight;
+        }
+
+        // X 좌표 계산 함수
+        function getX(i) {
+            return paddingLeft + (i / (n - 1)) * chartWidth;
+        }
+
         var points = data.map(function(v, i) {
-            var x = (i / (n - 1)) * (width - 20) + 10;
-            var y = height - 5 - (v / maxVal) * (height - 10);
-            return x + ',' + y;
+            return getX(i) + ',' + getY(v);
         });
 
         var path = 'M' + points.join(' L');
 
+        // 평균선
+        var avgY = getY(avgVal);
+        var avgLine = '<line x1="' + paddingLeft + '" y1="' + avgY + '" x2="' + (width - paddingRight) + '" y2="' + avgY + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>';
+
+        // 데이터 포인트 (원)
         var circles = data.map(function(v, i) {
             if (v > 0) {
-                var x = (i / (n - 1)) * (width - 20) + 10;
-                var y = height - 5 - (v / maxVal) * (height - 10);
-                return '<circle cx="' + x + '" cy="' + y + '" r="3" fill="#48bb78"/>';
+                return '<circle cx="' + getX(i) + '" cy="' + getY(v) + '" r="3" fill="#48bb78"/>';
             }
             return '';
         }).join('');
 
-        return '<svg width="100%" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
-            '<path d="' + path + '" fill="none" stroke="#48bb78" stroke-width="2"/>' +
-            circles +
-        '</svg>';
+        // 최대값 레이블 (좌측)
+        var maxLabel = '<text x="' + (paddingLeft - 5) + '" y="' + (paddingTop + 4) + '" text-anchor="end" font-size="10" fill="#6b7280">' + maxVal + '</text>';
+
+        // 평균값 레이블 (좌측)
+        var avgLabel = '<text x="' + (paddingLeft - 5) + '" y="' + (avgY + 3) + '" text-anchor="end" font-size="9" fill="#94a3b8">' + Math.round(avgVal) + '</text>';
+
+        // 최근 값 강조 (우측 끝)
+        var lastX = getX(n - 1);
+        var lastY = getY(lastVal);
+        var lastCircle = '<circle cx="' + lastX + '" cy="' + lastY + '" r="5" fill="#48bb78"/>';
+        var lastLabel = '<text x="' + (lastX + 8) + '" y="' + (lastY + 4) + '" font-size="11" font-weight="600" fill="#48bb78">' + lastVal + '</text>';
+
+        // 현재 재고 (우측 상단)
+        var stockLabel = currentStock !== undefined
+            ? '<text x="' + (width - 5) + '" y="12" text-anchor="end" font-size="11" fill="#6b7280">현재 재고: <tspan font-weight="600">' + currentStock + '</tspan>개</text>'
+            : '';
+
+        return '<div class="chart-container">' +
+            '<svg width="100%" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
+                stockLabel +
+                avgLine +
+                '<path d="' + path + '" fill="none" stroke="#48bb78" stroke-width="2"/>' +
+                circles +
+                lastCircle +
+                maxLabel +
+                avgLabel +
+                lastLabel +
+            '</svg>' +
+        '</div>';
     }
 
     // 약품 등록
@@ -2671,6 +2788,7 @@
             var data = await response.json();
 
             if (data.status === 'success') {
+                await loadStats();
                 await loadNextSuggestion();
                 await loadSkippedDrugs();
             } else {
