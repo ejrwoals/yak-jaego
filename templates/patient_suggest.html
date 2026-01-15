@@ -129,12 +129,12 @@
         border-radius: 16px;
         padding: 24px;
         margin-bottom: 24px;
-        animation: slideIn 0.3s ease;
+        animation: fadeIn 0.3s ease;
     }
 
-    @keyframes slideIn {
-        from { opacity: 0; transform: translateX(-20px); }
-        to { opacity: 1; transform: translateX(0); }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     .card-header {
@@ -189,6 +189,55 @@
         font-size: 11px;
         color: #6b7280;
         margin-top: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+
+    /* 도움말 아이콘 툴팁 */
+    .help-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        font-size: 10px;
+        font-weight: 600;
+        color: #718096;
+        background: #e2e8f0;
+        border-radius: 50%;
+        cursor: help;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .help-icon:hover {
+        background: #cbd5e0;
+        color: #4a5568;
+    }
+
+    .help-icon .help-tip {
+        display: none;
+        position: fixed;
+        background: #2d3748;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 400;
+        width: 250px;
+        white-space: normal;
+        text-align: left;
+        line-height: 1.5;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        pointer-events: none;
+        box-sizing: border-box;
+    }
+
+    .help-icon:hover .help-tip {
+        display: block;
     }
 
     /* 스파크라인 */
@@ -199,10 +248,25 @@
         margin-bottom: 20px;
     }
 
+    .sparkline-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
     .sparkline-title {
         font-size: 12px;
         color: #6b7280;
-        margin-bottom: 8px;
+    }
+
+    .sparkline-stock {
+        font-size: 12px;
+        color: #6b7280;
+    }
+
+    .sparkline-stock strong {
+        color: #374151;
     }
 
     .chart-container {
@@ -1708,6 +1772,35 @@
         await checkActivation();
     });
 
+    // 툴팁 위치 동적 계산 (이벤트 위임)
+    document.addEventListener('mouseover', function(e) {
+        var helpIcon = e.target.closest('.help-icon');
+        if (!helpIcon) return;
+
+        var tooltip = helpIcon.querySelector('.help-tip');
+        if (!tooltip) return;
+
+        var rect = helpIcon.getBoundingClientRect();
+        var tooltipWidth = 250;
+        var padding = 10;
+
+        // 기본: 아이콘 아래에 표시
+        var top = rect.bottom + 8;
+        var left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+
+        // 화면 왼쪽을 벗어나면 조정
+        if (left < padding) {
+            left = padding;
+        }
+        // 화면 오른쪽을 벗어나면 조정
+        if (left + tooltipWidth > window.innerWidth - padding) {
+            left = window.innerWidth - tooltipWidth - padding;
+        }
+
+        tooltip.style.top = top + 'px';
+        tooltip.style.left = left + 'px';
+    });
+
     // 환자 목록 로드
     async function loadPatients() {
         try {
@@ -1813,23 +1906,29 @@
     function renderSuggestionCard(suggestion) {
         selectedPatient = null;
 
-        // 평균 간격 ± 표준편차
-        var avgInterval = suggestion.avg_interval ? suggestion.avg_interval.toFixed(1) : '-';
+        // 평균 간격 범위 (min ~ max)
+        var avgInterval = suggestion.avg_interval || 0;
         var intervalStd = (suggestion.avg_interval && suggestion.interval_cv)
-            ? (suggestion.avg_interval * suggestion.interval_cv).toFixed(1)
-            : null;
-        var intervalDisplay = intervalStd ? avgInterval + '±' + intervalStd : avgInterval;
+            ? suggestion.avg_interval * suggestion.interval_cv
+            : 0;
+        var intervalMin = Math.max(0, avgInterval - intervalStd).toFixed(1);
+        var intervalMax = (avgInterval + intervalStd).toFixed(1);
+        var intervalDisplay = intervalStd > 0 ? intervalMin + '~' + intervalMax : avgInterval.toFixed(1);
 
-        // 평균 사용량 ± 표준편차
-        var avgPeakHeight = suggestion.avg_peak_height ? suggestion.avg_peak_height.toFixed(1) : '-';
+        // 평균 사용량 범위 (min ~ max)
+        var avgPeakHeight = suggestion.avg_peak_height || 0;
         var heightStd = (suggestion.avg_peak_height && suggestion.height_cv)
-            ? (suggestion.avg_peak_height * suggestion.height_cv).toFixed(1)
-            : null;
-        var usageDisplay = heightStd ? avgPeakHeight + '±' + heightStd : avgPeakHeight;
+            ? suggestion.avg_peak_height * suggestion.height_cv
+            : 0;
+        var usageMin = Math.max(0, avgPeakHeight - heightStd).toFixed(0);
+        var usageMax = (avgPeakHeight + heightStd).toFixed(0);
+        var usageDisplay = heightStd > 0 ? usageMin + '~' + usageMax : avgPeakHeight.toFixed(0);
 
-        // 활동률
+        // 활동률 (퍼센트)
         var activeMonths = suggestion.active_months || 0;
-        var activityDisplay = activeMonths + '/12개월';
+        var totalMonths = suggestion.total_months || 1;
+        var activityPercent = Math.round((activeMonths / totalMonths) * 100);
+        var activityDisplay = activityPercent + '%';
 
         // 런웨이
         var runway = (suggestion.monthly_avg && suggestion.monthly_avg > 0)
@@ -1838,8 +1937,8 @@
 
         var skipText = suggestion.skip_count > 0 ? ' (' + suggestion.skip_count + '회 건너뜀)' : '';
 
-        // 차트에 현재 재고 전달
-        var sparklineSvg = generateSparklineSVG(suggestion.monthly_usage || [], suggestion.current_stock);
+        // 차트 생성 (현재 재고는 별도 표시)
+        var sparklineSvg = generateSparklineSVG(suggestion.monthly_usage || []);
 
         var registeredWarning = suggestion.registered_count > 0 ?
             '<div style="text-align: center; color: #f59e0b; font-size: 13px; margin-top: -12px; margin-bottom: 12px;">' +
@@ -1858,23 +1957,26 @@
                 '<div class="metrics-grid">' +
                     '<div class="metric-card">' +
                         '<div class="metric-value">' + intervalDisplay + '</div>' +
-                        '<div class="metric-label">평균 간격 (개월)</div>' +
+                        '<div class="metric-label">평균 간격 (개월) <span class="help-icon">?<span class="help-tip">사용량이 발생한 월 사이의 평균 간격입니다. 범위는 ±1σ(표준편차)로, 약 68%의 데이터가 이 범위 내에 있습니다.</span></span></div>' +
                     '</div>' +
                     '<div class="metric-card">' +
                         '<div class="metric-value">' + usageDisplay + '</div>' +
-                        '<div class="metric-label">평균 사용량 (개)</div>' +
+                        '<div class="metric-label">평균 사용량 (개) <span class="help-icon">?<span class="help-tip">사용이 발생한 월의 평균 사용량입니다. 범위는 ±1σ(표준편차)로, 약 68%의 데이터가 이 범위 내에 있습니다.</span></span></div>' +
                     '</div>' +
                     '<div class="metric-card">' +
                         '<div class="metric-value">' + activityDisplay + '</div>' +
-                        '<div class="metric-label">활동률</div>' +
+                        '<div class="metric-label">활동률 <span class="help-icon">?<span class="help-tip">전체 데이터 기간 중 실제로 사용이 발생한 월의 비율입니다. 높을수록 꾸준히 사용되는 약품입니다.</span></span></div>' +
                     '</div>' +
                     '<div class="metric-card">' +
                         '<div class="metric-value">' + runway + '</div>' +
-                        '<div class="metric-label">런웨이</div>' +
+                        '<div class="metric-label">런웨이 <span class="help-icon">?<span class="help-tip">현재 재고로 버틸 수 있는 예상 개월 수입니다. (현재 재고 ÷ 월평균 사용량)</span></span></div>' +
                     '</div>' +
                 '</div>' +
                 '<div class="sparkline-container">' +
-                    '<div class="sparkline-title">월별 사용량 추이</div>' +
+                    '<div class="sparkline-header">' +
+                        '<div class="sparkline-title">월별 사용량 추이</div>' +
+                        '<div class="sparkline-stock">현재 재고: <strong>' + suggestion.current_stock + '</strong>개</div>' +
+                    '</div>' +
                     sparklineSvg +
                 '</div>' +
                 buildSimilarDrugsSection(suggestion.nearest_k_drugs) +
@@ -2155,7 +2257,7 @@
     }
 
     // 스파크라인 SVG 생성
-    function generateSparklineSVG(data, currentStock) {
+    function generateSparklineSVG(data) {
         if (!data || data.length === 0) {
             return '<div class="chart-container"><svg width="100%" height="80"></svg></div>';
         }
@@ -2164,7 +2266,7 @@
         var height = 80;
         var paddingLeft = 35;
         var paddingRight = 40;
-        var paddingTop = 15;
+        var paddingTop = 10;
         var paddingBottom = 5;
         var chartWidth = width - paddingLeft - paddingRight;
         var chartHeight = height - paddingTop - paddingBottom;
@@ -2209,26 +2311,32 @@
         // 평균값 레이블 (좌측)
         var avgLabel = '<text x="' + (paddingLeft - 5) + '" y="' + (avgY + 3) + '" text-anchor="end" font-size="9" fill="#94a3b8">' + Math.round(avgVal) + '</text>';
 
+        // 0 라인 (0인 값이 있을 때만 표시)
+        var hasZero = data.some(function(v) { return v === 0; });
+        var zeroLine = '';
+        var zeroLabel = '';
+        if (hasZero) {
+            var zeroY = getY(0);
+            zeroLine = '<line x1="' + paddingLeft + '" y1="' + zeroY + '" x2="' + (width - paddingRight) + '" y2="' + zeroY + '" stroke="#cbd5e0" stroke-width="1"/>';
+            zeroLabel = '<text x="' + (paddingLeft - 5) + '" y="' + (zeroY + 3) + '" text-anchor="end" font-size="9" fill="#cbd5e0">0</text>';
+        }
+
         // 최근 값 강조 (우측 끝)
         var lastX = getX(n - 1);
         var lastY = getY(lastVal);
         var lastCircle = '<circle cx="' + lastX + '" cy="' + lastY + '" r="5" fill="#48bb78"/>';
         var lastLabel = '<text x="' + (lastX + 8) + '" y="' + (lastY + 4) + '" font-size="11" font-weight="600" fill="#48bb78">' + lastVal + '</text>';
 
-        // 현재 재고 (우측 상단)
-        var stockLabel = currentStock !== undefined
-            ? '<text x="' + (width - 5) + '" y="12" text-anchor="end" font-size="11" fill="#6b7280">현재 재고: <tspan font-weight="600">' + currentStock + '</tspan>개</text>'
-            : '';
-
         return '<div class="chart-container">' +
             '<svg width="100%" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
-                stockLabel +
+                zeroLine +
                 avgLine +
                 '<path d="' + path + '" fill="none" stroke="#48bb78" stroke-width="2"/>' +
                 circles +
                 lastCircle +
                 maxLabel +
                 avgLabel +
+                zeroLabel +
                 lastLabel +
             '</svg>' +
         '</div>';

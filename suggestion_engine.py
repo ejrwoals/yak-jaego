@@ -400,7 +400,10 @@ def get_next_suggestion():
     # 평균 피크 높이 계산 (0이 아닌 값들의 평균)
     non_zero_usage = [v for v in monthly_usage if v > 0]
     avg_peak_height = sum(non_zero_usage) / len(non_zero_usage) if non_zero_usage else 0
-    active_months = len(non_zero_usage)
+
+    # 활동률 계산 (전체 데이터 기간 기준)
+    active_months = len([v for v in monthly_usage if v > 0])
+    total_months = len(monthly_usage)
 
     # 가장 가까운 K개 등록 약품
     nearest_k_drugs = get_nearest_k_drugs(약품코드)
@@ -416,6 +419,7 @@ def get_next_suggestion():
         'avg_peak_height': round(avg_peak_height, 1),
         'height_cv': periodicity['height_cv'] if periodicity else None,
         'active_months': active_months,
+        'total_months': total_months,
         'monthly_avg': round(monthly_avg, 1),
         'current_stock': current_stock,
         'monthly_usage': monthly_usage,
