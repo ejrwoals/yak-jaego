@@ -162,11 +162,16 @@ def load_recent_inventory():
 
 
 def parse_list_column(series):
-    """문자열로 저장된 리스트를 실제 리스트로 변환하고 평균 계산"""
+    """문자열로 저장된 리스트를 실제 리스트로 변환하고 마지막 값 반환 (현재 3개월 이동평균)"""
     import re
 
-    def parse_and_mean(x):
+    def parse_and_get_last(x):
         try:
+            # 이미 리스트인 경우
+            if isinstance(x, list):
+                numbers = [float(v) for v in x if v is not None]
+                return numbers[-1] if numbers else 0.0
+
             # numpy 타입 표기를 제거 (np.int64(34) -> 34, np.float64(1.5) -> 1.5)
             cleaned = re.sub(r'np\.(int64|float64)\(([^)]+)\)', r'\2', str(x))
 
@@ -179,12 +184,12 @@ def parse_list_column(series):
 
             if len(numbers) == 0:
                 return 0.0
-            return np.mean(numbers)
+            return numbers[-1]  # 마지막 값 반환 (현재 3개월 이동평균)
         except Exception as e:
-            print(f"파싱 오류: {e}, 원본 데이터: {x[:100]}")
+            print(f"파싱 오류: {e}, 원본 데이터: {str(x)[:100]}")
             return 0.0
 
-    return series.apply(parse_and_mean)
+    return series.apply(parse_and_get_last)
 
 
 def merge_and_calculate(today_df, processed_df, today_qty_info=None):
@@ -202,16 +207,67 @@ def merge_and_calculate(today_df, processed_df, today_qty_info=None):
     processed_df['1년 이동평균'] = processed_df['1년_이동평균']  # DB에서 이미 계산된 값 사용
     processed_df['3개월 이동평균'] = parse_list_column(processed_df['3개월_이동평균_리스트'])
 
+    # today_df에서 processed_df와 중복되는 컬럼 제거 (약품코드 제외)
+    merge_cols = ['1년 이동평균', '3개월 이동평균', '약품유형', '월별_조제수량_리스트', '3개월_이동평균_리스트']
+    today_df_clean = today_df.drop(columns=[c for c in merge_cols if c in today_df.columns], errors='ignore')
+
     # 약품코드를 기준으로 병합 (약품유형 컬럼 + 시계열 데이터 포함)
-    result_df = today_df.merge(
-        processed_df[['약품코드', '1년 이동평균', '3개월 이동평균', '약품유형',
-                      '월별_조제수량_리스트', '3개월_이동평균_리스트']],
+    result_df = today_df_clean.merge(
+        processed_df[['약품코드'] + merge_cols],
         on='약품코드',
         how='left'
     )
 
-    # 신규 약품 감지 (1년 이동평균이 NaN인 경우 = processed_inventory에 없는 약품)
-    result_df['신규약품'] = result_df['1년 이동평균'].isna()
+    # 신규 약품 감지 함수: 시계열 데이터가 없거나 사용 기간이 3개월 미만인 경우
+    import ast
+    import re
+
+    def parse_usage_list(x):
+        """월별_조제수량_리스트를 파싱하여 리스트로 변환"""
+        if isinstance(x, list):
+            return x
+        if pd.isna(x):
+            return []
+        try:
+            # numpy 타입 표기를 제거
+            cleaned = re.sub(r'np\.(int64|float64)\(([^)]+)\)', r'\2', str(x))
+            return ast.literal_eval(cleaned)
+        except:
+            return []
+
+    def is_new_drug(row):
+        # 1. 1년 이동평균이 NaN인 경우 = processed_inventory에 없는 약품
+        if pd.isna(row['1년 이동평균']):
+            return True
+
+        # 2. 월별_조제수량_리스트에서 첫 사용 시점부터 현재까지 3개월 미만인 경우
+        try:
+            raw_usage_list = row['월별_조제수량_리스트']
+        except (KeyError, TypeError):
+            return True
+
+        usage_list = parse_usage_list(raw_usage_list)
+        if not usage_list or len(usage_list) == 0:
+            return True
+
+        # 첫 번째 0이 아닌 값의 인덱스 찾기 (사용 시작 시점)
+        first_usage_idx = None
+        for i, qty in enumerate(usage_list):
+            if qty is not None and qty > 0:
+                first_usage_idx = i
+                break
+
+        # 전체 기간 동안 사용량이 없으면 신규 약품으로 분류
+        if first_usage_idx is None:
+            return True
+
+        # 첫 사용 시점부터 현재까지의 개월 수 계산
+        months_since_first_usage = len(usage_list) - first_usage_idx
+
+        # 3개월 미만 사용 시 신규 약품으로 분류
+        return months_since_first_usage < 3
+
+    result_df['신규약품'] = result_df.apply(is_new_drug, axis=1)
 
     # 약품유형이 없는 경우 기본값 '미분류'로 설정
     result_df['약품유형'] = result_df['약품유형'].fillna('미분류')
@@ -456,19 +512,91 @@ def generate_zero_stock_table_rows(df, col_map):
 
 def generate_new_drugs_table_rows(df, col_map):
     """신규 약품 테이블 행 HTML 생성"""
+    import ast
+    import re
+
     cm = col_map
+
+    def parse_list_string(x):
+        if isinstance(x, list):
+            return x
+        if pd.isna(x):
+            return []
+        try:
+            cleaned = re.sub(r'np\.(int64|float64)\(([^)]+)\)', r'\2', str(x))
+            return ast.literal_eval(cleaned)
+        except:
+            return []
+
     rows = ""
     for _, row in df.iterrows():
         stock = row[cm['stock']] if cm['stock'] in row else 0
         drug_type = row.get('약품유형', '미분류')
         type_badge_color = '#3498db' if drug_type == '전문약' else '#e67e22' if drug_type == '일반약' else '#95a5a6'
+
+        # 월별_조제수량_리스트에서 사용 기간과 평균 사용량 계산
+        usage_list = parse_list_string(row.get('월별_조제수량_리스트', []))
+
+        # 사용된 개월 수 계산 (첫 사용 시점부터 현재까지)
+        usage_months = 0
+        avg_usage = 0
+        estimated_runway = "-"
+
+        if usage_list:
+            # 0이 아닌 첫 번째 값의 인덱스 찾기
+            first_usage_idx = None
+            for i, qty in enumerate(usage_list):
+                if qty is not None and qty > 0:
+                    first_usage_idx = i
+                    break
+
+            if first_usage_idx is not None:
+                # 첫 사용 시점부터 끝까지의 데이터
+                usage_data = usage_list[first_usage_idx:]
+                usage_months = len(usage_data)
+
+                # 평균 사용량 계산 (전체 사용 기간의 평균 - 0 포함)
+                valid_values = [v if v is not None else 0 for v in usage_data]
+                if valid_values:
+                    avg_usage = sum(valid_values) / len(valid_values)
+
+                    # 예상 런웨이 계산
+                    if avg_usage > 0:
+                        runway_val = stock / avg_usage
+                        estimated_runway = f"{runway_val:.1f}개월"
+
+        # 사용 기간 표시
+        if usage_months == 0:
+            usage_period_display = "데이터 없음"
+            usage_period_style = "color: #888;"
+        else:
+            usage_period_display = f"{usage_months}개월"
+            usage_period_style = ""
+
+        # 평균 사용량 표시
+        if avg_usage > 0:
+            avg_usage_display = f"{avg_usage:.1f}"
+        else:
+            avg_usage_display = "-"
+
+        # 예상 런웨이 스타일
+        runway_style = ""
+        if estimated_runway != "-":
+            runway_val = stock / avg_usage if avg_usage > 0 else 999
+            if runway_val < 1:
+                runway_style = "color: #c62828; font-weight: bold;"
+            elif runway_val < 2:
+                runway_style = "color: #e65100; font-weight: bold;"
+
         rows += f"""
             <tr>
                 <td>{row['약품명']}</td>
                 <td>{row['약품코드']}</td>
-                <td>{row['제약회사']}</td>
                 <td style="text-align: right;">{stock:.0f}</td>
                 <td><span style="background-color: {type_badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">{drug_type}</span></td>
+                <td style="text-align: center; {usage_period_style}">{usage_period_display}</td>
+                <td style="text-align: right;">{avg_usage_display}</td>
+                <td style="text-align: right; {runway_style}">{estimated_runway}</td>
             </tr>
 """
     return rows
@@ -720,15 +848,17 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 <span class="modal-close" onclick="closeNewDrugsModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">시계열 데이터가 없는 신규 약품입니다. 다음 달 데이터 수집 후 런웨이 계산이 가능합니다.</p>
+                <p style="color: #666; margin-bottom: 15px;">시계열 데이터가 없거나 사용 기간이 3개월 미만인 신규 약품입니다. 3개월 이상의 데이터가 쌓이면 정상 분류됩니다.</p>
                 <table class="modal-table-new-drugs">
                     <thead>
                         <tr>
                             <th>약품명</th>
                             <th>약품코드</th>
-                            <th>제약회사</th>
                             <th>현재 재고</th>
                             <th>약품유형</th>
+                            <th>사용 기간</th>
+                            <th>평균 사용량</th>
+                            <th>예상 런웨이</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1682,17 +1812,21 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .modal-table-zero-stock td:nth-child(6) {{ width: 15%; white-space: nowrap; text-align: right; }}  /* 1년 이동평균 */
         .modal-table-zero-stock th:nth-child(7),
         .modal-table-zero-stock td:nth-child(7) {{ width: 15%; white-space: nowrap; text-align: right; }}  /* 3개월 이동평균 */
-        /* 신규 약품 모달 (5컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형 */
+        /* 신규 약품 모달 (7컬럼): 약품명, 약품코드, 현재재고, 약품유형, 사용기간, 평균사용량, 예상런웨이 */
         .modal-table-new-drugs th:nth-child(1),
-        .modal-table-new-drugs td:nth-child(1) {{ width: 40%; }}  /* 약품명 */
+        .modal-table-new-drugs td:nth-child(1) {{ width: 30%; }}  /* 약품명 */
         .modal-table-new-drugs th:nth-child(2),
-        .modal-table-new-drugs td:nth-child(2) {{ width: 15%; white-space: nowrap; }}  /* 약품코드 */
+        .modal-table-new-drugs td:nth-child(2) {{ width: 12%; white-space: nowrap; }}  /* 약품코드 */
         .modal-table-new-drugs th:nth-child(3),
-        .modal-table-new-drugs td:nth-child(3) {{ width: 18%; }}  /* 제약회사 */
+        .modal-table-new-drugs td:nth-child(3) {{ width: 10%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
         .modal-table-new-drugs th:nth-child(4),
-        .modal-table-new-drugs td:nth-child(4) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
+        .modal-table-new-drugs td:nth-child(4) {{ width: 10%; white-space: nowrap; }}  /* 약품유형 */
         .modal-table-new-drugs th:nth-child(5),
-        .modal-table-new-drugs td:nth-child(5) {{ width: 10%; white-space: nowrap; }}  /* 약품유형 */
+        .modal-table-new-drugs td:nth-child(5) {{ width: 12%; white-space: nowrap; text-align: center; }}  /* 사용 기간 */
+        .modal-table-new-drugs th:nth-child(6),
+        .modal-table-new-drugs td:nth-child(6) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 평균 사용량 */
+        .modal-table-new-drugs th:nth-child(7),
+        .modal-table-new-drugs td:nth-child(7) {{ width: 14%; white-space: nowrap; text-align: right; }}  /* 예상 런웨이 */
         /* 간헐적 사용 모달 (7컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 1년이동평균, 런웨이 - 클릭시 인라인 차트 */
         .modal-table-intermittent th:nth-child(1),
         .modal-table-intermittent td:nth-child(1) {{ width: 30%; }}  /* 약품명 */
@@ -2618,7 +2752,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                 <div class="set-new">
                                     <div class="set-icon">🆕</div>
                                     <div class="set-title">신규</div>
-                                    <div class="set-desc">시계열 없음</div>
+                                    <div class="set-desc">사용 &lt;3개월</div>
                                 </div>
                                 <div class="set-existing">
                                     <div class="set-label-existing">기존 약품</div>
@@ -2659,8 +2793,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                         </div>
                         <div class="bookmark-item">
                             <span class="badge-info">🆕 신규 약품</span>
-                            <span class="bookmark-condition">시계열 데이터 없음</span>
-                            <span class="bookmark-desc">최근 데이터에 처음 등장한 약품. 런웨이 계산 불가</span>
+                            <span class="bookmark-condition">사용 기간 3개월 미만</span>
+                            <span class="bookmark-desc">시계열 데이터가 없거나 사용 시작 후 3개월 미만. 런웨이 계산 불가</span>
                         </div>
                         <div class="bookmark-item">
                             <span class="badge-intermittent">🔄 간헐적 사용</span>

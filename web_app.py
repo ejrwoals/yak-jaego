@@ -306,8 +306,11 @@ def calculate_order():
         inventory_updater.update_inventory_from_today_csv(abs_temp_filepath)
         print("✅ 재고 업데이트 완료")
 
-        # 시계열 데이터 로드
-        df_processed = processed_inventory_db.get_processed_data()
+        # drug_order_calculator의 merge_and_calculate 함수 재사용
+        from drug_order_calculator import merge_and_calculate, load_processed_data
+
+        # 시계열 데이터 로드 (drug_order_calculator와 동일한 방식)
+        df_processed = load_processed_data()
 
         # today 파일에서 약품코드 추출
         today_codes = set(df_today['약품코드'].astype(str))
@@ -319,25 +322,12 @@ def calculate_order():
         if df_recent_filtered.empty:
             return jsonify({'error': 'today 파일 약품에 대한 재고 데이터가 없습니다.'}), 404
 
-        # 데이터 병합 (recent_inventory 기준 LEFT JOIN - 신규 약품 포함)
-        df_merged = pd.merge(
-            df_recent_filtered[['약품코드', '약품명', '제약회사', '현재_재고수량']],
-            df_processed[['약품코드', '약품유형', '1년_이동평균', '3개월_이동평균_리스트', '월별_조제수량_리스트']],
-            on='약품코드',
-            how='left'
-        )
+        # 컬럼명을 merge_and_calculate가 기대하는 형태로 변환
+        df_recent_filtered = df_recent_filtered.rename(columns={'현재_재고수량': '현재 재고수량'})
 
-        # 신규 약품 감지 (1년_이동평균이 NaN인 경우 = processed_inventory에 없는 약품)
-        df_merged['신규약품'] = df_merged['1년_이동평균'].isna()
-
-        # 약품유형이 없는 경우 기본값 '미분류'로 설정
-        df_merged['약품유형'] = df_merged['약품유형'].fillna('미분류')
-
-        # today 파일에서 조제수량/판매수량 정보 추출 (미리 초기화)
+        # today 파일에서 조제수량/판매수량 정보 추출
         today_qty_info = {}
-
-        # 신규 약품에 대해 today 파일의 조제수량/판매수량으로 약품유형 분류
-        if df_merged['신규약품'].any() and ('조제수량' in df_today.columns or '판매수량' in df_today.columns):
+        if '조제수량' in df_today.columns or '판매수량' in df_today.columns:
             for _, row in df_today.iterrows():
                 code = str(row['약품코드'])
                 dispense = 0
@@ -358,81 +348,18 @@ def calculate_order():
                             sale = 0
                 today_qty_info[code] = {'조제수량': dispense, '판매수량': sale}
 
-            # 신규 약품의 약품유형 분류
-            for idx in df_merged[df_merged['신규약품'] & (df_merged['약품유형'] == '미분류')].index:
-                drug_code = str(df_merged.at[idx, '약품코드'])
-                if drug_code in today_qty_info:
-                    info = today_qty_info[drug_code]
-                    if info['조제수량'] > 0:
-                        df_merged.at[idx, '약품유형'] = '전문약'
-                    elif info['판매수량'] > 0:
-                        df_merged.at[idx, '약품유형'] = '일반약'
+        # merge_and_calculate 호출 (신규 약품 감지, 런웨이 계산 등 모든 로직 포함)
+        df_merged = merge_and_calculate(df_recent_filtered, df_processed, today_qty_info)
 
-        # 당일 소모 수량 컬럼 추가 (전문약: 조제수량, 일반약: 판매수량)
-        df_merged['당일_소모수량'] = 0
-        if '조제수량' in df_today.columns or '판매수량' in df_today.columns:
-            # today_qty_info가 비어있으면 채우기 (신규 약품이 없는 경우)
-            if not today_qty_info:
-                for _, row in df_today.iterrows():
-                    code = str(row['약품코드'])
-                    dispense = 0
-                    sale = 0
-                    if '조제수량' in df_today.columns:
-                        val = row['조제수량']
-                        if pd.notna(val):
-                            try:
-                                dispense = float(str(val).replace(',', '').replace('-', '0') or 0)
-                            except:
-                                dispense = 0
-                    if '판매수량' in df_today.columns:
-                        val = row['판매수량']
-                        if pd.notna(val):
-                            try:
-                                sale = float(str(val).replace(',', '').replace('-', '0') or 0)
-                            except:
-                                sale = 0
-                    today_qty_info[code] = {'조제수량': dispense, '판매수량': sale}
-
-            for idx, row in df_merged.iterrows():
-                drug_code = str(row['약품코드'])
-                if drug_code in today_qty_info:
-                    info = today_qty_info[drug_code]
-                    drug_type = row['약품유형']
-                    if drug_type == '전문약':
-                        df_merged.at[idx, '당일_소모수량'] = info['조제수량']
-                    elif drug_type == '일반약':
-                        df_merged.at[idx, '당일_소모수량'] = info['판매수량']
-                    else:
-                        # 미분류: 조제수량이 있으면 조제수량, 아니면 판매수량
-                        df_merged.at[idx, '당일_소모수량'] = info['조제수량'] if info['조제수량'] > 0 else info['판매수량']
-
-        new_drug_count = df_merged['신규약품'].sum()
-        if new_drug_count > 0:
-            # 신규 약품 유형별 개수 계산
-            new_drugs = df_merged[df_merged['신규약품']]
-            new_dispense = len(new_drugs[new_drugs['약품유형'] == '전문약'])
-            new_sale = len(new_drugs[new_drugs['약품유형'] == '일반약'])
-            new_unclassified = len(new_drugs[new_drugs['약품유형'] == '미분류'])
-            print(f"🆕 신규 약품 {new_drug_count}개 감지 (전문약: {new_dispense}, 일반약: {new_sale}, 미분류: {new_unclassified})")
-
-        # 런웨이 계산 (신규 약품은 999로 처리)
-        df_merged['런웨이_1년평균'] = df_merged.apply(
-            lambda row: row['현재_재고수량'] / row['1년_이동평균']
-            if pd.notna(row['1년_이동평균']) and row['1년_이동평균'] > 0 else 999, axis=1
-        )
-
-        # 3개월 이동평균 마지막 값 추출 (신규 약품은 0으로 처리)
-        df_merged['3개월_이동평균'] = df_merged['3개월_이동평균_리스트'].apply(
-            lambda x: x[-1] if isinstance(x, list) and len(x) > 0 else 0
-        )
-
-        df_merged['런웨이_3개월평균'] = df_merged.apply(
-            lambda row: row['현재_재고수량'] / row['3개월_이동평균']
-            if row['3개월_이동평균'] > 0 else 999, axis=1
-        )
-
-        # 3-MA 런웨이 오름차순 정렬 (긴급한 약품 우선)
-        df_merged = df_merged.sort_values('런웨이_3개월평균')
+        # 컬럼명을 web_app.py 스타일로 변환 (generate_order_report_html의 col_map과 매핑)
+        df_merged = df_merged.rename(columns={
+            '현재 재고수량': '현재_재고수량',
+            '1년 이동평균': '1년_이동평균',
+            '3개월 이동평균': '3개월_이동평균',
+            '당일 소모수량': '당일_소모수량',
+            '런웨이': '런웨이_1년평균',
+            '3-MA 런웨이': '런웨이_3개월평균'
+        })
 
         # HTML 보고서 생성
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
