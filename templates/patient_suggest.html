@@ -689,15 +689,22 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        cursor: pointer;
         padding: 12px;
         background: #fef3c7;
         border-radius: 8px;
         margin-bottom: 12px;
     }
 
-    .skipped-section-header:hover {
-        background: #fde68a;
+    .skipped-header-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        flex: 1;
+    }
+
+    .skipped-header-left:hover {
+        opacity: 0.8;
     }
 
     .skipped-section-title {
@@ -713,6 +720,31 @@
         border-radius: 12px;
         font-size: 12px;
         font-weight: 500;
+    }
+
+    .reset-skipped-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: #f59e0b;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-left: 12px;
+    }
+
+    .reset-skipped-btn:hover {
+        background: #d97706;
+        transform: scale(1.05);
+    }
+
+    .reset-skipped-btn svg {
+        width: 18px;
+        height: 18px;
+        color: white;
     }
 
     .skipped-drugs-list {
@@ -1563,9 +1595,16 @@
 
     <!-- 건너뛴 약품 섹션 -->
     <div class="skipped-drugs-section" id="skippedDrugsSection" style="display: none;">
-        <div class="skipped-section-header" onclick="toggleSkippedDrugs()">
-            <span class="skipped-section-title">📋 건너뛴 약품</span>
-            <span class="skipped-section-count" id="skippedDrugsCount">0개</span>
+        <div class="skipped-section-header">
+            <div class="skipped-header-left" onclick="toggleSkippedDrugs()">
+                <span class="skipped-section-title">📋 건너뛴 약품</span>
+                <span class="skipped-section-count" id="skippedDrugsCount">0개</span>
+            </div>
+            <button class="reset-skipped-btn" onclick="resetAllSkippedDrugs()" title="전체 되돌리기">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+            </button>
         </div>
         <div class="skipped-drugs-list" id="skippedDrugsList"></div>
     </div>
@@ -2984,6 +3023,56 @@
     function toggleSkippedDrugs() {
         var list = document.getElementById('skippedDrugsList');
         list.classList.toggle('visible');
+    }
+
+    // 건너뛴 약품 전체 되돌리기
+    async function resetAllSkippedDrugs() {
+        var countText = document.getElementById('skippedDrugsCount').textContent;
+        var count = parseInt(countText) || 0;
+
+        if (count === 0) {
+            showToast('되돌릴 약품이 없습니다.', 'warning');
+            return;
+        }
+
+        var confirmed = await showConfirmModal({
+            icon: '↩️',
+            title: '건너뛴 약품 전체 되돌리기',
+            message: '건너뛴 약품 ' + count + '개를 모두 되돌리시겠습니까?<br><br>되돌리면 처음부터 다시 제안을 검토할 수 있습니다.',
+            confirmText: '전체 되돌리기',
+            isDanger: false
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            var response = await fetch('/api/suggestion/skipped/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            var data = await response.json();
+
+            if (data.status === 'success') {
+                showToast(data.message || '건너뛴 약품이 모두 되돌려졌습니다.', 'success');
+                // 건너뛴 약품 섹션 숨기기
+                document.getElementById('skippedDrugsSection').style.display = 'none';
+                document.getElementById('skippedDrugsList').innerHTML = '';
+                document.getElementById('skippedDrugsCount').textContent = '0개';
+                // 통계 및 제안 다시 로드
+                await loadStats();
+                await loadNextSuggestion();
+            } else {
+                showToast(data.message || '되돌리기에 실패했습니다.', 'error');
+            }
+        } catch (error) {
+            console.error('건너뛴 약품 되돌리기 실패:', error);
+            showToast('되돌리기 중 오류가 발생했습니다.', 'error');
+        }
     }
 
     // 건너뛴 약품 선택 시 메인 카드로 표시

@@ -2137,6 +2137,25 @@ def get_skipped_drugs():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/api/suggestion/skipped/clear', methods=['POST'])
+def clear_skipped_drugs():
+    """건너뛴 약품 목록 전체 삭제"""
+    try:
+        result = suggestion_db.clear_all()
+        if result['success']:
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'count': result.get('count', 0)
+            })
+        else:
+            return jsonify({'status': 'error', 'message': result['message']}), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/suggestion/drug/<drug_code>', methods=['GET'])
 def get_drug_suggestion(drug_code):
     """특정 약품의 제안 상세 정보 조회"""
