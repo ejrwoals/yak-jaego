@@ -253,9 +253,62 @@ def normalize_feature(value, feature_name):
         return value
 
 
+def calculate_active_months_from_list(usage_list):
+    """
+    월별 사용량 리스트로부터 활동률 관련 정보를 계산 (첫 사용 시점부터)
+
+    초기에 사용되지 않다가 나중에 사용되기 시작한 약품의 경우,
+    첫 사용 시점부터 계산하여 실제 활동률을 더 정확하게 반영합니다.
+
+    Args:
+        usage_list (list[int]): 월별 사용량 리스트
+
+    Returns:
+        dict: {
+            'active_months': int,    # 활성 월 수 (첫 사용 이후)
+            'total_months': int,     # 전체 월 수 (첫 사용 이후)
+            'ratio': float,          # 활동률 (0~1)
+            'trailing_zeros': int    # 마지막 연속 0 개월 수 (단종 판정용)
+        }
+    """
+    if not usage_list:
+        return {'active_months': 0, 'total_months': 0, 'ratio': 0.5, 'trailing_zeros': 0}
+
+    # 첫 사용 시점 찾기 (첫 번째 0이 아닌 값의 인덱스)
+    first_usage_idx = None
+    for i, usage in enumerate(usage_list):
+        if usage > 0:
+            first_usage_idx = i
+            break
+
+    # 마지막부터 연속 0 개수 계산 (단종 판정용)
+    trailing_zeros = 0
+    for u in reversed(usage_list):
+        if u == 0:
+            trailing_zeros += 1
+        else:
+            break
+
+    if first_usage_idx is None:
+        return {'active_months': 0, 'total_months': len(usage_list), 'ratio': 0.0, 'trailing_zeros': trailing_zeros}
+
+    # 첫 사용 시점 이후부터 활동률 계산
+    usage_from_first = usage_list[first_usage_idx:]
+    total_months = len(usage_from_first)
+    active_months = sum(1 for u in usage_from_first if u > 0)
+    ratio = active_months / total_months if total_months > 0 else 0.5
+
+    return {
+        'active_months': active_months,
+        'total_months': total_months,
+        'ratio': ratio,
+        'trailing_zeros': trailing_zeros
+    }
+
+
 def calculate_active_months_ratio(약품코드):
     """
-    약품의 활성 월 비율 계산 (0이 아닌 달의 비율)
+    약품의 활성 월 비율 계산 (첫 사용 시점부터의 0이 아닌 달의 비율)
 
     Args:
         약품코드 (str): 약품 코드
@@ -276,14 +329,7 @@ def calculate_active_months_ratio(약품코드):
         else:
             usage_list = usage_json
 
-        if not usage_list:
-            return 0.5
-
-        # 0이 아닌 달 수 계산
-        total_months = len(usage_list)
-        active_months = sum(1 for u in usage_list if u > 0)
-
-        return active_months / total_months if total_months > 0 else 0.5
+        return calculate_active_months_from_list(usage_list)['ratio']
 
     except Exception as e:
         print(f"활성 월 비율 계산 실패: {e}")

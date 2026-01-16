@@ -25,6 +25,7 @@ MIN_PATIENTS_FOR_ACTIVATION = 5  # 제안 기능 활성화에 필요한 최소 �
 MIN_PEAKS_FOR_SUGGESTION = 3     # 제안 대상 최소 피크 수
 DEFAULT_K = 3                    # KNN의 K값
 MAX_MONTHLY_USAGE = 200          # 월평균 사용량 임계값 (이 이상이면 추천 제외)
+DISCONTINUED_MONTHS_THRESHOLD = 9  # 단종 판정 임계값 (최근 N개월 연속 미사용 시 제외)
 
 # Feature 가중치 (6차원)
 # 순서: avg_interval, interval_cv, height_cv, acf_max, peak_count, active_months_ratio
@@ -281,6 +282,16 @@ def get_suggestion_candidates():
         if skip_counts.get(약품코드, 0) > 0:
             continue
 
+        # 단종 약품 제외 (최근 N개월 연속 미사용)
+        usage_json = processed.get('월별_조제수량_리스트', '[]')
+        try:
+            usage_list = json.loads(usage_json) if isinstance(usage_json, str) else usage_json
+            activity_info = drug_periodicity_db.calculate_active_months_from_list(usage_list)
+            if activity_info['trailing_zeros'] >= DISCONTINUED_MONTHS_THRESHOLD:
+                continue  # 단종 약품 제외
+        except:
+            pass
+
         fv = drug_periodicity_db.get_feature_vector(약품코드)
         if fv:
             candidate_codes.append(약품코드)
@@ -328,82 +339,52 @@ def get_suggestion_candidates():
     return candidates
 
 
-def get_next_suggestion():
+def _get_drug_suggestion_detail(약품코드):
     """
-    다음 제안 약품 1개 반환
+    약품의 제안 상세 정보를 조회하는 내부 헬퍼 함수
+
+    Args:
+        약품코드 (str): 약품 코드
 
     Returns:
-        dict 또는 None: {
-            'drug_code': str,
-            'drug_name': str,
-            'company': str,
-            'drug_type': str,
-            'similarity': float,
-            'periodicity_score': float,
-            'avg_interval': float,
-            'current_stock': int,
-            'monthly_usage': list[int],
-            'skip_count': int,
-            'registered_count': int,
-            'remaining_count': int
-        }
+        dict 또는 None: 약품 상세 정보
     """
-    # 활성화 상태 확인
-    status = get_activation_status()
-    if not status['active']:
-        return None
-
-    # 후보 목록
-    candidates = get_suggestion_candidates()
-
-    if not candidates:
-        return None
-
-    # 첫 번째 후보 선택
-    best = candidates[0]
-    약품코드 = best['약품코드']
-
-    # 상세 정보 조회
+    # DB 조회
     periodicity = drug_periodicity_db.get_periodicity(약품코드)
     processed = processed_inventory_db.get_drug_by_code(약품코드)
     inventory = inventory_db.get_inventory(약품코드)
 
-    # 약품명, 제약회사 조회
-    drug_name = ''
-    company = ''
-    drug_type = ''
+    if not processed:
+        return None
 
-    monthly_avg = 0
-    if processed:
-        drug_name = processed.get('약품명', '')
-        company = processed.get('제약회사', '')
-        drug_type = processed.get('약품유형', '')
-        monthly_avg = processed.get('1년_이동평균', 0) or 0
+    # 기본 정보
+    drug_name = processed.get('약품명', '')
+    company = processed.get('제약회사', '')
+    drug_type = processed.get('약품유형', '')
+    monthly_avg = processed.get('1년_이동평균', 0) or 0
 
     # 현재 재고
     current_stock = 0
     if inventory:
         current_stock = inventory.get('현재_재고수량', 0) or 0
 
-    # 월별 사용량
+    # 월별 사용량 파싱
     monthly_usage = []
-    if processed:
-        usage_json = processed.get('월별_조제수량_리스트', '[]')
-        try:
-            if isinstance(usage_json, str):
-                monthly_usage = json.loads(usage_json)
-            else:
-                monthly_usage = usage_json
-        except:
-            monthly_usage = []
+    usage_json = processed.get('월별_조제수량_리스트', '[]')
+    try:
+        if isinstance(usage_json, str):
+            monthly_usage = json.loads(usage_json)
+        else:
+            monthly_usage = usage_json
+    except:
+        monthly_usage = []
 
     # 평균 피크 높이 계산 (0이 아닌 값들의 평균)
     non_zero_usage = [v for v in monthly_usage if v > 0]
     avg_peak_height = sum(non_zero_usage) / len(non_zero_usage) if non_zero_usage else 0
 
-    # 활동률 계산 (전체 데이터 기간 기준)
-    active_months = len([v for v in monthly_usage if v > 0])
-    total_months = len(monthly_usage)
+    # 활동률 계산 (첫 사용 시점부터)
+    activity_info = drug_periodicity_db.calculate_active_months_from_list(monthly_usage)
 
     # 가장 가까운 K개 등록 약품
     nearest_k_drugs = get_nearest_k_drugs(약품코드)
@@ -413,21 +394,52 @@ def get_next_suggestion():
         'drug_name': drug_name,
         'company': company,
         'drug_type': drug_type,
-        'similarity': round(best['similarity'] * 100, 1),  # 퍼센트로
         'avg_interval': periodicity['avg_interval'] if periodicity else None,
         'interval_cv': periodicity['interval_cv'] if periodicity else None,
         'avg_peak_height': round(avg_peak_height, 1),
         'height_cv': periodicity['height_cv'] if periodicity else None,
-        'active_months': active_months,
-        'total_months': total_months,
+        'active_months': activity_info['active_months'],
+        'total_months': activity_info['total_months'],
         'monthly_avg': round(monthly_avg, 1),
         'current_stock': current_stock,
         'monthly_usage': monthly_usage,
-        'skip_count': best['skip_count'],
-        'registered_count': best['registered_count'],
-        'remaining_count': len(candidates) - 1,
-        'nearest_k_drugs': nearest_k_drugs  # KNN에서 가장 가까운 K개 등록 약품
+        'nearest_k_drugs': nearest_k_drugs
     }
+
+
+def get_next_suggestion():
+    """
+    다음 제안 약품 1개 반환
+
+    Returns:
+        dict 또는 None: 제안 정보
+    """
+    # 활성화 상태 확인
+    status = get_activation_status()
+    if not status['active']:
+        return None
+
+    # 후보 목록
+    candidates = get_suggestion_candidates()
+    if not candidates:
+        return None
+
+    # 첫 번째 후보 선택
+    best = candidates[0]
+    약품코드 = best['약품코드']
+
+    # 상세 정보 조회
+    detail = _get_drug_suggestion_detail(약품코드)
+    if not detail:
+        return None
+
+    # 후보 정보 추가
+    detail['similarity'] = round(best['similarity'] * 100, 1)
+    detail['skip_count'] = best['skip_count']
+    detail['registered_count'] = best['registered_count']
+    detail['remaining_count'] = len(candidates) - 1
+
+    return detail
 
 
 def register_drug_for_suggestion(약품코드, 환자ID, 처방량=1):
@@ -542,39 +554,9 @@ def get_drug_suggestion(약품코드):
         dict 또는 None: 제안 정보
     """
     # 상세 정보 조회
-    periodicity = drug_periodicity_db.get_periodicity(약품코드)
-    processed = processed_inventory_db.get_drug_by_code(약품코드)
-    inventory = inventory_db.get_inventory(약품코드)
-
-    if not processed:
+    detail = _get_drug_suggestion_detail(약품코드)
+    if not detail:
         return None
-
-    # 약품명, 제약회사 조회
-    drug_name = processed.get('약품명', '')
-    company = processed.get('제약회사', '')
-    drug_type = processed.get('약품유형', '')
-
-    # 현재 재고
-    current_stock = 0
-    if inventory:
-        current_stock = inventory.get('현재_재고수량', 0) or 0
-
-    # 월별 사용량
-    monthly_usage = []
-    usage_json = processed.get('월별_조제수량_리스트', '[]')
-    try:
-        if isinstance(usage_json, str):
-            monthly_usage = json.loads(usage_json)
-        else:
-            monthly_usage = usage_json
-    except:
-        monthly_usage = []
-
-    # 건너뛰기 횟수
-    skip_count = suggestion_db.get_skip_count(약품코드)
-
-    # 등록된 환자 수
-    registered_count = drug_patient_map_db.get_patient_count_for_drug(약품코드)
 
     # KNN 기반 유사도 계산
     registered_vectors = get_registered_feature_vectors()
@@ -583,25 +565,16 @@ def get_drug_suggestion(약품코드):
         similarities = weighted_euclidean_knn([fv], registered_vectors)
         similarity = float(similarities[0])
     else:
+        periodicity = drug_periodicity_db.get_periodicity(약품코드)
         similarity = periodicity['periodicity_score'] / 100 if periodicity else 0
 
-    return {
-        'drug_code': 약품코드,
-        'drug_name': drug_name,
-        'company': company,
-        'drug_type': drug_type,
-        'similarity': round(similarity * 100, 1),
-        'periodicity_score': periodicity['periodicity_score'] if periodicity else 0,
-        'avg_interval': periodicity['avg_interval'] if periodicity else None,
-        'interval_cv': periodicity['interval_cv'] if periodicity else None,
-        'height_cv': periodicity['height_cv'] if periodicity else None,
-        'peak_count': periodicity['peak_count'] if periodicity else 0,
-        'current_stock': current_stock,
-        'monthly_usage': monthly_usage,
-        'skip_count': skip_count,
-        'registered_count': registered_count,
-        'remaining_count': 0  # 개별 조회 시에는 의미 없음
-    }
+    # 추가 정보
+    detail['similarity'] = round(similarity * 100, 1)
+    detail['skip_count'] = suggestion_db.get_skip_count(약품코드)
+    detail['registered_count'] = drug_patient_map_db.get_patient_count_for_drug(약품코드)
+    detail['remaining_count'] = 0  # 개별 조회 시에는 의미 없음
+
+    return detail
 
 
 def get_suggestion_stats():
@@ -644,6 +617,15 @@ def get_suggestion_stats():
         if skip_counts.get(약품코드, 0) > 0:
             skipped_count += 1
             continue
+        # 단종 약품 제외 (최근 N개월 연속 미사용)
+        usage_json = processed.get('월별_조제수량_리스트', '[]')
+        try:
+            usage_list = json.loads(usage_json) if isinstance(usage_json, str) else usage_json
+            activity_info = drug_periodicity_db.calculate_active_months_from_list(usage_list)
+            if activity_info['trailing_zeros'] >= DISCONTINUED_MONTHS_THRESHOLD:
+                continue  # 단종 약품 제외
+        except:
+            pass
         filtered_periodic_drugs.append(약품코드)
 
     already_registered = len([d for d in filtered_periodic_drugs if d in registered_codes])
