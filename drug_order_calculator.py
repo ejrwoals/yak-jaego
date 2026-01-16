@@ -1828,20 +1828,24 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .modal-table-new-drugs th:nth-child(7),
         .modal-table-new-drugs td:nth-child(7) {{ width: 14%; white-space: nowrap; text-align: right; }}  /* 예상 런웨이 */
         /* 간헐적 사용 모달 (7컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 1년이동평균, 런웨이 - 클릭시 인라인 차트 */
+        .modal-body .modal-table-intermittent {{
+            table-layout: fixed !important;
+            width: 100% !important;
+        }}
         .modal-table-intermittent th:nth-child(1),
-        .modal-table-intermittent td:nth-child(1) {{ width: 30%; }}  /* 약품명 */
+        .modal-table-intermittent td:nth-child(1) {{ width: 28%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }}  /* 약품명 */
         .modal-table-intermittent th:nth-child(2),
         .modal-table-intermittent td:nth-child(2) {{ width: 12%; white-space: nowrap; }}  /* 약품코드 */
         .modal-table-intermittent th:nth-child(3),
-        .modal-table-intermittent td:nth-child(3) {{ width: 14%; }}  /* 제약회사 */
+        .modal-table-intermittent td:nth-child(3) {{ width: 12%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }}  /* 제약회사 */
         .modal-table-intermittent th:nth-child(4),
         .modal-table-intermittent td:nth-child(4) {{ width: 10%; white-space: nowrap; text-align: right; }}  /* 현재 재고 */
         .modal-table-intermittent th:nth-child(5),
         .modal-table-intermittent td:nth-child(5) {{ width: 10%; white-space: nowrap; }}  /* 약품유형 */
         .modal-table-intermittent th:nth-child(6),
-        .modal-table-intermittent td:nth-child(6) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 1년 이동평균 */
+        .modal-table-intermittent td:nth-child(6) {{ width: 14%; white-space: nowrap; text-align: right; }}  /* 1년 이동평균 */
         .modal-table-intermittent th:nth-child(7),
-        .modal-table-intermittent td:nth-child(7) {{ width: 12%; white-space: nowrap; text-align: right; }}  /* 런웨이 */
+        .modal-table-intermittent td:nth-child(7) {{ width: 14%; white-space: nowrap; text-align: right; }}  /* 런웨이 */
         .modal-table-intermittent .clickable-row {{
             cursor: pointer;
         }}
