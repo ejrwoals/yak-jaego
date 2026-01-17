@@ -3,6 +3,7 @@
 {% block title %}약품 개별 관리 - Jaego{% endblock %}
 
 {% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
@@ -17,20 +18,20 @@
     }
 
     body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        background: #f5f5f5;
+        font-family: var(--font-family);
+        background: var(--color-background);
         min-height: 100vh;
-        padding: 20px;
+        padding: var(--space-5);
         overflow-y: scroll;
     }
 
     .container {
         max-width: 1000px;
         margin: 0 auto;
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        padding: 30px;
+        background: var(--color-surface);
+        border-radius: var(--radius-2xl);
+        box-shadow: var(--shadow-lg);
+        padding: var(--space-8);
         animation: fadeIn 0.5s ease;
     }
 
@@ -41,19 +42,56 @@
 
     @keyframes highlight {
         0% { background-color: transparent; }
-        30% { background-color: #bee3f8; }
+        30% { background-color: var(--brand-primary-subtle); }
         100% { background-color: transparent; }
     }
 
+    /* Page Header */
+    .page-header {
+        display: block;
+        text-align: center;
+        padding-bottom: var(--space-3);
+        margin-bottom: var(--space-8);
+        border-bottom: 2px solid var(--color-border);
+    }
+
+    .page-header h1 {
+        color: var(--color-text-primary);
+        font-size: var(--text-2xl);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-3);
+    }
+
+    .page-header h1 .icon {
+        width: var(--icon-lg);
+        height: var(--icon-lg);
+        color: var(--brand-primary);
+    }
+
+    .page-header p {
+        color: var(--color-text-muted);
+        margin-top: var(--space-2);
+    }
+
     .back-link {
-        color: #4299e1;
+        color: var(--brand-primary);
         text-decoration: none;
-        font-size: 14px;
-        display: inline-block;
+        font-size: var(--text-sm);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        margin-bottom: var(--space-5);
     }
 
     .back-link:hover {
         text-decoration: underline;
+    }
+
+    .back-link .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     /* Header Row (Stats + Actions) */
@@ -61,125 +99,139 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 15px;
-        margin-bottom: 20px;
+        gap: var(--space-4);
+        margin-bottom: var(--space-5);
         flex-wrap: wrap;
     }
 
     /* Stats Bar */
     .stats-bar {
         display: flex;
-        gap: 15px;
-        padding: 12px 16px;
-        background: #f1f5f9;
-        border-radius: 10px;
+        gap: var(--space-4);
+        padding: var(--space-3) var(--space-4);
+        background: var(--color-surface-hover);
+        border-radius: var(--radius-lg);
         flex-wrap: wrap;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--color-border);
         flex: 1;
     }
 
     .header-actions {
         display: flex;
-        gap: 10px;
+        gap: var(--space-3);
         flex-wrap: wrap;
         flex-shrink: 0;
     }
 
     .stat-item {
-        color: #475569;
-        font-size: 14px;
+        color: var(--color-text-secondary);
+        font-size: var(--text-sm);
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: var(--space-2);
+    }
+
+    .stat-item .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .stat-value {
-        font-weight: bold;
-        font-size: 16px;
-        color: #1e293b;
+        font-weight: var(--font-bold);
+        font-size: var(--text-base);
+        color: var(--color-text-primary);
     }
 
     /* Search & Filter */
     .search-filter-bar {
         display: flex;
-        gap: 15px;
+        gap: var(--space-4);
         align-items: center;
-        margin-bottom: 20px;
+        margin-bottom: var(--space-5);
         flex-wrap: wrap;
     }
 
     .search-input {
         flex: 1;
         min-width: 250px;
-        padding: 14px 18px;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        font-size: 15px;
+        padding: var(--space-4);
+        border: 2px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-base);
     }
 
     .search-input:focus {
         outline: none;
-        border-color: #4299e1;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-primary-subtle);
     }
 
     .filter-buttons {
         display: flex;
-        gap: 8px;
+        gap: var(--space-2);
         flex-wrap: wrap;
     }
 
     .filter-btn {
-        padding: 6px 14px;
-        border: 1px solid #d1d5db;
-        border-radius: 20px;
-        background: #f9fafb;
+        padding: var(--space-2) var(--space-4);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-full);
+        background: var(--color-surface-hover);
         cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-        color: #6b7280;
-        transition: all 0.2s;
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        color: var(--color-text-muted);
+        transition: all var(--transition-fast);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+    }
+
+    .filter-btn .icon {
+        width: var(--icon-xs);
+        height: var(--icon-xs);
     }
 
     .filter-btn:hover {
-        background: #f3f4f6;
-        border-color: #9ca3af;
-        color: #374151;
+        background: var(--color-surface);
+        border-color: var(--color-border-hover);
+        color: var(--color-text-secondary);
     }
 
     .filter-btn.active {
-        background: #eff6ff;
-        border-color: #60a5fa;
-        color: #2563eb;
+        background: var(--brand-primary-subtle);
+        border-color: var(--brand-primary);
+        color: var(--brand-primary-dark);
     }
 
     .sort-buttons {
         display: flex;
-        gap: 6px;
+        gap: var(--space-2);
         flex-wrap: wrap;
-        padding-left: 10px;
-        border-left: 1px solid #e2e8f0;
+        padding-left: var(--space-3);
+        border-left: 1px solid var(--color-border);
     }
 
     .sort-btn {
-        padding: 5px 12px;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        background: white;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-surface);
         cursor: pointer;
-        font-size: 12px;
-        color: #9ca3af;
-        transition: all 0.2s;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        transition: all var(--transition-fast);
     }
 
     .sort-btn:hover {
-        color: #6b7280;
-        border-color: #d1d5db;
+        color: var(--color-text-secondary);
+        border-color: var(--color-border-hover);
     }
 
     .sort-btn.active {
-        background: #f9fafb;
-        border-color: #9ca3af;
-        color: #374151;
+        background: var(--color-surface-hover);
+        border-color: var(--color-border-hover);
+        color: var(--color-text-secondary);
     }
 
     /* Drug Card List */
@@ -188,7 +240,7 @@
         overflow-y: auto;
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
+        gap: var(--space-3);
     }
 
     .drug-list::-webkit-scrollbar {
@@ -196,28 +248,28 @@
     }
 
     .drug-list::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 4px;
+        background: var(--color-surface-hover);
+        border-radius: var(--radius-sm);
     }
 
     .drug-list::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
+        background: var(--color-border-hover);
+        border-radius: var(--radius-sm);
     }
 
     .drug-card {
-        background: #f7fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 14px;
-        transition: all 0.2s;
+        background: var(--color-surface-hover);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        transition: all var(--transition-fast);
         min-width: 0;
         overflow: hidden;
     }
 
     .drug-card:hover {
-        border-color: #cbd5e0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-color: var(--color-border-hover);
+        box-shadow: var(--shadow-md);
         transform: translateY(-1px);
     }
 
@@ -225,44 +277,50 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
     }
 
     .drug-card-title {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--space-2);
         flex: 1;
         min-width: 0;
     }
 
     .star-flag {
-        font-size: 1.3em;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .star-flag .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
     }
 
     .star-flag.off {
-        color: #cbd5e0;
+        color: var(--color-border-hover);
     }
 
     .star-flag.off:hover {
-        color: #a0aec0;
+        color: var(--color-text-muted);
     }
 
     .star-flag.on {
-        color: #f6e05e;
-        text-shadow: 0 0 8px rgba(246, 224, 94, 0.5);
+        color: var(--color-warning);
     }
 
     .star-flag.on:hover {
-        color: #ecc94b;
+        color: var(--color-warning-dark);
     }
 
     .drug-name {
-        font-size: 15px;
-        font-weight: 700;
-        color: #1a202c;
+        font-size: var(--text-base);
+        font-weight: var(--font-bold);
+        color: var(--color-text-primary);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -271,41 +329,41 @@
     .drug-meta {
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        color: #718096;
-        margin-top: 2px;
+        gap: var(--space-2);
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        margin-top: var(--space-1);
     }
 
     .drug-code {
-        font-size: 12px;
-        color: #718096;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
     }
 
     .drug-meta-separator {
-        color: #cbd5e0;
+        color: var(--color-border-hover);
     }
 
     .drug-company {
-        font-size: 12px;
-        color: #a0aec0;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
     }
 
     .drug-stock {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        background: #e8f4f8;
-        color: #3d7a8c;
-        padding: 5px 10px;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 10px;
+        gap: var(--space-1);
+        background: var(--brand-primary-subtle);
+        color: var(--brand-primary-dark);
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        margin-bottom: var(--space-3);
     }
 
     .drug-stock-label {
-        font-weight: 500;
+        font-weight: var(--font-medium);
     }
 
     /* Tooltip */
@@ -313,25 +371,25 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 16px;
-        height: 16px;
-        min-width: 16px;
-        min-height: 16px;
-        background: #e2e8f0;
-        color: #718096;
-        border-radius: 50%;
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        min-width: var(--icon-sm);
+        min-height: var(--icon-sm);
+        background: var(--color-border);
+        color: var(--color-text-muted);
+        border-radius: var(--radius-full);
         font-size: 10px;
-        font-weight: 600;
+        font-weight: var(--font-semibold);
         cursor: help;
-        margin-left: 6px;
+        margin-left: var(--space-2);
         position: relative;
         line-height: 1;
         vertical-align: middle;
     }
 
     .help-icon:hover {
-        background: #cbd5e0;
-        color: #4a5568;
+        background: var(--color-border-hover);
+        color: var(--color-text-secondary);
     }
 
     .help-icon .tooltip {
@@ -339,17 +397,17 @@
         position: absolute;
         bottom: calc(100% + 8px);
         left: 0;
-        background: #2d3748;
-        color: white;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-size: 12px;
-        font-weight: 400;
+        background: var(--color-text-primary);
+        color: var(--color-surface);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-xs);
+        font-weight: var(--font-normal);
         white-space: normal;
         width: 280px;
         line-height: 1.5;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 1000;
+        box-shadow: var(--shadow-lg);
+        z-index: var(--z-tooltip);
         overflow: visible;
         height: auto;
         min-height: fit-content;
@@ -361,7 +419,7 @@
         top: 100%;
         left: 12px;
         border: 6px solid transparent;
-        border-top-color: #2d3748;
+        border-top-color: var(--color-text-primary);
     }
 
     .help-icon:hover .tooltip {
@@ -371,67 +429,81 @@
     .drug-badges {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
     .badge {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 12px;
+        gap: var(--space-1);
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-full);
+        font-size: var(--text-xs);
+    }
+
+    .badge .icon {
+        width: var(--icon-xs);
+        height: var(--icon-xs);
     }
 
     .badge-threshold {
-        background: #fed7d7;
-        color: #c53030;
+        background: var(--color-danger-light);
+        color: var(--color-danger);
     }
 
     .badge-memo {
-        background: #feebc8;
-        color: #c05621;
+        background: var(--color-warning-light);
+        color: var(--color-warning-dark);
     }
 
     .badge-patient {
-        background: #e8f4fd;
-        color: #2b6cb0;
+        background: var(--color-info-light);
+        color: var(--color-info);
     }
 
     .btn {
-        padding: 8px 16px;
-        border-radius: 8px;
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radius-lg);
         border: none;
         cursor: pointer;
-        font-size: 14px;
-        transition: all 0.2s;
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        transition: all var(--transition-fast);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .btn .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .btn-primary {
-        background: #48bb78;
+        background: var(--brand-primary);
         color: white;
     }
 
     .btn-primary:hover {
-        background: #38a169;
+        background: var(--brand-primary-dark);
     }
 
     .btn-secondary {
-        background: #e2e8f0;
-        color: #4a5568;
+        background: var(--color-border);
+        color: var(--color-text-secondary);
     }
 
     .btn-secondary:hover {
-        background: #cbd5e0;
+        background: var(--color-border-hover);
     }
 
     .btn-danger {
-        background: #fc8181;
+        background: var(--color-danger);
         color: white;
     }
 
     .btn-danger:hover {
-        background: #f56565;
+        background: var(--color-danger-dark);
     }
 
     /* Modal */
@@ -443,7 +515,7 @@
         width: 100%;
         height: 100%;
         background: rgba(0,0,0,0.5);
-        z-index: 2000;
+        z-index: var(--z-modal);
         justify-content: center;
         align-items: center;
     }
@@ -453,62 +525,83 @@
     }
 
     .modal-content {
-        background: white;
-        border-radius: 16px;
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
         width: 90%;
         max-width: 600px;
         max-height: 90vh;
         overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        box-shadow: var(--shadow-xl);
     }
 
     .modal-header {
-        padding: 20px;
-        border-bottom: 1px solid #e2e8f0;
+        padding: var(--space-5);
+        border-bottom: 1px solid var(--color-border);
         display: flex;
         justify-content: space-between;
         align-items: center;
         position: sticky;
         top: 0;
-        background: white;
+        background: var(--color-surface);
         z-index: 10;
     }
 
     .modal-header h3 {
-        font-size: 18px;
-        color: #2d3748;
+        font-size: var(--text-lg);
+        color: var(--color-text-primary);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .modal-header h3 .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
+        color: var(--brand-primary);
     }
 
     .modal-close {
-        font-size: 24px;
+        width: var(--icon-lg);
+        height: var(--icon-lg);
         cursor: pointer;
-        color: #a0aec0;
+        color: var(--color-text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-md);
+        transition: all var(--transition-fast);
     }
 
     .modal-close:hover {
-        color: #718096;
+        color: var(--color-text-secondary);
+        background: var(--color-surface-hover);
+    }
+
+    .modal-close .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
     }
 
     .modal-body {
-        padding: 20px;
+        padding: var(--space-5);
     }
 
     .modal-footer {
-        padding: 20px;
-        border-top: 1px solid #e2e8f0;
+        padding: var(--space-5);
+        border-top: 1px solid var(--color-border);
         display: flex;
         justify-content: flex-end;
-        gap: 10px;
+        gap: var(--space-3);
         position: sticky;
         bottom: 0;
-        background: white;
+        background: var(--color-surface);
     }
 
     /* Form sections */
     .form-section {
-        margin-bottom: 20px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #e2e8f0;
+        margin-bottom: var(--space-5);
+        padding-bottom: var(--space-5);
+        border-bottom: 1px solid var(--color-border);
     }
 
     .form-section:last-child {
@@ -517,48 +610,63 @@
     }
 
     .form-section-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: #4a5568;
-        margin-bottom: 12px;
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        color: var(--color-text-secondary);
+        margin-bottom: var(--space-3);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .form-section-title .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        color: var(--brand-primary);
     }
 
     .form-row {
         display: flex;
-        gap: 15px;
-        margin-bottom: 12px;
+        gap: var(--space-4);
+        margin-bottom: var(--space-3);
     }
 
     .min-threshold-warning {
         display: flex;
         align-items: flex-start;
-        gap: 8px;
-        padding: 10px 12px;
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-        border: 1px solid #f59e0b;
-        border-radius: 8px;
-        margin-top: 8px;
+        gap: var(--space-2);
+        padding: var(--space-3);
+        background: var(--color-warning-light);
+        border: 1px solid var(--color-warning);
+        border-radius: var(--radius-lg);
+        margin-top: var(--space-2);
     }
 
     .min-threshold-warning .warning-icon {
         flex-shrink: 0;
+        color: var(--color-warning-dark);
+    }
+
+    .min-threshold-warning .warning-icon .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .min-threshold-warning .warning-text {
-        font-size: 13px;
-        color: #92400e;
+        font-size: var(--text-sm);
+        color: var(--color-warning-dark);
         line-height: 1.4;
     }
 
     .min-threshold-warning .auto-fill-link {
-        color: #d97706;
-        font-weight: 600;
+        color: var(--color-warning-dark);
+        font-weight: var(--font-semibold);
         cursor: pointer;
         text-decoration: underline;
     }
 
     .min-threshold-warning .auto-fill-link:hover {
-        color: #b45309;
+        color: var(--color-warning);
     }
 
     .form-group {
@@ -567,24 +675,25 @@
 
     .form-group label {
         display: block;
-        font-size: 13px;
-        color: #718096;
-        margin-bottom: 6px;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+        margin-bottom: var(--space-2);
     }
 
     .form-group input,
     .form-group textarea {
         width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: var(--space-3);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-sm);
     }
 
     .form-group input:focus,
     .form-group textarea:focus {
         outline: none;
-        border-color: #4299e1;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-primary-subtle);
     }
 
     .form-group textarea {
@@ -593,154 +702,154 @@
     }
 
     .current-value {
-        font-size: 13px;
-        color: #718096;
-        margin-bottom: 6px;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+        margin-bottom: var(--space-2);
     }
 
     /* Patient tags */
     .patient-tags {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 12px;
+        gap: var(--space-2);
+        margin-bottom: var(--space-3);
     }
 
     .patient-tag {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        background: #e8f4fd;
-        border: 1px solid #90cdf4;
-        border-radius: 20px;
-        font-size: 13px;
-        color: #2b6cb0;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-info-light);
+        border: 1px solid var(--color-info);
+        border-radius: var(--radius-full);
+        font-size: var(--text-sm);
+        color: var(--color-info);
     }
 
     .patient-tag .tag-content {
         cursor: pointer;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-2);
     }
 
     .patient-tag .tag-content:hover {
-        color: #2c5282;
+        color: var(--color-info-dark);
     }
 
     .patient-tag .tag-content:hover .patient-dosage-badge {
-        background: #2b6cb0;
+        background: var(--color-info-dark);
     }
 
     .patient-tag .remove-btn {
         cursor: pointer;
-        color: #4299e1;
-        font-weight: bold;
-        margin-left: 2px;
+        color: var(--color-info);
+        font-weight: var(--font-bold);
+        margin-left: var(--space-1);
     }
 
     .patient-tag .remove-btn:hover {
-        color: #e53e3e;
+        color: var(--color-danger);
     }
 
     .patient-dosage-badge {
-        background: #4299e1;
+        background: var(--color-info);
         color: white;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 11px;
-        font-weight: 500;
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-md);
+        font-size: var(--text-xs);
+        font-weight: var(--font-medium);
     }
 
     /* Buffer Calculation Section */
     .buffer-calc-container {
-        padding: 15px;
-        background: #f7fafc;
-        border-radius: 8px;
+        padding: var(--space-4);
+        background: var(--color-surface-hover);
+        border-radius: var(--radius-lg);
     }
 
     .risk-level-chips {
         display: flex;
-        gap: 8px;
+        gap: var(--space-2);
         justify-content: center;
         flex-wrap: wrap;
-        margin-top: 8px;
+        margin-top: var(--space-2);
     }
 
     .risk-chip {
-        padding: 8px 16px;
-        border: 2px solid #e2e8f0;
-        border-radius: 20px;
-        background: #fff;
+        padding: var(--space-2) var(--space-4);
+        border: 2px solid var(--color-border);
+        border-radius: var(--radius-full);
+        background: var(--color-surface);
         cursor: pointer;
-        transition: all 0.2s ease;
-        font-size: 14px;
-        color: #4a5568;
+        transition: all var(--transition-fast);
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
     }
 
     .risk-chip:hover {
-        border-color: #4299e1;
-        background: #ebf8ff;
+        border-color: var(--brand-primary);
+        background: var(--brand-primary-subtle);
     }
 
     .risk-chip.selected {
-        border-color: #4299e1;
-        background: #4299e1;
-        color: #fff;
+        border-color: var(--brand-primary);
+        background: var(--brand-primary);
+        color: white;
     }
 
     .risk-chip .chip-label {
-        font-weight: 500;
+        font-weight: var(--font-medium);
     }
 
     .buffer-result {
-        margin-top: 15px;
-        padding: 15px;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
+        margin-top: var(--space-4);
+        padding: var(--space-4);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
     }
 
     .buffer-result-header {
         text-align: center;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
     }
 
     .buffer-value {
-        font-size: 36px;
-        font-weight: 700;
-        color: #4299e1;
+        font-size: var(--text-4xl);
+        font-weight: var(--font-bold);
+        color: var(--brand-primary);
     }
 
     .buffer-unit {
-        font-size: 16px;
-        color: #718096;
-        margin-left: 5px;
+        font-size: var(--text-base);
+        color: var(--color-text-muted);
+        margin-left: var(--space-1);
     }
 
     .buffer-explanation {
-        font-size: 14px;
-        color: #4a5568;
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
         text-align: center;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
         line-height: 1.5;
     }
 
     .buffer-details {
-        font-size: 13px;
-        color: #718096;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 10px;
-        margin-top: 10px;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+        border-top: 1px solid var(--color-border);
+        padding-top: var(--space-3);
+        margin-top: var(--space-3);
     }
 
     .buffer-patient-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 6px 0;
-        border-bottom: 1px solid #f0f0f0;
+        padding: var(--space-2) 0;
+        border-bottom: 1px solid var(--color-surface-hover);
     }
 
     .buffer-patient-item:last-child {
@@ -748,8 +857,8 @@
     }
 
     .buffer-patient-included {
-        color: #2b6cb0;
-        font-weight: 500;
+        color: var(--color-info);
+        font-weight: var(--font-medium);
     }
 
     .patient-search-container {
@@ -758,10 +867,16 @@
 
     .patient-search-input {
         width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: var(--space-3);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-sm);
+    }
+
+    .patient-search-input:focus {
+        outline: none;
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-primary-subtle);
     }
 
     .patient-search-results {
@@ -769,15 +884,15 @@
         top: 100%;
         left: 0;
         right: 0;
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        margin-top: 4px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        margin-top: var(--space-1);
         max-height: 200px;
         overflow-y: auto;
         display: none;
-        z-index: 100;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        z-index: var(--z-dropdown);
+        box-shadow: var(--shadow-md);
     }
 
     .patient-search-results.visible {
@@ -785,81 +900,92 @@
     }
 
     .patient-result-item {
-        padding: 10px 12px;
+        padding: var(--space-3);
         cursor: pointer;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--color-surface-hover);
     }
 
     .patient-result-item:hover {
-        background: #f7fafc;
+        background: var(--color-surface-hover);
     }
 
     .patient-result-item:last-child {
         border-bottom: none;
     }
 
-    /* Add patient modal */
+    /* Add patient button */
     .add-patient-btn {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 8px 12px;
-        background: #48bb78;
+        gap: var(--space-1);
+        padding: var(--space-2) var(--space-3);
+        background: var(--brand-primary);
         color: white;
         border: none;
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
         cursor: pointer;
-        font-size: 13px;
+        font-size: var(--text-sm);
+        transition: all var(--transition-fast);
+    }
+
+    .add-patient-btn .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .add-patient-btn:hover {
-        background: #38a169;
+        background: var(--brand-primary-dark);
     }
 
     /* Status message */
     .status-message {
-        padding: 12px 16px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-5);
         display: none;
     }
 
     .status-message.success {
-        background: #c6f6d5;
-        color: #276749;
+        background: var(--color-success-light);
+        color: var(--color-success-dark);
         display: block;
     }
 
     .status-message.error {
-        background: #fed7d7;
-        color: #c53030;
+        background: var(--color-danger-light);
+        color: var(--color-danger);
         display: block;
     }
 
     /* Empty state */
     .empty-state {
         text-align: center;
-        padding: 60px 20px;
-        color: #a0aec0;
+        padding: var(--space-16) var(--space-5);
+        color: var(--color-text-muted);
         grid-column: 1 / -1;
     }
 
     .empty-state-icon {
-        font-size: 3em;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
+        color: var(--color-border-hover);
+    }
+
+    .empty-state-icon .icon {
+        width: var(--icon-xl);
+        height: var(--icon-xl);
     }
 
     /* Drug search in modal */
     .drug-search-section {
-        margin-bottom: 20px;
+        margin-bottom: var(--space-5);
     }
 
     .drug-search-results {
         max-height: 200px;
         overflow-y: auto;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        margin-top: 8px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        margin-top: var(--space-2);
         display: none;
     }
 
@@ -868,21 +994,21 @@
     }
 
     .drug-result-item {
-        padding: 12px;
+        padding: var(--space-3);
         cursor: pointer;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--color-surface-hover);
     }
 
     .drug-result-item:hover {
-        background: #f7fafc;
+        background: var(--color-surface-hover);
     }
 
     .selected-drug {
-        padding: 12px;
-        background: #ebf8ff;
-        border: 1px solid #90cdf4;
-        border-radius: 8px;
-        margin-top: 12px;
+        padding: var(--space-3);
+        background: var(--brand-primary-subtle);
+        border: 1px solid var(--brand-primary-light);
+        border-radius: var(--radius-lg);
+        margin-top: var(--space-3);
         display: none;
     }
 
@@ -893,9 +1019,18 @@
     .selected-drug-clear {
         background: none;
         border: none;
-        color: #e53e3e;
+        color: var(--color-danger);
         cursor: pointer;
-        font-size: 18px;
+        font-size: var(--text-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-1);
+    }
+
+    .selected-drug-clear .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
     }
 
     /* Editable fields section - hidden until drug selected */
@@ -909,41 +1044,46 @@
 
     .unselected-hint {
         text-align: center;
-        padding: 40px 20px;
-        color: #a0aec0;
-        font-size: 14px;
-        border: 2px dashed #e2e8f0;
-        border-radius: 12px;
-        margin-top: 20px;
+        padding: var(--space-10) var(--space-5);
+        color: var(--color-text-muted);
+        font-size: var(--text-sm);
+        border: 2px dashed var(--color-border);
+        border-radius: var(--radius-lg);
+        margin-top: var(--space-5);
     }
 
     .unselected-hint-icon {
-        font-size: 2em;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
+        color: var(--color-border-hover);
+    }
+
+    .unselected-hint-icon .icon {
+        width: var(--icon-xl);
+        height: var(--icon-xl);
     }
 
     /* Changed field indicator */
     .form-section.changed {
-        border-left: 3px solid #4299e1;
-        background: linear-gradient(90deg, #ebf8ff 0%, white 100%);
+        border-left: 3px solid var(--brand-primary);
+        background: linear-gradient(90deg, var(--brand-primary-subtle) 0%, var(--color-surface) 100%);
     }
 
     .form-section.changed .form-section-title::after {
         content: ' (변경됨)';
-        color: #4299e1;
-        font-size: 12px;
-        font-weight: normal;
+        color: var(--brand-primary);
+        font-size: var(--text-xs);
+        font-weight: var(--font-normal);
     }
 
     /* Disabled save button */
     .btn-primary:disabled {
-        background: #cbd5e0;
+        background: var(--color-border-hover);
         cursor: not-allowed;
         opacity: 0.7;
     }
 
     .btn-primary:disabled:hover {
-        background: #cbd5e0;
+        background: var(--color-border-hover);
     }
 
     /* Modal shake animation */
@@ -959,30 +1099,64 @@
 
     /* Current value display */
     .current-value-display {
-        font-size: 13px;
-        color: #4a5568;
-        padding: 8px 12px;
-        background: #f7fafc;
-        border-radius: 6px;
-        margin-bottom: 8px;
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+        padding: var(--space-2) var(--space-3);
+        background: var(--color-surface-hover);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-2);
     }
 
     .current-value-display strong {
-        color: #2d3748;
+        color: var(--color-text-primary);
+    }
+
+    /* New patient option in search results */
+    .new-patient-option {
+        background: var(--color-success-light) !important;
+        color: var(--color-success-dark) !important;
+        font-weight: var(--font-medium);
+    }
+
+    .new-patient-option:hover {
+        background: var(--color-success-light) !important;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .drug-list {
+            grid-template-columns: 1fr;
+        }
+
+        .header-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .stats-bar {
+            justify-content: center;
+        }
+
+        .header-actions {
+            justify-content: center;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
     <div class="container">
-        <a href="/" class="back-link" style="margin-bottom: 20px;">← 홈으로 돌아가기</a>
+        <a href="/" class="back-link">
+            <svg class="icon"><use href="#icon-arrow-left"></use></svg>
+            홈으로 돌아가기
+        </a>
 
-        <div style="display: block; text-align: center; padding-bottom: 10px; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
-            <h1 style="color: #2d3748; font-size: 1.8em; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <span>⚙️</span>
+        <div class="page-header">
+            <h1>
+                <svg class="icon"><use href="#icon-settings"></use></svg>
                 약품 개별 관리
             </h1>
-            <p style="color: #718096; margin-top: 8px;">개별 약품의 상세 설정을 관리합니다</p>
+            <p>개별 약품의 상세 설정을 관리합니다</p>
         </div>
 
         <div id="statusMessage" class="status-message"></div>
@@ -994,24 +1168,31 @@
                     <span class="stat-value" id="statTotal">0</span>개
                 </div>
                 <div class="stat-item">
-                    <span>⭐ 특별관리:</span>
+                    <svg class="icon" style="color: var(--color-warning);"><use href="#icon-star"></use></svg>
+                    <span>특별관리:</span>
                     <span class="stat-value" id="statFlagged">0</span>개
                 </div>
                 <div class="stat-item">
-                    <span>📝 메모:</span>
+                    <svg class="icon" style="color: var(--color-warning-dark);"><use href="#icon-file-text"></use></svg>
+                    <span>메모:</span>
                     <span class="stat-value" id="statMemo">0</span>개
                 </div>
                 <div class="stat-item">
-                    <span>⚙️ 임계값:</span>
+                    <svg class="icon" style="color: var(--color-danger);"><use href="#icon-sliders"></use></svg>
+                    <span>임계값:</span>
                     <span class="stat-value" id="statThreshold">0</span>개
                 </div>
                 <div class="stat-item">
-                    <span>👤 등록 환자:</span>
+                    <svg class="icon" style="color: var(--color-info);"><use href="#icon-user"></use></svg>
+                    <span>등록 환자:</span>
                     <span class="stat-value" id="statPatient">0</span>명
                 </div>
             </div>
             <div class="header-actions">
-                <button class="btn btn-primary" onclick="openAddModal()">+ 새 약품 관리 추가</button>
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <svg class="icon"><use href="#icon-plus"></use></svg>
+                    새 약품 관리 추가
+                </button>
             </div>
         </div>
 
@@ -1021,8 +1202,14 @@
                    oninput="filterDrugs()">
             <div class="filter-buttons">
                 <button class="filter-btn active" data-filter="all" onclick="setDrugFilter('all')">전체</button>
-                <button class="filter-btn" data-filter="flagged" onclick="setDrugFilter('flagged')">⭐ 특별관리</button>
-                <button class="filter-btn" data-filter="threshold" onclick="setDrugFilter('threshold')">⚙️ 임계값</button>
+                <button class="filter-btn" data-filter="flagged" onclick="setDrugFilter('flagged')">
+                    <svg class="icon"><use href="#icon-star"></use></svg>
+                    특별관리
+                </button>
+                <button class="filter-btn" data-filter="threshold" onclick="setDrugFilter('threshold')">
+                    <svg class="icon"><use href="#icon-sliders"></use></svg>
+                    임계값
+                </button>
             </div>
             <div class="sort-buttons">
                 <button class="sort-btn active" data-sort="recent" onclick="setDrugSort('recent')">최근순</button>
@@ -1032,9 +1219,11 @@
 
         <div class="drug-list" id="drugList">
             <div class="empty-state">
-                <div class="empty-state-icon">⚙️</div>
+                <div class="empty-state-icon">
+                    <svg class="icon"><use href="#icon-settings"></use></svg>
+                </div>
                 <div>관리 중인 약품이 없습니다.</div>
-                <div style="margin-top: 10px; font-size: 14px;">검색하여 약품을 추가하거나, "새 약품 관리 추가" 버튼을 클릭하세요.</div>
+                <div style="margin-top: var(--space-3); font-size: var(--text-sm);">검색하여 약품을 추가하거나, "새 약품 관리 추가" 버튼을 클릭하세요.</div>
             </div>
         </div>
     </div>
@@ -1043,45 +1232,56 @@
     <div id="drugModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">⚙️ 약품 상세 관리</h3>
-                <span class="modal-close" onclick="closeModal()">&times;</span>
+                <h3 id="modalTitle">
+                    <svg class="icon"><use href="#icon-settings"></use></svg>
+                    <span id="modalTitleText">약품 상세 관리</span>
+                </h3>
+                <span class="modal-close" onclick="closeModal()">
+                    <svg class="icon"><use href="#icon-x"></use></svg>
+                </span>
             </div>
             <div class="modal-body">
                 <!-- Drug Search (for new) -->
                 <div class="drug-search-section" id="drugSearchSection">
-                    <label style="font-size: 14px; color: #4a5568; margin-bottom: 8px; display: block;">약품 검색</label>
+                    <label style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2); display: block;">약품 검색</label>
                     <input type="text" class="search-input" id="modalDrugSearch"
                            placeholder="약품명 또는 약품코드로 검색..."
                            oninput="searchDrugsForModal()">
                     <div class="drug-search-results" id="modalDrugResults"></div>
                     <div class="selected-drug" id="selectedDrug">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: flex-start; gap: 10px;">
-                                <div class="star-flag" id="addStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글" style="margin-top: 2px;">☆</div>
+                            <div style="display: flex; align-items: flex-start; gap: var(--space-3);">
+                                <div class="star-flag off" id="addStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글" style="margin-top: 2px;">
+                                    <svg class="icon"><use href="#icon-star"></use></svg>
+                                </div>
                                 <div>
-                                    <div style="font-weight: 600;" id="selectedDrugName">-</div>
-                                    <div style="font-size: 13px; color: #718096; margin-top: 2px;">
+                                    <div style="font-weight: var(--font-semibold);" id="selectedDrugName">-</div>
+                                    <div style="font-size: var(--text-sm); color: var(--color-text-muted); margin-top: var(--space-1);">
                                         <span id="selectedDrugCode">-</span>
-                                        <span id="selectedDrugCompanySeparator" style="color: #cbd5e0; margin: 0 6px; display: none;">·</span>
-                                        <span id="selectedDrugCompany" style="color: #a0aec0; display: none;"></span>
+                                        <span id="selectedDrugCompanySeparator" style="color: var(--color-border-hover); margin: 0 var(--space-2); display: none;">·</span>
+                                        <span id="selectedDrugCompany" style="color: var(--color-text-muted); display: none;"></span>
                                     </div>
                                 </div>
                             </div>
-                            <button class="selected-drug-clear" onclick="clearDrugSelection()">&times;</button>
+                            <button class="selected-drug-clear" onclick="clearDrugSelection()">
+                                <svg class="icon"><use href="#icon-x"></use></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Drug Info (for edit) -->
                 <div class="form-section" id="drugInfoSection" style="display: none;">
-                    <div style="display: flex; align-items: flex-start; gap: 10px;">
-                        <div class="star-flag" id="editStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글" style="margin-top: 2px;">☆</div>
+                    <div style="display: flex; align-items: flex-start; gap: var(--space-3);">
+                        <div class="star-flag off" id="editStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글" style="margin-top: 2px;">
+                            <svg class="icon"><use href="#icon-star"></use></svg>
+                        </div>
                         <div style="flex: 1;">
-                            <div style="font-size: 18px; font-weight: 600;" id="editDrugName">-</div>
-                            <div style="font-size: 13px; color: #718096; margin-top: 4px;">
+                            <div style="font-size: var(--text-lg); font-weight: var(--font-semibold);" id="editDrugName">-</div>
+                            <div style="font-size: var(--text-sm); color: var(--color-text-muted); margin-top: var(--space-1);">
                                 <span id="editDrugCode">-</span>
-                                <span style="color: #cbd5e0; margin: 0 6px;">·</span>
-                                <span id="editDrugCompany" style="color: #a0aec0;">-</span>
+                                <span style="color: var(--color-border-hover); margin: 0 var(--space-2);">·</span>
+                                <span id="editDrugCompany" style="color: var(--color-text-muted);">-</span>
                             </div>
                         </div>
                     </div>
@@ -1089,16 +1289,21 @@
 
                 <!-- Hint when no drug selected -->
                 <div class="unselected-hint" id="unselectedHint">
-                    <div class="unselected-hint-icon">👆</div>
+                    <div class="unselected-hint-icon">
+                        <svg class="icon"><use href="#icon-chevron-up"></use></svg>
+                    </div>
                     <div>위에서 약품을 먼저 검색하여 선택해주세요</div>
-                    <div style="margin-top: 5px; font-size: 12px;">약품 선택 후 아래 편집 옵션이 표시됩니다</div>
+                    <div style="margin-top: var(--space-1); font-size: var(--text-xs);">약품 선택 후 아래 편집 옵션이 표시됩니다</div>
                 </div>
 
                 <!-- Editable fields (hidden until drug selected) -->
                 <div class="editable-fields-section" id="editableFieldsSection">
                     <!-- 1. Memo -->
                     <div class="form-section" id="sectionMemo">
-                        <div class="form-section-title">📝 메모</div>
+                        <div class="form-section-title">
+                            <svg class="icon"><use href="#icon-file-text"></use></svg>
+                            메모
+                        </div>
                         <div class="current-value-display" id="currentMemo">현재 메모: 없음</div>
                         <div class="form-group">
                             <textarea id="inputMemo" placeholder="메모를 입력하세요..." oninput="checkChanges()"></textarea>
@@ -1107,7 +1312,10 @@
 
                     <!-- 2. Drug Name Edit -->
                     <div class="form-section" id="sectionDrugName">
-                        <div class="form-section-title">📦 약품명 수정</div>
+                        <div class="form-section-title">
+                            <svg class="icon"><use href="#icon-package"></use></svg>
+                            약품명 수정
+                        </div>
                         <div class="current-value-display" id="currentDrugName">현재 약품명: -</div>
                         <div class="form-group">
                             <label>새 약품명 (변경 시에만 입력)</label>
@@ -1117,7 +1325,10 @@
 
                     <!-- 2. Stock Edit -->
                     <div class="form-section" id="sectionStock">
-                        <div class="form-section-title">🔢 재고 수정</div>
+                        <div class="form-section-title">
+                            <svg class="icon"><use href="#icon-hash"></use></svg>
+                            재고 수정
+                        </div>
                         <div class="current-value-display" id="currentStock">현재 재고: -</div>
                         <div class="form-group">
                             <label>새 재고수량 (변경 시에만 입력)</label>
@@ -1128,7 +1339,8 @@
                     <!-- 3. Threshold -->
                     <div class="form-section" id="sectionThreshold">
                         <div class="form-section-title">
-                            ⚙️ 최소 안전 재고량 개별 설정
+                            <svg class="icon"><use href="#icon-sliders"></use></svg>
+                            최소 안전 재고량 개별 설정
                             <span class="help-icon">?
                                 <span class="tooltip">설정한 임계값 이하로 재고가 떨어지면 재고 현황 리포트에서 해당 약품이 강조 표시됩니다. 재고 임계값은 수량 기준, 런웨이 임계값은 현재 사용 속도 대비 남은 개월 수 기준입니다. 환자 등록 시 1회 최대 처방량으로 자동 설정됩니다.</span>
                             </span>
@@ -1145,7 +1357,9 @@
                             </div>
                         </div>
                         <div id="minThresholdWarning" class="min-threshold-warning" style="display: none;">
-                            <span class="warning-icon">⚠️</span>
+                            <span class="warning-icon">
+                                <svg class="icon"><use href="#icon-alert-triangle"></use></svg>
+                            </span>
                             <span class="warning-text"></span>
                         </div>
                     </div>
@@ -1153,7 +1367,8 @@
                     <!-- 4. Patients -->
                     <div class="form-section" id="sectionPatients">
                         <div class="form-section-title">
-                            👤 환자 태그
+                            <svg class="icon"><use href="#icon-user"></use></svg>
+                            환자 태그
                             <span class="help-icon">?
                                 <span class="tooltip">특정 환자에게만 처방되는 약품에 환자를 태그하세요. 환자 등록 시 1회 최대 처방량이 최소 안전 재고량으로 자동 설정됩니다. 방문 주기와 처방량을 입력하면 동시 방문 대비용 재고도 계산할 수 있습니다.</span>
                             </span>
@@ -1167,15 +1382,19 @@
                                    oninput="searchPatients()">
                             <div class="patient-search-results" id="patientSearchResults"></div>
                         </div>
-                        <div style="margin-top: 10px;">
-                            <button class="add-patient-btn" onclick="openPatientModal()">+ 새 환자 등록</button>
+                        <div style="margin-top: var(--space-3);">
+                            <button class="add-patient-btn" onclick="openPatientModal()">
+                                <svg class="icon"><use href="#icon-plus"></use></svg>
+                                새 환자 등록
+                            </button>
                         </div>
                     </div>
 
                     <!-- 5. Buffer Calculation -->
                     <div class="form-section" id="sectionBuffer">
                         <div class="form-section-title">
-                            📊 동시 방문 대비용 재고 계산
+                            <svg class="icon"><use href="#icon-bar-chart-2"></use></svg>
+                            동시 방문 대비용 재고 계산
                             <span class="help-icon">?
                                 <span class="tooltip">연결된 환자들의 방문 주기와 처방량을 기반으로, 동시 방문 확률을 계산하여 필요한 안전 재고량을 산출합니다. 포아송 이항분포 모델을 사용합니다.</span>
                             </span>
@@ -1230,8 +1449,13 @@
     <div id="patientModal" class="modal">
         <div class="modal-content" style="max-width: 400px;">
             <div class="modal-header">
-                <h3>👤 새 환자 등록</h3>
-                <span class="modal-close" onclick="closePatientModal()">&times;</span>
+                <h3>
+                    <svg class="icon"><use href="#icon-user-plus"></use></svg>
+                    새 환자 등록
+                </h3>
+                <span class="modal-close" onclick="closePatientModal()">
+                    <svg class="icon"><use href="#icon-x"></use></svg>
+                </span>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -1265,18 +1489,23 @@
     <div id="dosageModal" class="modal">
         <div class="modal-content" style="max-width: 380px;">
             <div class="modal-header">
-                <h3 id="dosageModalTitle">💊 1회 처방량 입력</h3>
-                <span class="modal-close" onclick="closeDosageModal()">&times;</span>
+                <h3 id="dosageModalTitle">
+                    <svg class="icon" id="dosageModalIcon"><use href="#icon-pill"></use></svg>
+                    <span id="dosageModalTitleText">1회 처방량 입력</span>
+                </h3>
+                <span class="modal-close" onclick="closeDosageModal()">
+                    <svg class="icon"><use href="#icon-x"></use></svg>
+                </span>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom: 15px; padding: 12px; background: #f7fafc; border-radius: 8px;">
-                    <span id="dosagePatientName" style="font-weight: 600; color: #2d3748;"></span>
-                    <span id="dosagePatientInfo" style="color: #718096; font-size: 13px;"></span>
+                <div style="margin-bottom: var(--space-4); padding: var(--space-3); background: var(--color-surface-hover); border-radius: var(--radius-lg);">
+                    <span id="dosagePatientName" style="font-weight: var(--font-semibold); color: var(--color-text-primary);"></span>
+                    <span id="dosagePatientInfo" style="color: var(--color-text-muted); font-size: var(--text-sm);"></span>
                 </div>
                 <div class="form-group">
                     <label>1회 처방량 *</label>
                     <input type="number" id="inputDosage" placeholder="예: 30" min="1" value="1" onfocus="this.select()">
-                    <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                    <div style="font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1);">
                         이 환자에게 한 번 방문 시 처방하는 약품 수량
                     </div>
                 </div>
@@ -1382,9 +1611,11 @@
         if (drugs.length === 0) {
             listDiv.innerHTML = '\
                 <div class="empty-state">\
-                    <div class="empty-state-icon">⚙️</div>\
+                    <div class="empty-state-icon">\
+                        <svg class="icon"><use href="#icon-settings"></use></svg>\
+                    </div>\
                     <div>관리 중인 약품이 없습니다.</div>\
-                    <div style="margin-top: 10px; font-size: 14px;">검색하여 약품을 추가하거나, "새 약품 관리 추가" 버튼을 클릭하세요.</div>\
+                    <div style="margin-top: var(--space-3); font-size: var(--text-sm);">검색하여 약품을 추가하거나, "새 약품 관리 추가" 버튼을 클릭하세요.</div>\
                 </div>\
             ';
             return;
@@ -1392,28 +1623,29 @@
 
         listDiv.innerHTML = drugs.map(function(drug) {
             var starClass = drug.special_flag ? 'on' : 'off';
-            var starIcon = drug.special_flag ? '★' : '☆';
 
             var badges = '';
             if (drug.has_threshold) {
                 var thInfo = [];
                 if (drug.threshold.stock) thInfo.push(drug.threshold.stock + '개이하');
                 if (drug.threshold.runway) thInfo.push(drug.threshold.runway + '개월미만');
-                badges += '<span class="badge badge-threshold">⚙️ ' + thInfo.join(', ') + '</span>';
+                badges += '<span class="badge badge-threshold"><svg class="icon"><use href="#icon-sliders"></use></svg> ' + thInfo.join(', ') + '</span>';
             }
             if (drug.has_memo) {
-                badges += '<span class="badge badge-memo">📝 메모</span>';
+                badges += '<span class="badge badge-memo"><svg class="icon"><use href="#icon-file-text"></use></svg> 메모</span>';
             }
             if (drug.patients && drug.patients.length > 0) {
                 var names = drug.patients.map(function(p) { return p['환자명']; }).join(', ');
-                badges += '<span class="badge badge-patient">👤 ' + names + '</span>';
+                badges += '<span class="badge badge-patient"><svg class="icon"><use href="#icon-user"></use></svg> ' + names + '</span>';
             }
 
             return '\
                 <div class="drug-card" data-code="' + drug.drug_code + '">\
                     <div class="drug-card-header">\
                         <div class="drug-card-title">\
-                            <span class="star-flag ' + starClass + '" onclick="toggleFlag(\'' + drug.drug_code + '\')" title="특별 관리">' + starIcon + '</span>\
+                            <span class="star-flag ' + starClass + '" onclick="toggleFlag(\'' + drug.drug_code + '\')" title="특별 관리">\
+                                <svg class="icon"><use href="#icon-star"></use></svg>\
+                            </span>\
                             <div style="min-width: 0; flex: 1;">\
                                 <div class="drug-name" title="' + drug.drug_name + '">' + drug.drug_name + '</div>\
                                 <div class="drug-meta">\
@@ -1423,7 +1655,7 @@
                                 </div>\
                             </div>\
                         </div>\
-                        <button class="btn btn-secondary" onclick="openEditModal(\'' + drug.drug_code + '\')" style="padding: 6px 12px; font-size: 13px;">관리</button>\
+                        <button class="btn btn-secondary" onclick="openEditModal(\'' + drug.drug_code + '\')" style="padding: var(--space-2) var(--space-3); font-size: var(--text-sm);">관리</button>\
                     </div>\
                     <div class="drug-stock">\
                         <span class="drug-stock-label">현재고 :</span>\
@@ -1519,7 +1751,7 @@
             flag: false
         };
 
-        document.getElementById('modalTitle').textContent = '⚙️ 새 약품 관리 추가';
+        document.getElementById('modalTitleText').textContent = '새 약품 관리 추가';
         document.getElementById('drugSearchSection').style.display = 'block';
         document.getElementById('drugInfoSection').style.display = 'none';
 
@@ -1567,7 +1799,7 @@
                 if (data.status === 'success') {
                     var d = data.data;
 
-                    document.getElementById('modalTitle').textContent = '⚙️ 약품 상세 관리';
+                    document.getElementById('modalTitleText').textContent = '약품 상세 관리';
                     document.getElementById('drugSearchSection').style.display = 'none';
                     document.getElementById('drugInfoSection').style.display = 'block';
 
@@ -1815,23 +2047,19 @@
 
         if (modalFlag) {
             if (editStar) {
-                editStar.textContent = '★';
                 editStar.classList.remove('off');
                 editStar.classList.add('on');
             }
             if (addStar) {
-                addStar.textContent = '★';
                 addStar.classList.remove('off');
                 addStar.classList.add('on');
             }
         } else {
             if (editStar) {
-                editStar.textContent = '☆';
                 editStar.classList.remove('on');
                 editStar.classList.add('off');
             }
             if (addStar) {
-                addStar.textContent = '☆';
                 addStar.classList.remove('on');
                 addStar.classList.add('off');
             }
@@ -1967,10 +2195,12 @@
 
         // Update modal title and button based on mode
         if (editMode) {
-            document.getElementById('dosageModalTitle').textContent = '✏️ 처방량 수정';
+            document.getElementById('dosageModalIcon').querySelector('use').setAttribute('href', '#icon-edit-2');
+            document.getElementById('dosageModalTitleText').textContent = '처방량 수정';
             document.getElementById('dosageModalBtn').textContent = '수정';
         } else {
-            document.getElementById('dosageModalTitle').textContent = '💊 1회 처방량 입력';
+            document.getElementById('dosageModalIcon').querySelector('use').setAttribute('href', '#icon-pill');
+            document.getElementById('dosageModalTitleText').textContent = '1회 처방량 입력';
             document.getElementById('dosageModalBtn').textContent = '추가';
         }
 
@@ -2207,10 +2437,10 @@
 
         // Show patient details
         if (result.all_patients && result.all_patients.length > 0) {
-            var detailsHtml = '<div style="font-weight: 600; margin-bottom: 8px;">환자별 정보:</div>';
+            var detailsHtml = '<div style="font-weight: var(--font-semibold); margin-bottom: var(--space-2);">환자별 정보:</div>';
             result.all_patients.forEach(function(p) {
                 var includedClass = p['버퍼포함'] ? 'buffer-patient-included' : '';
-                var includedIcon = p['버퍼포함'] ? '✓ ' : '';
+                var includedIcon = p['버퍼포함'] ? '<svg class="icon" style="width: var(--icon-xs); height: var(--icon-xs); vertical-align: middle; margin-right: var(--space-1);"><use href="#icon-check"></use></svg>' : '';
                 detailsHtml += '\
                     <div class="buffer-patient-item ' + includedClass + '">\
                         <span>' + includedIcon + p['환자명'] + ' (' + p['방문주기_일'] + '일 주기)</span>\
@@ -2446,7 +2676,7 @@
         if (hasDrugModalContent()) {
             shakeModal('drugModal');
             var confirmed = await showConfirmModal({
-                icon: '⚠️',
+                icon: 'warning',
                 title: '작성 중인 내용이 있습니다',
                 message: '정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.',
                 confirmText: '닫기',
@@ -2464,7 +2694,7 @@
         if (hasPatientModalContent()) {
             shakeModal('patientModal');
             var confirmed = await showConfirmModal({
-                icon: '⚠️',
+                icon: 'warning',
                 title: '작성 중인 내용이 있습니다',
                 message: '정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.',
                 confirmText: '닫기',
@@ -2482,7 +2712,7 @@
         if (hasDosageModalContent()) {
             shakeModal('dosageModal');
             var confirmed = await showConfirmModal({
-                icon: '⚠️',
+                icon: 'warning',
                 title: '작성 중인 내용이 있습니다',
                 message: '정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.',
                 confirmText: '닫기',

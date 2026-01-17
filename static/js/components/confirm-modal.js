@@ -6,13 +6,37 @@
 (function(Jaego) {
     'use strict';
 
-    let confirmCallback = null;
+    var confirmCallback = null;
+
+    // SVG icon map for common types
+    var iconMap = {
+        'warning': {
+            svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-alert-triangle"></use></svg>',
+            className: 'icon-warning'
+        },
+        'danger': {
+            svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-trash-2"></use></svg>',
+            className: 'icon-danger'
+        },
+        'info': {
+            svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-info"></use></svg>',
+            className: 'icon-info'
+        },
+        'success': {
+            svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-check-circle"></use></svg>',
+            className: 'icon-success'
+        },
+        'question': {
+            svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-help-circle"></use></svg>',
+            className: 'icon-info'
+        }
+    };
 
     Jaego.confirmModal = {
         /**
          * Show confirmation modal
          * @param {Object} options - Modal options
-         * @param {string} options.icon - Icon to display (emoji)
+         * @param {string} options.icon - Icon type ('warning', 'danger', 'info', 'success', 'question') or emoji
          * @param {string} options.title - Modal title
          * @param {string} options.message - Modal message (supports HTML)
          * @param {string} options.confirmText - Confirm button text
@@ -20,7 +44,7 @@
          * @returns {Promise<boolean>} - Resolves to true if confirmed, false if cancelled
          */
         show: function(options) {
-            var icon = options.icon || '\u26A0\uFE0F';
+            var icon = options.icon || 'warning';
             var title = options.title;
             var message = options.message;
             var confirmText = options.confirmText || '\uD655\uC778';
@@ -37,7 +61,20 @@
             var messageEl = document.getElementById('confirmModalMessage');
             var confirmBtn = document.getElementById('confirmModalBtn');
 
-            if (iconEl) iconEl.textContent = icon;
+            // Handle icon - either SVG type or emoji
+            if (iconEl) {
+                var iconConfig = iconMap[icon];
+                if (iconConfig) {
+                    iconEl.innerHTML = iconConfig.svg;
+                    iconEl.className = 'confirm-modal-icon ' + iconConfig.className;
+                } else {
+                    // Fallback to emoji for backward compatibility
+                    iconEl.textContent = icon;
+                    iconEl.className = 'confirm-modal-icon';
+                    iconEl.style.fontSize = '48px';
+                }
+            }
+
             if (titleEl) titleEl.textContent = title;
             if (messageEl) messageEl.innerHTML = message;
 

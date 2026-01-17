@@ -3,6 +3,7 @@
 {% block title %}약품 추천 - Jaego{% endblock %}
 
 {% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.VERSION }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.VERSION }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.VERSION }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.VERSION }}">
@@ -11,19 +12,19 @@
 {% block page_styles %}
 <style>
     body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        background: #f5f5f5;
+        font-family: var(--font-family);
+        background: var(--gray-100);
         min-height: 100vh;
-        padding: 20px;
+        padding: var(--space-5);
     }
 
     .container {
         max-width: 800px;
         margin: 0 auto;
         background: white;
-        border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        padding: 30px;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-xl);
+        padding: var(--space-6);
         animation: fadeIn 0.5s ease;
     }
 
@@ -33,166 +34,171 @@
     }
 
     .back-link {
-        display: inline-block;
-        color: #48bb78;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        color: var(--brand-primary);
         text-decoration: none;
-        margin-bottom: 20px;
-        font-size: 14px;
+        margin-bottom: var(--space-5);
+        font-size: var(--text-sm);
     }
 
     .back-link:hover {
         text-decoration: underline;
     }
 
+    .back-link .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+    }
+
     .header {
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: var(--space-6);
     }
 
     .header h1 {
-        font-size: 28px;
-        color: #1f2937;
-        margin-bottom: 8px;
+        font-size: var(--text-2xl);
+        color: var(--gray-900);
+        margin-bottom: var(--space-2);
     }
 
     .header p {
-        color: #6b7280;
-        font-size: 14px;
+        color: var(--gray-500);
+        font-size: var(--text-sm);
     }
 
     /* 진행 바 */
     .progress-section {
-        background: #f7fafc;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 24px;
+        background: var(--gray-50);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        margin-bottom: var(--space-6);
     }
 
     .progress-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: var(--space-2);
     }
 
     .progress-label {
-        font-size: 14px;
-        color: #4b5563;
+        font-size: var(--text-sm);
+        color: var(--gray-600);
     }
 
     .progress-count {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 600;
-        color: #48bb78;
+        color: var(--brand-primary);
     }
 
     .progress-bar {
         height: 8px;
-        background: #e5e7eb;
-        border-radius: 4px;
+        background: var(--gray-200);
+        border-radius: var(--radius-sm);
         overflow: hidden;
     }
 
     .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
-        border-radius: 4px;
+        background: var(--brand-primary);
+        border-radius: var(--radius-sm);
         transition: width 0.3s ease;
     }
 
     /* 비활성 상태 */
     .inactive-state {
         text-align: center;
-        padding: 60px 20px;
+        padding: var(--space-12) var(--space-5);
     }
 
     .inactive-icon {
-        font-size: 64px;
-        margin-bottom: 20px;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto var(--space-5);
+        color: var(--gray-400);
     }
 
     .inactive-title {
-        font-size: 20px;
-        color: #1f2937;
-        margin-bottom: 12px;
+        font-size: var(--text-xl);
+        color: var(--gray-900);
+        margin-bottom: var(--space-3);
     }
 
     .inactive-message {
-        color: #6b7280;
-        margin-bottom: 24px;
+        color: var(--gray-500);
+        margin-bottom: var(--space-6);
+        line-height: 1.6;
     }
 
     /* 제안 카드 */
     .suggestion-card {
-        background: #f7fafc;
-        border: 2px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 24px;
+        background: var(--gray-50);
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-xl);
+        padding: var(--space-6);
+        margin-bottom: var(--space-6);
         animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
     }
 
     .card-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .drug-info h2 {
-        font-size: 18px;
-        color: #1f2937;
-        margin-bottom: 4px;
+        font-size: var(--text-lg);
+        color: var(--gray-900);
+        margin-bottom: var(--space-1);
     }
 
     .drug-meta {
-        font-size: 13px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     .similarity-badge {
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        background: var(--brand-primary);
         color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radius-full);
         font-weight: 600;
-        font-size: 14px;
+        font-size: var(--text-sm);
     }
 
     /* 메트릭 카드 */
     .metrics-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin-bottom: 16px;
+        gap: var(--space-3);
+        margin-bottom: var(--space-4);
     }
 
     .metric-card {
         background: white;
-        border-radius: 8px;
-        padding: 12px;
+        border-radius: var(--radius-md);
+        padding: var(--space-3);
         text-align: center;
     }
 
     .metric-value {
-        font-size: 18px;
+        font-size: var(--text-lg);
         font-weight: 600;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .metric-label {
-        font-size: 11px;
-        color: #6b7280;
-        margin-top: 4px;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
+        margin-top: var(--space-1);
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     /* 도움말 아이콘 툴팁 */
@@ -206,8 +212,8 @@
         min-height: 16px;
         font-size: 10px;
         font-weight: 600;
-        color: #718096;
-        background: #e2e8f0;
+        color: var(--gray-500);
+        background: var(--gray-200);
         border-radius: 50%;
         cursor: help;
         position: relative;
@@ -217,25 +223,25 @@
     }
 
     .help-icon:hover {
-        background: #cbd5e0;
-        color: #4a5568;
+        background: var(--gray-300);
+        color: var(--gray-600);
     }
 
     .help-icon .help-tip {
         display: none;
         position: fixed;
-        background: #2d3748;
+        background: var(--gray-800);
         color: white;
-        padding: 10px 14px;
-        border-radius: 6px;
-        font-size: 12px;
+        padding: var(--space-3);
+        border-radius: var(--radius-md);
+        font-size: var(--text-xs);
         font-weight: 400;
         width: 250px;
         white-space: normal;
         text-align: left;
         line-height: 1.5;
         z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: var(--shadow-lg);
         pointer-events: none;
         box-sizing: border-box;
         overflow: visible;
@@ -250,30 +256,30 @@
     /* 스파크라인 */
     .sparkline-container {
         background: white;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 20px;
+        border-radius: var(--radius-md);
+        padding: var(--space-4);
+        margin-bottom: var(--space-5);
     }
 
     .sparkline-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: var(--space-2);
     }
 
     .sparkline-title {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     .sparkline-stock {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     .sparkline-stock strong {
-        color: #374151;
+        color: var(--gray-700);
     }
 
     .chart-container {
@@ -287,9 +293,9 @@
     /* 유사 약품 섹션 */
     .similar-drugs-container {
         background: white;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 20px;
+        border-radius: var(--radius-md);
+        padding: var(--space-4);
+        margin-bottom: var(--space-5);
     }
 
     .similar-drugs-header {
@@ -305,36 +311,38 @@
     }
 
     .similar-drugs-title {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-2);
     }
 
     .similar-drugs-title .icon {
-        font-size: 14px;
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        color: var(--brand-primary);
     }
 
     .similar-drugs-toggle {
         font-size: 10px;
-        color: #9ca3af;
+        color: var(--gray-400);
         transition: transform 0.2s;
     }
 
     .similar-drugs-list {
-        margin-top: 12px;
+        margin-top: var(--space-3);
     }
 
     .similar-drug-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 12px;
-        background: #f8fafc;
-        border-radius: 6px;
-        margin-bottom: 8px;
-        border-left: 3px solid #10b981;
+        padding: var(--space-3);
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-2);
+        border-left: 3px solid var(--brand-primary);
     }
 
     .similar-drug-item:last-child {
@@ -347,9 +355,9 @@
     }
 
     .similar-drug-name {
-        font-size: 13px;
+        font-size: var(--text-sm);
         font-weight: 500;
-        color: #1f2937;
+        color: var(--gray-900);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -357,40 +365,40 @@
     }
 
     .similar-drug-interval {
-        font-size: 11px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
         margin-top: 2px;
     }
 
     .similar-drug-badge {
         flex-shrink: 0;
-        background: #ecfdf5;
-        color: #059669;
-        font-size: 11px;
+        background: var(--brand-primary-subtle);
+        color: var(--brand-primary-dark);
+        font-size: var(--text-xs);
         font-weight: 500;
-        padding: 4px 8px;
-        border-radius: 4px;
-        margin-left: 10px;
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-sm);
+        margin-left: var(--space-3);
     }
 
     /* 등록 폼 */
     .register-form {
         background: white;
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: var(--radius-lg);
+        padding: var(--space-5);
     }
 
     .form-title {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 16px;
+        color: var(--gray-900);
+        margin-bottom: var(--space-4);
     }
 
     .form-row {
         display: flex;
-        gap: 16px;
-        margin-bottom: 16px;
+        gap: var(--space-4);
+        margin-bottom: var(--space-4);
     }
 
     .form-group {
@@ -399,25 +407,25 @@
 
     .form-group label {
         display: block;
-        font-size: 13px;
-        color: #4b5563;
-        margin-bottom: 6px;
+        font-size: var(--text-sm);
+        color: var(--gray-600);
+        margin-bottom: var(--space-2);
     }
 
     .form-group select,
     .form-group input {
         width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: var(--space-3);
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
     }
 
     .form-group select:focus,
     .form-group input:focus {
         outline: none;
-        border-color: #48bb78;
-        box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-primary-subtle);
     }
 
     /* Patient Combobox */
@@ -436,7 +444,7 @@
         transform: translateY(-50%);
         background: none;
         border: none;
-        color: #9ca3af;
+        color: var(--gray-400);
         cursor: pointer;
         font-size: 18px;
         padding: 0;
@@ -444,7 +452,7 @@
     }
 
     .patient-combobox .clear-btn:hover {
-        color: #6b7280;
+        color: var(--gray-500);
     }
 
     .patient-dropdown {
@@ -453,13 +461,13 @@
         left: 0;
         right: 0;
         background: white;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        margin-top: 4px;
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        margin-top: var(--space-1);
         max-height: 240px;
         overflow-y: auto;
         z-index: 100;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: var(--shadow-lg);
         display: none;
     }
 
@@ -468,9 +476,9 @@
     }
 
     .patient-option {
-        padding: 10px 12px;
+        padding: var(--space-3);
         cursor: pointer;
-        border-bottom: 1px solid #f3f4f6;
+        border-bottom: 1px solid var(--gray-100);
     }
 
     .patient-option:last-child {
@@ -478,38 +486,38 @@
     }
 
     .patient-option:hover {
-        background: #f7fafc;
+        background: var(--gray-50);
     }
 
     .patient-option.selected {
-        background: #ecfdf5;
+        background: var(--brand-primary-subtle);
     }
 
     .patient-option .name {
         font-weight: 500;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .patient-option .birth {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     .patient-option.new-patient {
-        background: #fef3c7;
-        color: #92400e;
+        background: var(--warning-subtle);
+        color: var(--warning-dark);
         font-weight: 500;
     }
 
     .patient-option.new-patient:hover {
-        background: #fde68a;
+        background: var(--warning-light);
     }
 
     .no-results {
-        padding: 12px;
+        padding: var(--space-3);
         text-align: center;
-        color: #9ca3af;
-        font-size: 13px;
+        color: var(--gray-400);
+        font-size: var(--text-sm);
     }
 
     /* New Patient Mini Modal */
@@ -532,11 +540,11 @@
 
     .mini-modal-content {
         background: white;
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: var(--radius-xl);
+        padding: var(--space-6);
         width: 90%;
         max-width: 360px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        box-shadow: var(--shadow-xl);
     }
 
     /* Modal shake animation */
@@ -551,38 +559,38 @@
     }
 
     .mini-modal-title {
-        font-size: 18px;
+        font-size: var(--text-lg);
         font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 8px;
+        color: var(--gray-900);
+        margin-bottom: var(--space-2);
     }
 
     .mini-modal-subtitle {
-        font-size: 14px;
-        color: #6b7280;
-        margin-bottom: 20px;
+        font-size: var(--text-sm);
+        color: var(--gray-500);
+        margin-bottom: var(--space-5);
     }
 
     .mini-modal .form-group {
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .mini-modal-buttons {
         display: flex;
-        gap: 12px;
+        gap: var(--space-3);
         justify-content: flex-end;
     }
 
     .button-row {
         display: flex;
-        gap: 12px;
+        gap: var(--space-3);
         justify-content: flex-end;
     }
 
     .btn {
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: var(--space-3) var(--space-6);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
         font-weight: 500;
         cursor: pointer;
         border: none;
@@ -590,21 +598,21 @@
     }
 
     .btn-primary {
-        background: #48bb78;
+        background: var(--brand-primary);
         color: white;
     }
 
     .btn-primary:hover {
-        background: #38a169;
+        background: var(--brand-primary-dark);
     }
 
     .btn-secondary {
-        background: #e5e7eb;
-        color: #4b5563;
+        background: var(--gray-200);
+        color: var(--gray-600);
     }
 
     .btn-secondary:hover {
-        background: #d1d5db;
+        background: var(--gray-300);
     }
 
     .btn:disabled {
@@ -613,15 +621,15 @@
     }
 
     .skip-count {
-        font-size: 12px;
-        color: #9ca3af;
+        font-size: var(--text-xs);
+        color: var(--gray-400);
     }
 
     /* 신규 약품 섹션 */
     .new-drugs-section {
-        margin-top: 24px;
-        border-top: 1px solid #e5e7eb;
-        padding-top: 24px;
+        margin-top: var(--space-6);
+        border-top: 1px solid var(--gray-200);
+        padding-top: var(--space-6);
     }
 
     .section-header {
@@ -629,28 +637,28 @@
         justify-content: space-between;
         align-items: center;
         cursor: pointer;
-        padding: 12px;
-        background: #f7fafc;
-        border-radius: 8px;
-        margin-bottom: 12px;
+        padding: var(--space-3);
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-3);
     }
 
     .section-header:hover {
-        background: #edf2f7;
+        background: var(--gray-100);
     }
 
     .section-title {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 600;
-        color: #4b5563;
+        color: var(--gray-600);
     }
 
     .section-count {
-        background: #e5e7eb;
-        color: #4b5563;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
+        background: var(--gray-200);
+        color: var(--gray-600);
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-full);
+        font-size: var(--text-xs);
     }
 
     .new-drugs-list {
@@ -667,8 +675,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 12px;
-        border-bottom: 1px solid #f3f4f6;
+        padding: var(--space-3);
+        border-bottom: 1px solid var(--gray-100);
     }
 
     .new-drug-item:last-child {
@@ -676,36 +684,36 @@
     }
 
     .new-drug-name {
-        font-size: 13px;
-        color: #1f2937;
+        font-size: var(--text-sm);
+        color: var(--gray-900);
     }
 
     .new-drug-peaks {
-        font-size: 12px;
-        color: #9ca3af;
+        font-size: var(--text-xs);
+        color: var(--gray-400);
     }
 
     /* 건너뛴 약품 섹션 */
     .skipped-drugs-section {
-        margin-top: 24px;
-        border-top: 1px solid #e5e7eb;
-        padding-top: 24px;
+        margin-top: var(--space-6);
+        border-top: 1px solid var(--gray-200);
+        padding-top: var(--space-6);
     }
 
     .skipped-section-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px;
-        background: #fef3c7;
-        border-radius: 8px;
-        margin-bottom: 12px;
+        padding: var(--space-3);
+        background: var(--warning-subtle);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-3);
     }
 
     .skipped-header-left {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--space-2);
         cursor: pointer;
         flex: 1;
     }
@@ -715,17 +723,25 @@
     }
 
     .skipped-section-title {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 600;
-        color: #92400e;
+        color: var(--warning-dark);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .skipped-section-title .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .skipped-section-count {
-        background: #fbbf24;
-        color: #78350f;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
+        background: var(--warning);
+        color: var(--warning-darker);
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-full);
+        font-size: var(--text-xs);
         font-weight: 500;
     }
 
@@ -736,19 +752,19 @@
         width: 32px;
         height: 32px;
         border: none;
-        background: #f59e0b;
-        border-radius: 6px;
+        background: var(--warning);
+        border-radius: var(--radius-md);
         cursor: pointer;
         transition: all 0.2s;
-        margin-left: 12px;
+        margin-left: var(--space-3);
     }
 
     .reset-skipped-btn:hover {
-        background: #d97706;
+        background: var(--warning-dark);
         transform: scale(1.05);
     }
 
-    .reset-skipped-btn svg {
+    .reset-skipped-btn .icon {
         width: 18px;
         height: 18px;
         color: white;
@@ -768,8 +784,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px;
-        border-bottom: 1px solid #f3f4f6;
+        padding: var(--space-3);
+        border-bottom: 1px solid var(--gray-100);
         cursor: pointer;
         transition: background 0.2s;
     }
@@ -779,7 +795,7 @@
     }
 
     .skipped-drug-item:hover {
-        background: #fef3c7;
+        background: var(--warning-subtle);
     }
 
     .skipped-drug-info {
@@ -787,60 +803,63 @@
     }
 
     .skipped-drug-name {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 500;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .skipped-drug-code {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     .skipped-drug-badge {
-        background: #fbbf24;
-        color: #78350f;
-        padding: 4px 8px;
-        border-radius: 10px;
-        font-size: 11px;
+        background: var(--warning);
+        color: var(--warning-darker);
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-full);
+        font-size: var(--text-xs);
         font-weight: 500;
     }
 
     /* 완료 상태 */
     .complete-state {
         text-align: center;
-        padding: 60px 20px;
+        padding: var(--space-12) var(--space-5);
     }
 
     .complete-icon {
-        font-size: 64px;
-        margin-bottom: 20px;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto var(--space-5);
+        color: var(--success);
     }
 
     .complete-title {
-        font-size: 20px;
-        color: #1f2937;
-        margin-bottom: 12px;
+        font-size: var(--text-xl);
+        color: var(--gray-900);
+        margin-bottom: var(--space-3);
     }
 
     .complete-message {
-        color: #6b7280;
-        margin-bottom: 24px;
+        color: var(--gray-500);
+        margin-bottom: var(--space-6);
+        line-height: 1.6;
     }
 
     /* Info Box */
     .info-box {
-        background: #f0fdf4;
-        border-left: 4px solid #48bb78;
-        border-radius: 8px;
-        margin-bottom: 24px;
-        font-size: 0.95em;
-        color: #166534;
+        background: var(--brand-primary-subtle);
+        border-left: 4px solid var(--brand-primary);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-6);
+        font-size: var(--text-sm);
+        color: var(--brand-primary-dark);
         overflow: hidden;
     }
 
     .info-box-header {
-        padding: 12px 15px;
+        padding: var(--space-3) var(--space-4);
         cursor: pointer;
         display: flex;
         justify-content: space-between;
@@ -849,19 +868,24 @@
     }
 
     .info-box-header:hover {
-        background: #dcfce7;
+        background: rgba(13, 148, 136, 0.1);
     }
 
     .info-box-title {
-        color: #15803d;
+        color: var(--brand-primary-dark);
         font-weight: 600;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-2);
+    }
+
+    .info-box-title .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
     }
 
     .info-box-arrow {
-        color: #48bb78;
+        color: var(--brand-primary);
         font-size: 0.8em;
         transition: transform 0.3s ease;
     }
@@ -881,15 +905,15 @@
     }
 
     .info-box-body {
-        padding: 0 15px 15px 15px;
+        padding: 0 var(--space-4) var(--space-4) var(--space-4);
         line-height: 1.6;
     }
 
     /* 로딩 */
     .loading {
         text-align: center;
-        padding: 40px;
-        color: #6b7280;
+        padding: var(--space-8);
+        color: var(--gray-500);
     }
 
     /* 등록 완료 모달 */
@@ -912,11 +936,11 @@
 
     .success-modal-content {
         background: white;
-        border-radius: 20px;
-        padding: 28px;
+        border-radius: var(--radius-xl);
+        padding: var(--space-6);
         width: 90%;
         max-width: 420px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        box-shadow: var(--shadow-xl);
         animation: modalPop 0.3s ease;
     }
 
@@ -927,65 +951,67 @@
 
     .success-header {
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: var(--space-5);
     }
 
     .success-icon {
-        font-size: 48px;
-        margin-bottom: 12px;
+        width: 48px;
+        height: 48px;
+        margin: 0 auto var(--space-3);
+        color: var(--success);
     }
 
     .success-title {
-        font-size: 18px;
+        font-size: var(--text-lg);
         font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 4px;
+        color: var(--gray-900);
+        margin-bottom: var(--space-1);
     }
 
     .success-subtitle {
-        font-size: 14px;
-        color: #6b7280;
+        font-size: var(--text-sm);
+        color: var(--gray-500);
     }
 
     .success-info {
-        background: #f0fdf4;
-        border-radius: 12px;
-        padding: 14px 16px;
-        margin-bottom: 24px;
+        background: var(--brand-primary-subtle);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        margin-bottom: var(--space-6);
     }
 
     .success-info-row {
         display: flex;
         justify-content: space-between;
-        font-size: 13px;
+        font-size: var(--text-sm);
     }
 
     .success-info-row:not(:last-child) {
-        margin-bottom: 6px;
+        margin-bottom: var(--space-2);
     }
 
     .success-info-label {
-        color: #6b7280;
+        color: var(--gray-500);
     }
 
     .success-info-value {
-        color: #1f2937;
+        color: var(--gray-900);
         font-weight: 500;
     }
 
     .success-options {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: var(--space-3);
     }
 
     .success-option-btn {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 14px 16px;
-        border: 2px solid #e5e7eb;
-        border-radius: 12px;
+        gap: var(--space-3);
+        padding: var(--space-4);
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
         background: white;
         cursor: pointer;
         transition: all 0.2s;
@@ -993,19 +1019,26 @@
     }
 
     .success-option-btn:hover {
-        border-color: #48bb78;
-        background: #f0fdf4;
+        border-color: var(--brand-primary);
+        background: var(--brand-primary-subtle);
     }
 
     .success-option-btn.primary {
-        border-color: #48bb78;
-        background: #f0fdf4;
+        border-color: var(--brand-primary);
+        background: var(--brand-primary-subtle);
     }
 
     .success-option-icon {
-        font-size: 20px;
         width: 32px;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .success-option-icon .icon {
+        width: var(--icon-lg);
+        height: var(--icon-lg);
+        color: var(--brand-primary);
     }
 
     .success-option-text {
@@ -1013,15 +1046,15 @@
     }
 
     .success-option-title {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 500;
-        color: #1f2937;
+        color: var(--gray-900);
         margin-bottom: 2px;
     }
 
     .success-option-desc {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     /* 환자 약품 목록 모달 */
@@ -1044,54 +1077,54 @@
 
     .patient-drugs-content {
         background: white;
-        border-radius: 20px;
-        padding: 24px;
+        border-radius: var(--radius-xl);
+        padding: var(--space-6);
         width: 90%;
         max-width: 500px;
         max-height: 80vh;
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        box-shadow: var(--shadow-xl);
     }
 
     .patient-drugs-header {
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .patient-drugs-title {
-        font-size: 18px;
+        font-size: var(--text-lg);
         font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 4px;
+        color: var(--gray-900);
+        margin-bottom: var(--space-1);
     }
 
     .patient-drugs-subtitle {
-        font-size: 13px;
-        color: #6b7280;
+        font-size: var(--text-sm);
+        color: var(--gray-500);
     }
 
     .patient-drugs-list {
         flex: 1;
         overflow-y: auto;
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .patient-drug-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        margin-bottom: 8px;
+        padding: var(--space-3);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-2);
         cursor: pointer;
         transition: all 0.2s;
     }
 
     .patient-drug-item:hover {
-        border-color: #48bb78;
-        background: #f0fdf4;
+        border-color: var(--brand-primary);
+        background: var(--brand-primary-subtle);
     }
 
     .patient-drug-info {
@@ -1099,30 +1132,30 @@
     }
 
     .patient-drug-name {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 500;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .patient-drug-meta {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
         margin-top: 2px;
     }
 
     .patient-drug-score {
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        background: var(--brand-primary);
         color: white;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-full);
+        font-size: var(--text-xs);
         font-weight: 500;
     }
 
     .patient-drugs-empty {
         text-align: center;
-        padding: 40px 20px;
-        color: #9ca3af;
+        padding: var(--space-8) var(--space-5);
+        color: var(--gray-400);
     }
 
     .patient-drugs-footer {
@@ -1133,21 +1166,21 @@
     /* 약품 검색 박스 */
     .drug-search-box {
         position: relative;
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .drug-search-box input {
         width: 100%;
-        padding: 12px 40px 12px 14px;
-        border: 2px solid #e5e7eb;
-        border-radius: 10px;
-        font-size: 14px;
+        padding: var(--space-3) var(--space-8) var(--space-3) var(--space-4);
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-sm);
         transition: border-color 0.2s;
     }
 
     .drug-search-box input:focus {
         outline: none;
-        border-color: #48bb78;
+        border-color: var(--brand-primary);
     }
 
     .drug-search-clear {
@@ -1157,7 +1190,7 @@
         transform: translateY(-50%);
         background: none;
         border: none;
-        color: #9ca3af;
+        color: var(--gray-400);
         font-size: 20px;
         cursor: pointer;
         display: none;
@@ -1168,101 +1201,101 @@
     }
 
     .drug-search-clear:hover {
-        color: #6b7280;
+        color: var(--gray-500);
     }
 
     /* 처방량 입력 영역 */
     .dosage-input-area {
-        background: #f0fdf4;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
-        border: 2px solid #48bb78;
+        background: var(--brand-primary-subtle);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        margin-bottom: var(--space-4);
+        border: 2px solid var(--brand-primary);
     }
 
     .selected-drug-info {
-        margin-bottom: 12px;
+        margin-bottom: var(--space-3);
     }
 
     .selected-drug-name {
-        font-size: 15px;
+        font-size: var(--text-base);
         font-weight: 600;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .selected-drug-meta {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
         margin-top: 2px;
     }
 
     .dosage-form-row {
-        margin-bottom: 12px;
+        margin-bottom: var(--space-3);
     }
 
     .dosage-form-row label {
         display: block;
-        font-size: 13px;
-        color: #4b5563;
-        margin-bottom: 4px;
+        font-size: var(--text-sm);
+        color: var(--gray-600);
+        margin-bottom: var(--space-1);
     }
 
     .dosage-form-row input {
         width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: var(--space-3);
+        border: 1px solid var(--gray-300);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
     }
 
     .dosage-form-row input:focus {
         outline: none;
-        border-color: #48bb78;
-        box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-primary-subtle);
     }
 
     .dosage-buttons {
         display: flex;
-        gap: 8px;
+        gap: var(--space-2);
         justify-content: flex-end;
     }
 
     .dosage-buttons .btn {
-        padding: 8px 16px;
-        font-size: 13px;
+        padding: var(--space-2) var(--space-4);
+        font-size: var(--text-sm);
     }
 
     /* 등록된 약품 섹션 */
     .registered-drugs-section {
-        background: #f8fafc;
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 16px;
-        border: 1px solid #e2e8f0;
+        background: var(--gray-50);
+        border-radius: var(--radius-lg);
+        padding: var(--space-3);
+        margin-bottom: var(--space-4);
+        border: 1px solid var(--gray-200);
     }
 
     .registered-drugs-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: var(--space-2);
     }
 
     .registered-drugs-label {
-        font-size: 12px;
+        font-size: var(--text-xs);
         font-weight: 600;
-        color: #64748b;
+        color: var(--gray-500);
     }
 
     .registered-drugs-count {
-        font-size: 11px;
-        color: #94a3b8;
+        font-size: var(--text-xs);
+        color: var(--gray-400);
     }
 
     .registered-drugs-list {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: var(--space-2);
         max-height: 80px;
         overflow-y: auto;
     }
@@ -1270,41 +1303,41 @@
     .registered-drug-tag {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        background: #e0f2fe;
-        color: #0369a1;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 11px;
+        gap: var(--space-1);
+        background: var(--info-subtle);
+        color: var(--info-dark);
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-md);
+        font-size: var(--text-xs);
         font-weight: 500;
     }
 
     .registered-drug-tag .check {
-        color: #0ea5e9;
+        color: var(--info);
     }
 
     .registered-drugs-empty {
-        font-size: 12px;
-        color: #94a3b8;
+        font-size: var(--text-xs);
+        color: var(--gray-400);
         font-style: italic;
     }
 
     /* 검색 결과에서 이미 등록된 약품 표시 */
     .patient-drug-item.already-registered {
         opacity: 0.6;
-        background: #f1f5f9;
+        background: var(--gray-100);
         cursor: not-allowed;
     }
 
     .patient-drug-item.already-registered:hover {
-        border-color: #e5e7eb;
-        background: #f1f5f9;
+        border-color: var(--gray-200);
+        background: var(--gray-100);
     }
 
     .patient-drug-item.already-registered .patient-drug-name::after {
         content: ' (등록됨)';
-        color: #94a3b8;
-        font-size: 11px;
+        color: var(--gray-400);
+        font-size: var(--text-xs);
     }
 
     /* 약품에 환자 추가 모달 */
@@ -1327,63 +1360,63 @@
 
     .drug-patients-content {
         background: white;
-        border-radius: 20px;
-        padding: 24px;
+        border-radius: var(--radius-xl);
+        padding: var(--space-6);
         width: 90%;
         max-width: 500px;
         overflow: visible;
         display: flex;
         flex-direction: column;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        box-shadow: var(--shadow-xl);
     }
 
     .drug-patients-header {
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .drug-patients-title {
-        font-size: 18px;
+        font-size: var(--text-lg);
         font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 4px;
+        color: var(--gray-900);
+        margin-bottom: var(--space-1);
     }
 
     .drug-patients-subtitle {
-        font-size: 13px;
-        color: #6b7280;
+        font-size: var(--text-sm);
+        color: var(--gray-500);
     }
 
     /* 등록된 환자 섹션 */
     .registered-patients-section {
-        background: #f8fafc;
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 16px;
-        border: 1px solid #e2e8f0;
+        background: var(--gray-50);
+        border-radius: var(--radius-lg);
+        padding: var(--space-3);
+        margin-bottom: var(--space-4);
+        border: 1px solid var(--gray-200);
     }
 
     .registered-patients-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: var(--space-2);
     }
 
     .registered-patients-label {
-        font-size: 12px;
+        font-size: var(--text-xs);
         font-weight: 600;
-        color: #64748b;
+        color: var(--gray-500);
     }
 
     .registered-patients-count {
-        font-size: 11px;
-        color: #94a3b8;
+        font-size: var(--text-xs);
+        color: var(--gray-400);
     }
 
     .registered-patients-list {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: var(--space-2);
         max-height: 80px;
         overflow-y: auto;
     }
@@ -1391,43 +1424,43 @@
     .registered-patient-tag {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        background: #fef3c7;
-        color: #92400e;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 11px;
+        gap: var(--space-1);
+        background: var(--warning-subtle);
+        color: var(--warning-dark);
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-md);
+        font-size: var(--text-xs);
         font-weight: 500;
     }
 
     .registered-patient-tag .check {
-        color: #f59e0b;
+        color: var(--warning);
     }
 
     .registered-patients-empty {
-        font-size: 12px;
-        color: #94a3b8;
+        font-size: var(--text-xs);
+        color: var(--gray-400);
         font-style: italic;
     }
 
     /* 환자 검색 박스 */
     .patient-search-box {
         position: relative;
-        margin-bottom: 16px;
+        margin-bottom: var(--space-4);
     }
 
     .patient-search-box input {
         width: 100%;
-        padding: 12px 14px;
-        border: 2px solid #e5e7eb;
-        border-radius: 10px;
-        font-size: 14px;
+        padding: var(--space-3) var(--space-4);
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-sm);
         transition: border-color 0.2s;
     }
 
     .patient-search-box input:focus {
         outline: none;
-        border-color: #48bb78;
+        border-color: var(--brand-primary);
     }
 
     .patient-search-results {
@@ -1436,13 +1469,13 @@
         left: 0;
         right: 0;
         background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        margin-top: 4px;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        margin-top: var(--space-1);
         max-height: 200px;
         overflow-y: auto;
         z-index: 100;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: var(--shadow-lg);
         display: none;
     }
 
@@ -1451,9 +1484,9 @@
     }
 
     .patient-search-item {
-        padding: 10px 14px;
+        padding: var(--space-3) var(--space-4);
         cursor: pointer;
-        border-bottom: 1px solid #f3f4f6;
+        border-bottom: 1px solid var(--gray-100);
         transition: background 0.2s;
     }
 
@@ -1462,61 +1495,61 @@
     }
 
     .patient-search-item:hover {
-        background: #f0fdf4;
+        background: var(--brand-primary-subtle);
     }
 
     .patient-search-item.already-registered {
         opacity: 0.5;
         cursor: not-allowed;
-        background: #f8fafc;
+        background: var(--gray-50);
     }
 
     .patient-search-item.already-registered:hover {
-        background: #f8fafc;
+        background: var(--gray-50);
     }
 
     .patient-search-item .name {
         font-weight: 500;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .patient-search-item .birth {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
     }
 
     .patient-search-item.new-patient {
-        background: #fef3c7;
-        color: #92400e;
+        background: var(--warning-subtle);
+        color: var(--warning-dark);
         font-weight: 500;
     }
 
     .patient-search-item.new-patient:hover {
-        background: #fde68a;
+        background: var(--warning-light);
     }
 
     /* 환자 처방량 입력 영역 */
     .patient-dosage-area {
-        background: #f0fdf4;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
-        border: 2px solid #48bb78;
+        background: var(--brand-primary-subtle);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        margin-bottom: var(--space-4);
+        border: 2px solid var(--brand-primary);
     }
 
     .selected-patient-info {
-        margin-bottom: 12px;
+        margin-bottom: var(--space-3);
     }
 
     .selected-patient-name {
-        font-size: 15px;
+        font-size: var(--text-base);
         font-weight: 600;
-        color: #1f2937;
+        color: var(--gray-900);
     }
 
     .selected-patient-birth {
-        font-size: 12px;
-        color: #6b7280;
+        font-size: var(--text-xs);
+        color: var(--gray-500);
         margin-top: 2px;
     }
 
@@ -1544,11 +1577,11 @@
         }
 
         .success-modal-content {
-            margin: 20px;
+            margin: var(--space-5);
         }
 
         .patient-drugs-content {
-            margin: 20px;
+            margin: var(--space-5);
             max-height: 90vh;
         }
     }
@@ -1561,7 +1594,10 @@
 
 {% block content %}
 <div class="container">
-    <a href="/patient/manage" class="back-link">&larr; 환자 관리로 돌아가기</a>
+    <a href="/patient/manage" class="back-link">
+        <svg class="icon"><use href="#icon-arrow-left"></use></svg>
+        환자 관리로 돌아가기
+    </a>
 
     <div class="header">
         <h1>약품 추천</h1>
@@ -1571,7 +1607,10 @@
     <!-- Info Box -->
     <div class="info-box">
         <div class="info-box-header" onclick="toggleInfoBox()">
-            <span class="info-box-title">💡 이 기능은?</span>
+            <span class="info-box-title">
+                <svg class="icon"><use href="#icon-info"></use></svg>
+                이 기능은?
+            </span>
             <span class="info-box-arrow" id="info-box-arrow">▼</span>
         </div>
         <div class="info-box-content" id="info-box-content">
@@ -1604,13 +1643,14 @@
     <div class="skipped-drugs-section" id="skippedDrugsSection" style="display: none;">
         <div class="skipped-section-header">
             <div class="skipped-header-left" onclick="toggleSkippedDrugs()">
-                <span class="skipped-section-title">📋 건너뛴 약품</span>
+                <span class="skipped-section-title">
+                    <svg class="icon"><use href="#icon-file-text"></use></svg>
+                    건너뛴 약품
+                </span>
                 <span class="skipped-section-count" id="skippedDrugsCount">0개</span>
             </div>
             <button class="reset-skipped-btn" onclick="resetAllSkippedDrugs()" title="전체 되돌리기">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>
+                <svg class="icon"><use href="#icon-refresh-cw"></use></svg>
             </button>
         </div>
         <div class="skipped-drugs-list" id="skippedDrugsList"></div>
@@ -1646,7 +1686,7 @@
 <div class="success-modal" id="successModal">
     <div class="success-modal-content">
         <div class="success-header">
-            <div class="success-icon">✅</div>
+            <svg class="success-icon"><use href="#icon-check-circle"></use></svg>
             <div class="success-title">등록 완료</div>
             <div class="success-subtitle" id="successSubtitle">약품이 환자에게 등록되었습니다</div>
         </div>
@@ -1666,21 +1706,27 @@
         </div>
         <div class="success-options">
             <button class="success-option-btn" onclick="addAnotherPatient()">
-                <span class="success-option-icon">👥</span>
+                <span class="success-option-icon">
+                    <svg class="icon"><use href="#icon-users"></use></svg>
+                </span>
                 <div class="success-option-text">
                     <div class="success-option-title">이 약품에 환자 추가</div>
                     <div class="success-option-desc">같은 약품을 사용하는 다른 환자 등록</div>
                 </div>
             </button>
             <button class="success-option-btn" onclick="showPatientDrugs()">
-                <span class="success-option-icon">💊</span>
+                <span class="success-option-icon">
+                    <svg class="icon"><use href="#icon-pill"></use></svg>
+                </span>
                 <div class="success-option-text">
                     <div class="success-option-title" id="patientDrugsTitle">환자의 다른 약품</div>
                     <div class="success-option-desc">이 환자가 사용할 수 있는 다른 약품 확인</div>
                 </div>
             </button>
             <button class="success-option-btn" onclick="goToNextSuggestion()">
-                <span class="success-option-icon">➡️</span>
+                <span class="success-option-icon">
+                    <svg class="icon"><use href="#icon-arrow-right"></use></svg>
+                </span>
                 <div class="success-option-text">
                     <div class="success-option-title">다음 추천으로</div>
                     <div class="success-option-desc">다음 약품 추천 보기</div>
@@ -1880,7 +1926,7 @@
             console.error('활성화 상태 확인 실패:', error);
             document.getElementById('mainContent').innerHTML =
                 '<div class="inactive-state">' +
-                    '<div class="inactive-icon">⚠️</div>' +
+                    '<svg class="inactive-icon"><use href="#icon-alert-triangle"></use></svg>' +
                     '<div class="inactive-title">오류가 발생했습니다</div>' +
                     '<div class="inactive-message">' + error.message + '</div>' +
                 '</div>';
@@ -1918,7 +1964,7 @@
     function showInactiveState(status) {
         document.getElementById('mainContent').innerHTML =
             '<div class="inactive-state">' +
-                '<div class="inactive-icon">👥</div>' +
+                '<svg class="inactive-icon"><use href="#icon-users"></use></svg>' +
                 '<div class="inactive-title">약품 추천 기능을 사용하려면</div>' +
                 '<div class="inactive-message">' +
                     '약품 추천을 위해 더 많은 데이터가 필요합니다.<br><br>' +
@@ -1987,8 +2033,9 @@
         var sparklineSvg = generateSparklineSVG(suggestion.monthly_usage || []);
 
         var registeredWarning = suggestion.registered_count > 0 ?
-            '<div style="text-align: center; color: #f59e0b; font-size: 13px; margin-top: -12px; margin-bottom: 12px;">' +
-                '⚠️ 이미 ' + suggestion.registered_count + '명의 환자가 등록되어 있습니다' +
+            '<div style="text-align: center; color: var(--warning); font-size: var(--text-sm); margin-top: calc(-1 * var(--space-3)); margin-bottom: var(--space-3); display: flex; align-items: center; justify-content: center; gap: var(--space-2);">' +
+                '<svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-alert-triangle"></use></svg>' +
+                '이미 ' + suggestion.registered_count + '명의 환자가 등록되어 있습니다' +
             '</div>' : '';
 
         document.getElementById('mainContent').innerHTML =
@@ -2194,7 +2241,7 @@
         if (hasNewPatientModalContent()) {
             shakeModal('newPatientModal');
             var confirmed = await showConfirmModal({
-                icon: '⚠️',
+                icon: 'warning',
                 title: '작성 중인 내용이 있습니다',
                 message: '정말 닫으시겠습니까?<br>입력한 내용은 저장되지 않습니다.',
                 confirmText: '닫기',
@@ -2262,7 +2309,7 @@
         var html = '<div class="similar-drugs-container">' +
             '<div class="similar-drugs-header" onclick="toggleSimilarDrugs()">' +
                 '<div class="similar-drugs-title">' +
-                    '<span class="icon">🔗</span>' +
+                    '<svg class="icon"><use href="#icon-link"></use></svg>' +
                     '유사한 패턴의 등록 약품 (KNN K=' + nearestDrugs.length + ')' +
                 '</div>' +
                 '<span class="similar-drugs-toggle">▶</span>' +
@@ -2525,7 +2572,7 @@
         countEl.textContent = patientsList.length + '명';
         list.innerHTML = patientsList.map(function(patient) {
             return '<span class="registered-patient-tag">' +
-                '<span class="check">✓</span>' +
+                '<svg class="icon" style="width: 12px; height: 12px;"><use href="#icon-check"></use></svg>' +
                 escapeHtml(patient.환자명) +
             '</span>';
         }).join('');
@@ -2638,7 +2685,7 @@
             var data = await response.json();
 
             if (data.status === 'success') {
-                showToast('✓ ' + selectedPatientForDrug.name + ' 등록 완료', 'success');
+                showToast(selectedPatientForDrug.name + ' 등록 완료', 'success');
 
                 document.getElementById('modalPatientSearchInput').value = '';
                 document.getElementById('modalPatientSearchResults').classList.remove('visible');
@@ -2837,7 +2884,7 @@
             var data = await response.json();
 
             if (data.status === 'success') {
-                showToast('✓ ' + selectedDrugForPatient.drug_name + ' 등록 완료', 'success');
+                showToast(selectedDrugForPatient.drug_name + ' 등록 완료', 'success');
 
                 document.getElementById('drugSearchInput').value = '';
                 document.getElementById('drugSearchClear').classList.remove('visible');
@@ -2914,7 +2961,7 @@
         list.innerHTML = drugs.map(function(drug) {
             var displayName = drug.drug_name.length > 15 ? drug.drug_name.substring(0, 15) + '...' : drug.drug_name;
             return '<span class="registered-drug-tag">' +
-                '<span class="check">✓</span>' +
+                '<svg class="icon" style="width: 12px; height: 12px;"><use href="#icon-check"></use></svg>' +
                 escapeHtml(displayName) +
             '</span>';
         }).join('');
@@ -2957,7 +3004,7 @@
     function showCompleteState() {
         document.getElementById('mainContent').innerHTML =
             '<div class="complete-state">' +
-                '<div class="complete-icon">🎉</div>' +
+                '<svg class="complete-icon"><use href="#icon-check-circle"></use></svg>' +
                 '<div class="complete-title">모든 제안을 확인했습니다!</div>' +
                 '<div class="complete-message">' +
                     '주기적 패턴의 약품들을 모두 확인했습니다.<br>' +
@@ -3043,7 +3090,7 @@
         }
 
         var confirmed = await showConfirmModal({
-            icon: '↩️',
+            icon: 'question',
             title: '건너뛴 약품 전체 되돌리기',
             message: '건너뛴 약품 ' + count + '개를 모두 되돌리시겠습니까?<br><br>되돌리면 처음부터 다시 제안을 검토할 수 있습니다.',
             confirmText: '전체 되돌리기',

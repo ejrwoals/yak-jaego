@@ -3,6 +3,7 @@
 {% block title %}약 주문 수량 산출 - Jaego{% endblock %}
 
 {% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
@@ -117,7 +118,7 @@
     }
 
     .calculate-btn {
-        background: #555;
+        background: var(--brand-primary);
         color: white;
         border: none;
         padding: 15px 40px;
@@ -128,12 +129,16 @@
         margin-top: 20px;
         width: 100%;
         transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
     }
 
     .calculate-btn:hover:not(:disabled) {
-        background: #444;
+        background: var(--brand-primary-dark);
         transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 5px 20px rgba(13, 148, 136, 0.35);
     }
 
     .calculate-btn:disabled {
@@ -215,7 +220,7 @@
         width: 28px;
         height: 28px;
         background: white;
-        border: 3px solid #4b5563;
+        border: 3px solid var(--brand-primary);
         border-radius: 50%;
         cursor: grab;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
@@ -239,7 +244,7 @@
         left: 50%;
         transform: translate(-50%, -50%);
         font-size: 14px;
-        color: #4b5563;
+        color: var(--brand-primary);
         font-weight: bold;
     }
 
@@ -290,15 +295,24 @@
 
 {% block content %}
 <div class="container">
-    <a href="/" class="back-link">&larr; 홈으로 돌아가기</a>
+    <a href="/" class="back-link">
+        <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-arrow-left"></use></svg>
+        홈으로 돌아가기
+    </a>
 
     <div class="header">
-        <h1><span class="icon">📦</span> 약 주문 수량 산출</h1>
+        <h1>
+            <svg class="icon" style="width: 28px; height: 28px;"><use href="#icon-package"></use></svg>
+            약 주문 수량 산출
+        </h1>
     </div>
 
     <div class="info-box-orange">
         <div class="info-box-header" onclick="toggleInfoBox()">
-            <h3>⚠️ 실행 전 확인사항</h3>
+            <h3 style="display: flex; align-items: center; gap: 8px;">
+                <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-alert-triangle"></use></svg>
+                실행 전 확인사항
+            </h3>
             <span class="info-box-arrow" id="info-box-arrow">▼</span>
         </div>
         <div class="info-box-content" id="info-box-content">
@@ -313,7 +327,10 @@
 
     <!-- 런웨이 임계값 슬라이더 -->
     <div class="slider-section">
-        <h3>🎚️ 강조 표시 기준 런웨이</h3>
+        <h3>
+            <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-sliders"></use></svg>
+            강조 표시 기준 런웨이
+        </h3>
         <div class="slider-container">
             <div class="slider-track" id="sliderTrack">
                 <div class="slider-handle" id="sliderHandle"></div>
@@ -337,14 +354,16 @@
     </div>
 
     <div class="upload-section">
-        <label for="todayFileInput" class="file-label">
-            📂 재고 현황 파일 선택
+        <label for="todayFileInput" class="file-label" style="display: inline-flex; align-items: center; gap: 8px;">
+            <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-folder"></use></svg>
+            재고 현황 파일 선택
         </label>
         <input type="file" id="todayFileInput" accept=".csv,.xls,.xlsx" style="display: none;">
         <div id="fileName" class="file-name">파일이 선택되지 않았습니다</div>
     </div>
 
     <button class="calculate-btn" onclick="calculateOrder()" id="calculateBtn" disabled>
+        <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-calculator"></use></svg>
         주문 수량 계산하기
     </button>
 
@@ -460,7 +479,7 @@
     fileInput.addEventListener('change', function(e) {
         var file = e.target.files[0];
         if (file) {
-            fileName.textContent = '\u2705 ' + file.name;
+            fileName.textContent = file.name;
             fileName.classList.add('selected');
             calculateBtn.disabled = false;
         } else {
@@ -473,7 +492,7 @@
     async function calculateOrder() {
         var file = fileInput.files[0];
         if (!file) {
-            showStatus('\u274C 파일을 먼저 선택해주세요', 'error');
+            showStatus('파일을 먼저 선택해주세요', 'error');
             return;
         }
 
@@ -499,8 +518,8 @@
             var result = await response.json();
 
             if (response.ok && result.success) {
-                showStatus('\u2705 주문 수량 계산 완료! (총 ' + result.drug_count + '개, 긴급 ' + result.urgent_count + '개)', 'success');
-                showToast('\u2705 주문 수량 계산 완료!', 'success');
+                showStatus('주문 수량 계산 완료! (총 ' + result.drug_count + '개, 긴급 ' + result.urgent_count + '개)', 'success');
+                showToast('주문 수량 계산 완료!', 'success');
 
                 setTimeout(function() {
                     window.open('/reports/' + result.html_filename, '_blank');
@@ -513,14 +532,14 @@
                     fileName.classList.remove('selected');
                 }, 800);
             } else {
-                showStatus('\u274C 오류: ' + result.error, 'error');
-                showToast('\u274C 오류가 발생했습니다', 'error');
+                showStatus('오류: ' + result.error, 'error');
+                showToast('오류가 발생했습니다', 'error');
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
         } catch (error) {
-            showStatus('\u274C 오류: ' + error.message, 'error');
-            showToast('\u274C 오류가 발생했습니다', 'error');
+            showStatus('오류: ' + error.message, 'error');
+            showToast('오류가 발생했습니다', 'error');
             btn.disabled = false;
             btn.innerHTML = originalText;
         }

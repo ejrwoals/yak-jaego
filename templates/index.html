@@ -8,36 +8,35 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
 {% endblock %}
 
 {% block page_styles %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=optional" rel="stylesheet">
 <style>
     body {
-        font-family: 'Noto Sans KR', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: var(--font-family);
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        gap: 20px;
+        gap: var(--space-5);
         overflow-y: scroll;
+        padding: var(--space-5);
     }
 
     .title-container {
-        background: #555;
-        border-radius: 20px;
-        padding: 28px 50px;
+        background: var(--brand-primary);
+        border-radius: var(--radius-2xl);
+        padding: var(--space-6) var(--space-10);
         max-width: 800px;
         width: 100%;
         text-align: center;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        box-shadow: var(--shadow-lg);
     }
 
     .page-title {
-        font-size: 1.8em;
-        font-weight: 700;
+        font-size: var(--text-2xl);
+        font-weight: var(--font-bold);
         color: white;
         letter-spacing: -0.5px;
         margin: 0;
@@ -50,56 +49,62 @@
 
     .header {
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: var(--space-6);
     }
 
     .header-toolbar {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: var(--space-2);
         flex-wrap: wrap;
     }
 
     .toolbar-item {
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
-        border-radius: 20px;
-        font-size: 0.85em;
-        font-weight: 500;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--radius-full);
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
         text-decoration: none;
-        transition: all 0.2s ease;
+        transition: all var(--transition-fast);
         cursor: pointer;
         border: none;
         background: none;
     }
 
+    .toolbar-item .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+    }
+
     .toolbar-item.db-status {
-        background: #e8f5e9;
-        color: #2e7d32;
-        border: 1px solid #c8e6c9;
+        background: var(--color-success-light);
+        color: var(--color-success-dark);
+        border: 1px solid var(--color-success);
     }
 
     .toolbar-item.db-status:hover {
-        background: #c8e6c9;
+        background: var(--color-success);
+        color: white;
     }
 
     .toolbar-item.util-link {
-        background: #f5f5f5;
-        color: #555;
-        border: 1px solid #e0e0e0;
+        background: var(--color-surface-hover);
+        color: var(--color-text-secondary);
+        border: 1px solid var(--color-border);
     }
 
     .toolbar-item.util-link:hover {
-        background: #e0e0e0;
-        color: #333;
+        background: var(--color-surface-active);
+        color: var(--color-text-primary);
+        border-color: var(--color-border-hover);
     }
 
     .toolbar-arrow {
-        font-size: 0.7em;
-        transition: transform 0.3s ease;
+        transition: transform var(--transition-normal);
     }
 
     .toolbar-arrow.open {
@@ -107,56 +112,56 @@
     }
 
     .db-info-panel {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        margin-top: 15px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-xl);
+        margin-top: var(--space-4);
         max-height: 0;
         overflow: hidden;
-        transition: all 0.3s ease;
+        transition: all var(--transition-normal);
+        box-shadow: var(--shadow-sm);
     }
 
     .db-info-panel.open {
         max-height: 400px;
-        margin-top: 15px;
+        margin-top: var(--space-4);
     }
 
     .db-info-panel-body {
-        padding: 24px;
+        padding: var(--space-6);
     }
 
     .db-stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 12px;
-        margin-bottom: 16px;
+        gap: var(--space-3);
+        margin-bottom: var(--space-4);
     }
 
     .db-stat-card {
-        background: white;
-        border-radius: 12px;
-        padding: 16px;
+        background: var(--color-surface-hover);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
         text-align: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        border: 1px solid #e8e8e8;
+        border: 1px solid var(--color-border);
     }
 
     .db-stat-card .stat-value {
-        font-size: 1.1em;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 2px;
+        font-size: var(--text-lg);
+        font-weight: var(--font-bold);
+        color: var(--color-text-primary);
+        margin-bottom: var(--space-1);
     }
 
     .db-stat-card .stat-label {
-        font-size: 0.75em;
-        color: #6b7280;
-        font-weight: 500;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        font-weight: var(--font-medium);
     }
 
     .db-bottom-row {
         display: flex;
-        gap: 12px;
+        gap: var(--space-3);
         align-items: stretch;
     }
 
@@ -165,117 +170,135 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        padding: 12px 16px;
+        gap: var(--space-2);
+        padding: var(--space-3) var(--space-4);
         margin: 0;
+    }
+
+    .db-stat-card.period .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        color: var(--color-text-muted);
     }
 
     .db-stat-card.period .stat-label {
         margin: 0;
-        font-size: 0.8em;
+        font-size: var(--text-xs);
     }
 
     .db-stat-card.period .stat-value {
-        font-size: 0.9em;
-        font-weight: 600;
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
         margin: 0;
     }
 
     .btn-rebuild-db {
-        background: #e5e7eb;
-        color: #374151;
-        border: 1px solid #d1d5db;
-        padding: 12px 20px;
-        border-radius: 12px;
-        font-size: 0.85em;
-        font-weight: 500;
+        background: var(--color-surface-hover);
+        color: var(--color-text-secondary);
+        border: 1px solid var(--color-border);
+        padding: var(--space-3) var(--space-5);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-2);
         justify-content: center;
-        transition: all 0.2s ease;
+        transition: all var(--transition-fast);
         white-space: nowrap;
     }
 
+    .btn-rebuild-db .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+    }
+
     .btn-rebuild-db:hover {
-        background: #d1d5db;
-        border-color: #9ca3af;
+        background: var(--color-surface-active);
+        border-color: var(--color-border-hover);
+        color: var(--color-text-primary);
     }
 
     .btn-rebuild-db:disabled {
-        background: #f3f4f6;
-        color: #9ca3af;
+        background: var(--color-surface-hover);
+        color: var(--color-text-disabled);
         cursor: not-allowed;
     }
 
     .rebuild-status {
-        margin-top: 12px;
-        padding: 10px;
-        border-radius: 6px;
-        font-size: 0.9em;
+        margin-top: var(--space-3);
+        padding: var(--space-3);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
         display: none;
     }
 
     .rebuild-status.success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+        background-color: var(--color-success-light);
+        color: var(--color-success-dark);
+        border: 1px solid var(--color-success);
         display: block;
     }
 
     .rebuild-status.error {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background-color: var(--color-danger-light);
+        color: var(--color-danger-dark);
+        border: 1px solid var(--color-danger);
         display: block;
     }
 
     .rebuild-status.loading {
-        background-color: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
+        background-color: var(--color-info-light);
+        color: var(--color-info-dark);
+        border: 1px solid var(--color-info);
         display: block;
     }
 
     .tabs-container {
-        margin-bottom: 30px;
+        margin-bottom: var(--space-6);
     }
 
     .tabs {
         display: flex;
-        gap: 10px;
+        gap: var(--space-3);
         justify-content: center;
-        margin-bottom: 25px;
+        margin-bottom: var(--space-6);
     }
 
     .tab-button {
-        background: white;
-        border: 2px solid #e0e0e0;
-        color: #7f8c8d;
-        padding: 15px 40px;
-        border-radius: 12px;
-        font-size: 1.1em;
-        font-weight: 600;
+        background: var(--color-surface);
+        border: 2px solid var(--color-border);
+        color: var(--color-text-muted);
+        padding: var(--space-4) var(--space-8);
+        border-radius: var(--radius-xl);
+        font-size: var(--text-base);
+        font-weight: var(--font-semibold);
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all var(--transition-normal);
         display: flex;
         align-items: center;
-        gap: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        gap: var(--space-3);
+        box-shadow: var(--shadow-xs);
+    }
+
+    .tab-button .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
     }
 
     .tab-button:hover {
-        border-color: #cbd5e0;
+        border-color: var(--color-border-hover);
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        box-shadow: var(--shadow-sm);
+        color: var(--color-text-secondary);
     }
 
     .tab-button.active {
-        background: #555;
+        background: var(--brand-primary);
         color: white;
         border-color: transparent;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        box-shadow: var(--shadow-md);
     }
 
     .tab-content {
@@ -288,74 +311,100 @@
     }
 
     .workflow-content {
-        background: white;
-        border-radius: 15px;
-        padding: 30px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        background: var(--color-surface);
+        border-radius: var(--radius-xl);
+        padding: var(--space-6);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--color-border);
     }
 
     .workflow-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 30px;
+        gap: var(--space-6);
     }
 
     .workflow-section {
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: var(--radius-lg);
+        padding: var(--space-5);
     }
 
     .workflow-section h3 {
-        font-size: 1.3em;
-        margin-bottom: 20px;
-        color: #2c3e50;
+        font-size: var(--text-lg);
+        margin-bottom: var(--space-5);
+        color: var(--color-text-primary);
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: var(--space-2);
+        font-weight: var(--font-semibold);
+    }
+
+    .workflow-section h3 .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
     }
 
     .section-new {
-        background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
-        border: 2px solid #e8eeff;
+        background: var(--brand-primary-subtle);
+        border: 1px solid rgba(13, 148, 136, 0.2);
+    }
+
+    .section-new h3 {
+        color: var(--brand-primary-dark);
+    }
+
+    .section-new h3 .icon {
+        color: var(--brand-primary);
     }
 
     .section-history {
-        background: linear-gradient(135deg, #fff8f8 0%, #fff0f0 100%);
-        border: 2px solid #ffe8e8;
+        background: var(--color-surface-hover);
+        border: 1px solid var(--color-border);
+    }
+
+    .section-history h3 .icon {
+        color: var(--color-text-muted);
     }
 
     .action-buttons {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: var(--space-3);
     }
 
     .btn-new {
-        background: #555;
+        background: var(--brand-primary);
         color: white;
         border: none;
-        padding: 15px 25px;
-        border-radius: 10px;
-        font-size: 1em;
-        font-weight: 600;
+        padding: var(--space-4) var(--space-5);
+        border-radius: var(--radius-lg);
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
         cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transition: all var(--transition-normal);
+        box-shadow: var(--shadow-sm);
         text-decoration: none;
-        display: block;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+    }
+
+    .btn-new .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .btn-new:hover {
-        background: #444;
+        background: var(--brand-primary-dark);
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: var(--shadow-md);
     }
 
     .report-list {
         max-height: 240px;
         overflow-y: auto;
-        padding-right: 5px;
+        padding-right: var(--space-1);
     }
 
     .report-list::-webkit-scrollbar {
@@ -363,31 +412,31 @@
     }
 
     .report-list::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
+        background: var(--color-surface-hover);
+        border-radius: var(--radius-full);
     }
 
     .report-list::-webkit-scrollbar-thumb {
-        background: #cbd5e0;
-        border-radius: 10px;
+        background: var(--color-border-hover);
+        border-radius: var(--radius-full);
     }
 
     .report-item {
-        background: white;
-        border: 1px solid #e8ecef;
-        border-radius: 8px;
-        padding: 12px 15px;
-        margin-bottom: 10px;
-        transition: all 0.2s ease;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-3) var(--space-4);
+        margin-bottom: var(--space-2);
+        transition: all var(--transition-fast);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
+        gap: var(--space-3);
     }
 
     .report-item:hover {
-        border-color: #cbd5e0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-color: var(--color-border-hover);
+        box-shadow: var(--shadow-xs);
     }
 
     .report-item-link {
@@ -395,21 +444,21 @@
         cursor: pointer;
         text-decoration: none;
         color: inherit;
-        transition: transform 0.2s ease;
+        transition: transform var(--transition-fast);
     }
 
     .report-item-link:hover {
-        transform: translateX(5px);
+        transform: translateX(4px);
     }
 
     .btn-delete-report {
         background: none;
         border: none;
-        color: #a0aec0;
+        color: var(--color-text-muted);
         cursor: pointer;
-        padding: 8px;
-        border-radius: 6px;
-        transition: all 0.2s ease;
+        padding: var(--space-2);
+        border-radius: var(--radius-md);
+        transition: all var(--transition-fast);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -417,89 +466,112 @@
     }
 
     .btn-delete-report:hover {
-        background-color: #fee2e2;
-        color: #ef4444;
+        background-color: var(--color-danger-light);
+        color: var(--color-danger);
     }
 
-    .btn-delete-report svg {
-        width: 18px;
-        height: 18px;
+    .btn-delete-report .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
     }
 
     .btn-delete-all {
         background: none;
-        color: #a0aec0;
+        color: var(--color-text-muted);
         border: none;
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-size: 0.75em;
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-md);
+        font-size: var(--text-xs);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all var(--transition-fast);
         display: flex;
         align-items: center;
-        gap: 4px;
-        margin-top: 10px;
+        gap: var(--space-1);
+        margin-top: var(--space-3);
     }
 
     .btn-delete-all:hover {
-        color: #ef4444;
-        background-color: #fee2e2;
+        color: var(--color-danger);
+        background-color: var(--color-danger-light);
     }
 
     .btn-delete-all:disabled {
-        color: #cbd5e0;
+        color: var(--color-text-disabled);
         cursor: not-allowed;
     }
 
     .report-item-time {
-        font-size: 0.8em;
-        color: #718096;
-        margin-bottom: 5px;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        margin-bottom: var(--space-1);
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: var(--space-1);
+    }
+
+    .report-item-time .icon {
+        width: var(--icon-xs);
+        height: var(--icon-xs);
     }
 
     .report-item-type {
-        font-size: 0.95em;
-        font-weight: 600;
-        color: #2d3748;
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        color: var(--color-text-primary);
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-2);
     }
 
-    .report-item-type.dispense::before { content: "💊"; }
-    .report-item-type.sale::before { content: "🛒"; }
-    .report-item-type.order::before { content: "📦"; }
+    .report-item-type .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+    }
+
+    .report-item-type.dispense .icon {
+        color: var(--brand-primary);
+    }
+
+    .report-item-type.sale .icon {
+        color: var(--brand-accent);
+    }
+
+    .report-item-type.order .icon {
+        color: var(--color-info);
+    }
 
     .empty-state {
         text-align: center;
-        padding: 40px 20px;
-        color: #a0aec0;
+        padding: var(--space-10) var(--space-5);
+        color: var(--color-text-muted);
     }
 
     .empty-state-icon {
-        font-size: 3em;
-        margin-bottom: 10px;
+        margin-bottom: var(--space-3);
+        color: var(--color-text-disabled);
+    }
+
+    .empty-state-icon .icon {
+        width: var(--icon-xl);
+        height: var(--icon-xl);
     }
 
     .loading-state {
         text-align: center;
-        padding: 30px;
-        color: #718096;
+        padding: var(--space-6);
+        color: var(--color-text-muted);
     }
 
     .footer {
         text-align: center;
-        margin-top: 40px;
-        color: #95a5a6;
-        font-size: 0.9em;
+        margin-top: var(--space-8);
+        color: var(--color-text-muted);
+        font-size: var(--text-sm);
     }
 
     @media (max-width: 768px) {
         .container {
-            padding: 30px 20px;
+            padding: var(--space-6) var(--space-4);
         }
 
         .tabs {
@@ -516,7 +588,17 @@
         }
 
         .workflow-content {
-            padding: 20px;
+            padding: var(--space-4);
+        }
+
+        .header-toolbar {
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .toolbar-item {
+            width: 100%;
+            justify-content: center;
         }
     }
 </style>
@@ -531,17 +613,17 @@
     <div class="header">
         <div class="header-toolbar">
             <button class="toolbar-item db-status" onclick="toggleDbInfo()">
-                <span>✅</span>
+                <svg class="icon"><use href="#icon-check-circle"></use></svg>
                 <span>DB 준비 완료</span>
                 <span style="opacity: 0.8;">({{ db_stats.recent_count }}개)</span>
-                <span class="toolbar-arrow" id="db-info-arrow">▼</span>
+                <svg class="icon toolbar-arrow" id="db-info-arrow"><use href="#icon-chevron-down"></use></svg>
             </button>
             <a href="/drug/manage" class="toolbar-item util-link">
-                <span>⚙️</span>
+                <svg class="icon"><use href="#icon-settings"></use></svg>
                 <span>약품 개별 관리</span>
             </a>
             <a href="/patient/manage" class="toolbar-item util-link">
-                <span>👤</span>
+                <svg class="icon"><use href="#icon-user"></use></svg>
                 <span>환자 관리</span>
             </a>
         </div>
@@ -570,12 +652,13 @@
                 <div class="db-bottom-row">
                     {% if db_stats.data_period %}
                     <div class="db-stat-card period">
-                        <div class="stat-label">📅 데이터 기간</div>
+                        <svg class="icon"><use href="#icon-calendar"></use></svg>
+                        <div class="stat-label">데이터 기간</div>
                         <div class="stat-value" id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</div>
                     </div>
                     {% endif %}
                     <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
-                        <span>🔄</span>
+                        <svg class="icon"><use href="#icon-refresh-cw"></use></svg>
                         <span>DB 재생성</span>
                     </button>
                 </div>
@@ -588,11 +671,11 @@
     <div class="tabs-container">
         <div class="tabs">
             <button class="tab-button active" onclick="switchTab('timeseries')">
-                <span>📊</span>
+                <svg class="icon"><use href="#icon-bar-chart-2"></use></svg>
                 <span>분석 보고서</span>
             </button>
             <button class="tab-button order-tab" onclick="switchTab('order')">
-                <span>📦</span>
+                <svg class="icon"><use href="#icon-package"></use></svg>
                 <span>주문 수량 산출</span>
             </button>
         </div>
@@ -601,15 +684,27 @@
             <div class="workflow-content">
                 <div class="workflow-grid">
                     <div class="workflow-section section-new">
-                        <h3>✨ 새로 생성하기</h3>
+                        <h3>
+                            <svg class="icon"><use href="#icon-sparkles"></use></svg>
+                            새로 생성하기
+                        </h3>
                         <div class="action-buttons">
-                            <a href="/workflow/simple" class="btn-new">📊 재고 관리 보고서</a>
-                            <a href="/workflow/volatility" class="btn-new">📈 고변동성 약품 보고서</a>
+                            <a href="/workflow/simple" class="btn-new">
+                                <svg class="icon"><use href="#icon-bar-chart-2"></use></svg>
+                                재고 관리 보고서
+                            </a>
+                            <a href="/workflow/volatility" class="btn-new">
+                                <svg class="icon"><use href="#icon-trending-up"></use></svg>
+                                고변동성 약품 보고서
+                            </a>
                         </div>
                     </div>
 
                     <div class="workflow-section section-history">
-                        <h3>📁 과거 보고서</h3>
+                        <h3>
+                            <svg class="icon"><use href="#icon-folder"></use></svg>
+                            과거 보고서
+                        </h3>
                         <div id="timeseries-reports" class="report-list">
                             <div class="loading-state">로딩 중...</div>
                         </div>
@@ -625,14 +720,23 @@
             <div class="workflow-content">
                 <div class="workflow-grid">
                     <div class="workflow-section section-new">
-                        <h3>✨ 새로 생성하기</h3>
+                        <h3>
+                            <svg class="icon"><use href="#icon-sparkles"></use></svg>
+                            새로 생성하기
+                        </h3>
                         <div class="action-buttons">
-                            <a href="/workflow/order" class="btn-new order">📦 주문 수량 산출</a>
+                            <a href="/workflow/order" class="btn-new order">
+                                <svg class="icon"><use href="#icon-package"></use></svg>
+                                주문 수량 산출
+                            </a>
                         </div>
                     </div>
 
                     <div class="workflow-section section-history">
-                        <h3>📁 과거 보고서</h3>
+                        <h3>
+                            <svg class="icon"><use href="#icon-folder"></use></svg>
+                            과거 보고서
+                        </h3>
                         <div id="order-reports" class="report-list">
                             <div class="loading-state">로딩 중...</div>
                         </div>
@@ -695,6 +799,16 @@
         order: false
     };
 
+    function getReportIcon(typeClass) {
+        if (typeClass === 'dispense') {
+            return '<svg class="icon"><use href="#icon-pill"></use></svg>';
+        } else if (typeClass === 'sale') {
+            return '<svg class="icon"><use href="#icon-shopping-cart"></use></svg>';
+        } else {
+            return '<svg class="icon"><use href="#icon-package"></use></svg>';
+        }
+    }
+
     async function loadReports(type) {
         var container = document.getElementById(type + '-reports');
 
@@ -703,12 +817,12 @@
             var data = await response.json();
 
             if (data.error) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\u26A0\uFE0F</div><div>\uC624\uB958: ' + data.error + '</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="icon"><use href="#icon-alert-triangle"></use></svg></div><div>\uC624\uB958: ' + data.error + '</div></div>';
                 return;
             }
 
             if (!data.reports || data.reports.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\uD83D\uDCED</div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="icon"><use href="#icon-folder-open"></use></svg></div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
                 return;
             }
 
@@ -735,13 +849,11 @@
 
                 html += '<div class="report-item" data-filename="' + report.filename + '" data-type="' + type + '">' +
                     '<a href="/reports/' + report.filename + '" target="_blank" class="report-item-link">' +
-                    '<div class="report-item-time">\uD83D\uDD50 ' + report.created_at + '</div>' +
-                    '<div class="report-item-type ' + typeClass + '">' + styleText + typeText + '</div>' +
+                    '<div class="report-item-time"><svg class="icon"><use href="#icon-clock"></use></svg> ' + report.created_at + '</div>' +
+                    '<div class="report-item-type ' + typeClass + '">' + getReportIcon(typeClass) + styleText + typeText + '</div>' +
                     '</a>' +
                     '<button class="btn-delete-report" onclick="deleteReport(\'' + report.filename + '\', \'' + type + '\')" title="\uBCF4\uACE0\uC11C \uC0AD\uC81C">' +
-                    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
-                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />' +
-                    '</svg></button></div>';
+                    '<svg class="icon"><use href="#icon-trash-2"></use></svg></button></div>';
             });
 
             container.innerHTML = html;
@@ -752,7 +864,7 @@
             }
         } catch (error) {
             console.error('\uBCF4\uACE0\uC11C \uB85C\uB4DC \uC2E4\uD328:', error);
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\u274C</div><div>\uBCF4\uACE0\uC11C\uB97C \uBD88\uB7EC\uC624\uB294\uB370 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4</div></div>';
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="icon"><use href="#icon-x-circle"></use></svg></div><div>\uBCF4\uACE0\uC11C\uB97C \uBD88\uB7EC\uC624\uB294\uB370 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4</div></div>';
         }
     }
 
@@ -763,7 +875,7 @@
 
     async function rebuildDatabase() {
         var confirmed = await showConfirmModal({
-            icon: '\u26A0\uFE0F',
+            icon: 'warning',
             title: 'DB \uC7AC\uC0DD\uC131',
             message: '\uAE30\uC874 DB\uAC00 \uC0AD\uC81C\uB418\uACE0 data/ \uD3F4\uB354\uC758 \uBAA8\uB4E0 \uD30C\uC77C\uC744 \uAE30\uBC18\uC73C\uB85C \uC0C8\uB85C\uC6B4 DB\uAC00 \uC0DD\uC131\uB429\uB2C8\uB2E4.<br><br>\uC774 \uC791\uC5C5\uC740 \uC218 \uBD84\uC774 \uC18C\uC694\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
             confirmText: '\uC7AC\uC0DD\uC131',
@@ -775,10 +887,10 @@
         var statusDiv = document.getElementById('rebuild-status');
 
         button.disabled = true;
-        button.innerHTML = '<span>\u23F3</span><span>DB \uC7AC\uC0DD\uC131 \uC911...</span>';
+        button.innerHTML = '<svg class="icon icon-spin"><use href="#icon-loader"></use></svg><span>DB \uC7AC\uC0DD\uC131 \uC911...</span>';
 
         statusDiv.className = 'rebuild-status loading';
-        statusDiv.innerHTML = '\uD83D\uDD04 DB \uC7AC\uC0DD\uC131 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC\uB9CC \uAE30\uB2E4\uB824\uC8FC\uC138\uC694...';
+        statusDiv.innerHTML = 'DB \uC7AC\uC0DD\uC131 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC\uB9CC \uAE30\uB2E4\uB824\uC8FC\uC138\uC694...';
 
         try {
             var response = await fetch('/api/rebuild-db', {
@@ -790,13 +902,12 @@
 
             if (response.ok && data.success) {
                 statusDiv.className = 'rebuild-status success';
-                statusDiv.innerHTML = '\u2705 ' + data.message;
+                statusDiv.innerHTML = data.message;
 
                 if (data.stats) {
                     document.getElementById('processed-total').textContent = data.stats.processed_stats.total;
                     document.getElementById('new-drug-count').textContent = data.stats.new_drug_count;
 
-                    // 약품 유형별 카운트 업데이트
                     if (data.stats.processed_stats.by_type) {
                         for (var drugType in data.stats.processed_stats.by_type) {
                             var typeElement = document.getElementById('drug-type-' + drugType);
@@ -820,15 +931,15 @@
                 }, 5000);
             } else {
                 statusDiv.className = 'rebuild-status error';
-                statusDiv.innerHTML = '\u274C ' + (data.error || '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
+                statusDiv.innerHTML = (data.error || '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
             }
         } catch (error) {
             console.error('DB \uC7AC\uC0DD\uC131 \uC2E4\uD328:', error);
             statusDiv.className = 'rebuild-status error';
-            statusDiv.innerHTML = '\u274C DB \uC7AC\uC0DD\uC131 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: ' + error.message;
+            statusDiv.innerHTML = 'DB \uC7AC\uC0DD\uC131 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: ' + error.message;
         } finally {
             button.disabled = false;
-            button.innerHTML = '<span>\uD83D\uDD04</span><span>DB \uC7AC\uC0DD\uC131</span>';
+            button.innerHTML = '<svg class="icon"><use href="#icon-refresh-cw"></use></svg><span>DB \uC7AC\uC0DD\uC131</span>';
         }
     }
 
@@ -838,12 +949,12 @@
         var count = reportItems.length;
 
         if (count === 0) {
-            showToast('삭제할 보고서가 없습니다.', 'info');
+            showToast('\uC0AD\uC81C\uD560 \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.', 'info');
             return;
         }
 
         var confirmed = await showConfirmModal({
-            icon: '\uD83D\uDDD1\uFE0F',
+            icon: 'danger',
             title: '\uC804\uCCB4 \uBCF4\uACE0\uC11C \uC0AD\uC81C',
             message: '\uC815\uB9D0 <strong>' + count + '\uAC1C</strong>\uC758 \uBCF4\uACE0\uC11C\uB97C \uBAA8\uB450 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?<br><br>\uC0AD\uC81C\uB41C \uBCF4\uACE0\uC11C\uB294 \uBCF5\uAD6C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.',
             confirmText: '\uC804\uCCB4 \uC0AD\uC81C',
@@ -853,7 +964,7 @@
 
         var deleteAllBtn = document.getElementById('btn-delete-all-' + reportType);
         deleteAllBtn.disabled = true;
-        deleteAllBtn.innerHTML = '<span>\u23F3</span><span>\uC0AD\uC81C \uC911...</span>';
+        deleteAllBtn.innerHTML = '<svg class="icon icon-spin"><use href="#icon-loader"></use></svg><span>\uC0AD\uC81C \uC911...</span>';
 
         var successCount = 0;
         var failCount = 0;
@@ -880,18 +991,18 @@
         }
 
         if (failCount === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\uD83D\uDCED</div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="icon"><use href="#icon-folder-open"></use></svg></div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
             deleteAllBtn.style.display = 'none';
         } else {
-            showToast(successCount + '개 삭제 완료, ' + failCount + '개 실패', 'warning');
+            showToast(successCount + '\uAC1C \uC0AD\uC81C \uC644\uB8CC, ' + failCount + '\uAC1C \uC2E4\uD328', 'warning');
             deleteAllBtn.disabled = false;
-            deleteAllBtn.innerHTML = '<span>\uD83D\uDDD1\uFE0F</span><span>\uC804\uCCB4 \uC0AD\uC81C</span>';
+            deleteAllBtn.innerHTML = '<span>\uC804\uCCB4 \uC0AD\uC81C</span>';
         }
     }
 
     async function deleteReport(filename, reportType) {
         var confirmed = await showConfirmModal({
-            icon: '\uD83D\uDDD1\uFE0F',
+            icon: 'danger',
             title: '\uBCF4\uACE0\uC11C \uC0AD\uC81C',
             message: '\uC774 \uBCF4\uACE0\uC11C\uB97C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?<br><br>\uC0AD\uC81C\uB41C \uBCF4\uACE0\uC11C\uB294 \uBCF5\uAD6C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.',
             confirmText: '\uC0AD\uC81C',
@@ -919,16 +1030,16 @@
 
                         var container = document.getElementById(reportType + '-reports');
                         if (container && container.querySelectorAll('.report-item').length === 0) {
-                            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">\uD83D\uDCED</div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
+                            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="icon"><use href="#icon-folder-open"></use></svg></div><div>\uC0DD\uC131\uB41C \uBCF4\uACE0\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</div></div>';
                         }
                     }, 300);
                 }
             } else {
-                showToast('삭제 실패: ' + (data.error || '알 수 없는 오류'), 'error');
+                showToast('\uC0AD\uC81C \uC2E4\uD328: ' + (data.error || '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958'), 'error');
             }
         } catch (error) {
             console.error('\uBCF4\uACE0\uC11C \uC0AD\uC81C \uC2E4\uD328:', error);
-            showToast('보고서 삭제 중 오류가 발생했습니다.', 'error');
+            showToast('\uBCF4\uACE0\uC11C \uC0AD\uC81C \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.', 'error');
         }
     }
 </script>

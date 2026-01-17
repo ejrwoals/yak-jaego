@@ -3,6 +3,7 @@
 {% block title %}재고 분석 보고서{% endblock %}
 
 {% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/toast.css') }}?v={{ config.get('VERSION', '1') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/dropdown.css') }}?v={{ config.get('VERSION', '1') }}">
@@ -81,7 +82,7 @@
         width: 24px;
         height: 48px;
         background: white;
-        border: 3px solid #555;
+        border: 3px solid var(--brand-primary);
         border-radius: 8px;
         cursor: ew-resize;
         z-index: 10;
@@ -104,7 +105,7 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        color: #555;
+        color: var(--brand-primary);
         font-size: 14px;
         font-weight: bold;
     }
@@ -174,13 +175,22 @@
 
 {% block content %}
 <div class="container">
-    <a href="/" class="back-btn">&larr; 홈으로 돌아가기</a>
+    <a href="/" class="back-btn">
+        <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-arrow-left"></use></svg>
+        홈으로 돌아가기
+    </a>
 
-    <h1>📊 재고 분석 보고서</h1>
+    <h1>
+        <svg class="icon" style="width: 28px; height: 28px;"><use href="#icon-bar-chart-2"></use></svg>
+        재고 분석 보고서
+    </h1>
 
     <div class="info-box">
         <div class="info-box-header" onclick="toggleInfoBox()">
-            <span class="info-box-title">💡 이 보고서는?</span>
+            <span class="info-box-title">
+                <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-info"></use></svg>
+                이 보고서는?
+            </span>
             <span class="info-box-arrow" id="info-box-arrow">▼</span>
         </div>
         <div class="info-box-content" id="info-box-content">
@@ -199,7 +209,7 @@
                 <div class="radio-option">
                     <input type="radio" id="dispense" name="mode" value="dispense" checked>
                     <label for="dispense">
-                        <span class="radio-icon">💊</span>
+                        <span class="radio-icon"><svg class="icon"><use href="#icon-pill"></use></svg></span>
                         <span class="radio-text">
                             <div class="radio-title">전문약</div>
                             <div class="radio-desc">조제수량 기준</div>
@@ -209,7 +219,7 @@
                 <div class="radio-option">
                     <input type="radio" id="sale" name="mode" value="sale">
                     <label for="sale">
-                        <span class="radio-icon">🏥</span>
+                        <span class="radio-icon"><svg class="icon"><use href="#icon-building-2"></use></svg></span>
                         <span class="radio-text">
                             <div class="radio-title">일반약</div>
                             <div class="radio-desc">판매수량 기준</div>
@@ -249,9 +259,9 @@
             </label>
             <div class="runway-slider-container">
                 <div class="runway-labels">
-                    <span class="runway-label shortage">🟡 부족</span>
-                    <span class="runway-label sufficient">🟢 충분</span>
-                    <span class="runway-label excess">🔵 과다</span>
+                    <span class="runway-label shortage">부족</span>
+                    <span class="runway-label sufficient">충분</span>
+                    <span class="runway-label excess">과다</span>
                 </div>
                 <div class="runway-bar">
                     <div class="runway-segment shortage" id="segment-shortage"></div>
@@ -284,7 +294,8 @@
         </div>
 
         <button type="submit" class="submit-btn" id="submitBtn">
-            🚀 보고서 생성하기
+            <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-file-text"></use></svg>
+            보고서 생성하기
         </button>
     </form>
 
@@ -317,7 +328,7 @@
         var loading = document.getElementById('loading');
 
         submitBtn.disabled = true;
-        submitBtn.textContent = '\u23F3 생성 중...';
+        submitBtn.innerHTML = '<svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-loader"></use></svg> 생성 중...';
         loading.classList.add('active');
 
         var formData = new FormData(this);
@@ -332,20 +343,20 @@
                 window.open(data.report_url, '_blank');
 
                 submitBtn.disabled = false;
-                submitBtn.textContent = '\uD83D\uDE80 보고서 생성하기';
+                submitBtn.innerHTML = '<svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-file-text"></use></svg> 보고서 생성하기';
                 loading.classList.remove('active');
 
-                showToast('\u2705 보고서가 성공적으로 생성되었습니다!', 'success');
+                showToast('보고서가 성공적으로 생성되었습니다!', 'success');
             } else {
                 throw new Error(data.message || '보고서 생성 실패');
             }
         })
         .catch(function(error) {
             console.error('Error:', error);
-            showToast('\u274C 보고서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
+            showToast('보고서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
 
             submitBtn.disabled = false;
-            submitBtn.textContent = '\uD83D\uDE80 보고서 생성하기';
+            submitBtn.innerHTML = '<svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-file-text"></use></svg> 보고서 생성하기';
             loading.classList.remove('active');
         });
     });

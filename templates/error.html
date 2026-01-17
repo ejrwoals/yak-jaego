@@ -11,10 +11,14 @@
 {# No base scripts needed on error page #}
 {% block base_scripts %}{% endblock %}
 
+{% block component_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
+{% endblock %}
+
 {% block page_styles %}
 <style>
     body {
-        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        background: linear-gradient(135deg, var(--danger) 0%, var(--danger-dark) 100%);
     }
 
     .container {
@@ -22,20 +26,33 @@
     }
 
     .error-icon {
-        font-size: 5em;
-        margin-bottom: 20px;
-        text-align: center;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto var(--space-5);
+        color: var(--danger);
     }
 
     h1 {
-        color: #c62828;
+        color: var(--danger-dark);
+    }
+
+    .suggestion-box h3 {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .suggestion-box h3 .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
+        color: var(--brand-primary);
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="error-icon">❌</div>
+    <svg class="error-icon"><use href="#icon-x-circle"></use></svg>
     <h1>데이터베이스 오류</h1>
 
     <div class="error-box">
@@ -45,24 +62,30 @@
 
     {% if suggestion %}
     <div class="suggestion-box">
-        <h3>💡 해결 방법</h3>
+        <h3>
+            <svg class="icon"><use href="#icon-info"></use></svg>
+            해결 방법
+        </h3>
         <p>{{ suggestion }}</p>
     </div>
     {% endif %}
 
     <div class="divider"></div>
 
-    <div style="text-align: left; color: #7f8c8d; margin: 20px 0;">
-        <h3 style="color: #2c3e50; margin-bottom: 15px;">데이터베이스 초기화 방법</h3>
-        <ol style="line-height: 2; margin-left: 20px;">
+    <div style="text-align: left; color: var(--gray-500); margin: var(--space-5) 0;">
+        <h3 style="color: var(--gray-800); margin-bottom: var(--space-4);">데이터베이스 초기화 방법</h3>
+        <ol style="line-height: 2; margin-left: var(--space-5);">
             <li><strong>월별 CSV 파일 준비:</strong> <code>data/</code> 폴더에 월별 약품 데이터 파일을 넣으세요</li>
-            <li><strong>DB 초기화 실행:</strong> 터미널에서 <code style="background-color: #263238; color: #aed581; padding: 4px 8px; border-radius: 4px; font-family: monospace;">python init_db.py</code> 명령어를 실행하세요</li>
+            <li><strong>DB 초기화 실행:</strong> 터미널에서 <code style="background-color: var(--gray-800); color: #aed581; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-family: monospace;">python init_db.py</code> 명령어를 실행하세요</li>
             <li><strong>완료 확인:</strong> 초기화가 완료되면 이 페이지로 돌아오세요</li>
         </ol>
     </div>
 
     <div style="text-align: center;">
-        <a href="/" class="home-btn">홈으로 돌아가기</a>
+        <a href="/" class="home-btn" style="display: inline-flex; align-items: center; gap: var(--space-2);">
+            <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-arrow-left"></use></svg>
+            홈으로 돌아가기
+        </a>
     </div>
 </div>
 {% endblock %}

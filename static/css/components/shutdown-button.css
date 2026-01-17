@@ -3,32 +3,45 @@
 .exit-btn,
 .btn-shutdown {
     position: fixed;
-    top: 20px;
-    left: 20px;
-    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    top: var(--space-5);
+    left: var(--space-5);
+    background: var(--color-danger);
     color: white;
     border: none;
-    padding: 12px 24px;
-    border-radius: 25px;
-    font-size: 0.95em;
-    font-weight: 600;
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
     display: flex;
     align-items: center;
-    gap: 8px;
-    z-index: var(--z-fixed, 1000);
+    gap: var(--space-2);
+    z-index: var(--z-fixed);
+}
+
+.exit-btn .icon,
+.btn-shutdown .icon {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
 }
 
 .exit-btn:hover,
 .btn-shutdown:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
-    background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+    box-shadow: var(--shadow-lg);
+    background: var(--color-danger-dark);
 }
 
 .exit-btn:active,
 .btn-shutdown:active {
     transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+.exit-btn:focus,
+.btn-shutdown:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-danger-light), var(--shadow-md);
 }

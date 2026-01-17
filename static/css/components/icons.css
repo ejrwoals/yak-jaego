@@ -1,0 +1,211 @@
+/* Jaego - Icon System */
+/* Lucide Icons SVG Styles */
+
+/* Base Icon Styles */
+.icon {
+    display: inline-block;
+    width: var(--icon-md);
+    height: var(--icon-md);
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+/* Icon Sizes */
+.icon-xs {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+}
+
+.icon-sm {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+}
+
+.icon-md {
+    width: var(--icon-md);
+    height: var(--icon-md);
+}
+
+.icon-lg {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+}
+
+.icon-xl {
+    width: var(--icon-xl);
+    height: var(--icon-xl);
+}
+
+/* Icon Colors */
+.icon-primary {
+    color: var(--brand-primary);
+}
+
+.icon-secondary {
+    color: var(--color-text-secondary);
+}
+
+.icon-muted {
+    color: var(--color-text-muted);
+}
+
+.icon-success {
+    color: var(--color-success);
+}
+
+.icon-danger {
+    color: var(--color-danger);
+}
+
+.icon-warning {
+    color: var(--color-warning);
+}
+
+.icon-info {
+    color: var(--color-info);
+}
+
+.icon-white {
+    color: white;
+}
+
+/* Icon with text alignment */
+.icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.icon-text-sm {
+    gap: var(--space-1);
+}
+
+/* Icon Button (icon only) */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+}
+
+.icon-btn:active {
+    background: var(--color-surface-active);
+}
+
+.icon-btn-danger:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+}
+
+.icon-btn-primary:hover {
+    background: var(--brand-primary-subtle);
+    color: var(--brand-primary);
+}
+
+/* Spinning animation for loading icons */
+.icon-spin {
+    animation: icon-spin 1s linear infinite;
+}
+
+@keyframes icon-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Pulse animation for attention */
+.icon-pulse {
+    animation: icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Icon in circle background */
+.icon-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--icon-lg) + var(--space-4));
+    height: calc(var(--icon-lg) + var(--space-4));
+    border-radius: var(--radius-full);
+    background: var(--color-surface-hover);
+}
+
+.icon-circle-primary {
+    background: var(--brand-primary-subtle);
+    color: var(--brand-primary);
+}
+
+.icon-circle-success {
+    background: var(--color-success-light);
+    color: var(--color-success);
+}
+
+.icon-circle-danger {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+}
+
+.icon-circle-warning {
+    background: var(--color-warning-light);
+    color: var(--color-warning);
+}
+
+.icon-circle-info {
+    background: var(--color-info-light);
+    color: var(--color-info);
+}
+
+/* Large icon for empty states / modals */
+.icon-hero {
+    width: 48px;
+    height: 48px;
+    stroke-width: 1.5;
+}
+
+/* Status indicator with icon */
+.status-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+.status-icon-shortage {
+    color: var(--color-shortage);
+}
+
+.status-icon-sufficient {
+    color: var(--color-sufficient);
+}
+
+.status-icon-excess {
+    color: var(--color-excess);
+}

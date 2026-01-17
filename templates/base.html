@@ -15,6 +15,9 @@
     {% block page_styles %}{% endblock %}
 </head>
 <body class="{% block body_class %}page-container{% endblock %}">
+    {# SVG Icon Definitions - must be at the start of body #}
+    {% include 'partials/_icons.html' %}
+
     {# Toast container - include if needed #}
     {% block toast_container %}{% endblock %}
 
