@@ -40,7 +40,20 @@
             }
 
             // Show shutdown message
-            document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #2d3748;">\u2705 \uC11C\uBC84\uAC00 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774 \uCC3D\uC744 \uB2EB\uC73C\uC154\uB3C4 \uB429\uB2C8\uB2E4.</div>';
+            document.body.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #fafafa;">
+                    <div style="text-align: center; padding: 48px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #e4e4e7; max-width: 400px;">
+                        <div style="width: 64px; height: 64px; background: #d1fae5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                        </div>
+                        <h1 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #18181b;">서버가 종료되었습니다</h1>
+                        <p style="margin: 0; font-size: 14px; color: #71717a;">이 창을 닫으셔도 됩니다.</p>
+                    </div>
+                </div>
+            `;
         }
     };
 

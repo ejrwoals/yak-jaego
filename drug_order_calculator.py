@@ -395,25 +395,29 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
         ma12_val = float(row[cm['ma12']]) if not pd.isna(row[cm['ma12']]) else 0
         ma3_val = float(row[cm['ma3']]) if not pd.isna(row[cm['ma3']]) else 0
 
+        trend_up_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>'
+        trend_down_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>'
+        trend_stable_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>'
+
         if ma12_val == 0 and ma3_val > 0:
-            trend_icon = '📈'  # 신규 사용 시작
+            trend_icon = trend_up_svg  # 신규 사용 시작
             trend_class = 'trend-up'
         elif ma12_val > 0 and ma3_val == 0:
-            trend_icon = '📉'  # 사용 중단
+            trend_icon = trend_down_svg  # 사용 중단
             trend_class = 'trend-down'
         elif ma12_val == 0 and ma3_val == 0:
-            trend_icon = '➖'  # 둘 다 0
+            trend_icon = trend_stable_svg  # 둘 다 0
             trend_class = 'trend-stable'
         else:
             ratio = ma3_val / ma12_val
             if ratio > 1.15:
-                trend_icon = '📈'  # 상승 (15% 초과)
+                trend_icon = trend_up_svg  # 상승 (15% 초과)
                 trend_class = 'trend-up'
             elif ratio < 0.85:
-                trend_icon = '📉'  # 하락 (15% 미만)
+                trend_icon = trend_down_svg  # 하락 (15% 미만)
                 trend_class = 'trend-down'
             else:
-                trend_icon = '➖'  # 유지 (±15% 이내)
+                trend_icon = trend_stable_svg  # 유지 (±15% 이내)
                 trend_class = 'trend-stable'
 
         # 인라인 차트용 데이터 생성
@@ -443,14 +447,14 @@ def generate_table_rows(df, col_map=None, months=None, runway_threshold=1.0, cus
             th = custom_thresholds[drug_code]
             tooltip_parts = []
             if th.get('절대재고_임계값') is not None:
-                tooltip_parts.append(f"<span style='color:#a0aec0'>📦 개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>개별 설정된 최소 안전 재고 수준:</span> <span style='color:#90cdf4'>{html_escape(str(th['절대재고_임계값']))}개</span>")
             if th.get('런웨이_임계값') is not None:
-                tooltip_parts.append(f"<span style='color:#a0aec0'>📅 개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
+                tooltip_parts.append(f"<span style='color:#a0aec0'>개별 설정된 최소 안전 런웨이:</span> <span style='color:#90cdf4'>{html_escape(str(th['런웨이_임계값']))}개월</span>")
             if th.get('환자목록'):
                 patient_names = html_escape(', '.join(th['환자목록']))
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             tooltip_text = '<br>'.join(tooltip_parts)
-            threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+            threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 메모 버튼 생성
         memo = memos.get(drug_code, '')
@@ -793,7 +797,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     # 음수 재고 경고 책갈피 HTML
     zero_stock_bookmark = f"""
         <div class="alert-bookmark warning" onclick="openZeroStockModal()">
-            <span class="alert-icon">⚠️</span>
+            <span class="alert-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
             <span class="alert-title">음수 재고</span>
             <span class="alert-count">{zero_stock_count}개</span>
         </div>
@@ -804,11 +808,11 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <div id="zeroStockModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>⚠️ 음수 재고 약품 ({zero_stock_count}개)</h3>
+                <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 음수 재고 약품 ({zero_stock_count}개)</h3>
                 <span class="modal-close" onclick="closeZeroStockModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">💡 음수 재고는 실제 재고보다 더 많이 출고된 상태를 의미합니다. 재고 실사 또는 데이터 확인이 필요합니다.</p>
+                <p style="color: var(--text-muted); margin-bottom: 15px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>음수 재고는 실제 재고보다 더 많이 출고된 상태를 의미합니다. 재고 실사 또는 데이터 확인이 필요합니다.</p>
                 <table class="modal-table-zero-stock">
                     <thead>
                         <tr>
@@ -833,7 +837,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     # 신규 약품 알림 책갈피 HTML
     new_drugs_bookmark = f"""
         <div class="alert-bookmark info" onclick="openNewDrugsModal()">
-            <span class="alert-icon">🆕</span>
+            <span class="alert-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
             <span class="alert-title">신규 약품</span>
             <span class="alert-count">{new_drugs_count}개</span>
         </div>
@@ -843,12 +847,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     new_drugs_modal = f"""
     <div id="newDrugsModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header" style="background-color: #3498db;">
-                <h3>🆕 신규 약품 ({new_drugs_count}개)</h3>
+            <div class="modal-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> 신규 약품 ({new_drugs_count}개)</h3>
                 <span class="modal-close" onclick="closeNewDrugsModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">시계열 데이터가 없거나 사용 기간이 3개월 미만인 신규 약품입니다. 3개월 이상의 데이터가 쌓이면 정상 분류됩니다.</p>
+                <p class="modal-description">시계열 데이터가 없거나 사용 기간이 3개월 미만인 신규 약품입니다. 3개월 이상의 데이터가 쌓이면 정상 분류됩니다.</p>
                 <table class="modal-table-new-drugs">
                     <thead>
                         <tr>
@@ -873,7 +877,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     # 간헐적 사용 약품 책갈피 HTML
     intermittent_bookmark = f"""
         <div class="alert-bookmark intermittent" onclick="openIntermittentModal()">
-            <span class="alert-icon">🔄</span>
+            <span class="alert-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>
             <span class="alert-title">간헐적 사용</span>
             <span class="alert-count">{intermittent_count}개</span>
         </div>
@@ -883,12 +887,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     intermittent_modal = f"""
     <div id="intermittentModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header" style="background-color: #9b59b6;">
-                <h3>🔄 간헐적 사용 약품 ({intermittent_count}개)</h3>
+            <div class="modal-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> 간헐적 사용 약품 ({intermittent_count}개)</h3>
                 <span class="modal-close" onclick="closeIntermittentModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="color: #666; margin-bottom: 15px;">최근 3개월간 사용량이 없지만 오늘 사용된 약품입니다. 간헐적으로 사용되므로 재고 확보가 필요할 수 있습니다.</p>
+                <p class="modal-description">최근 3개월간 사용량이 없지만 오늘 사용된 약품입니다. 간헐적으로 사용되므로 재고 확보가 필요할 수 있습니다.</p>
                 <table class="modal-table-intermittent">
                     <thead>
                         <tr>
@@ -1029,14 +1033,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
         if has_stock_th:
             stock_ratio = (drug['stock'] / drug['stock_threshold']) * 100 if drug['stock_threshold'] > 0 else 100
-            stock_color = '#38a169' if stock_ratio >= 100 else '#dd6b20' if stock_ratio >= 50 else '#e53e3e'
+            stock_color = 'var(--color-success)' if stock_ratio >= 100 else 'var(--color-warning)' if stock_ratio >= 50 else 'var(--color-danger)'
             overflow_class = ' overflow' if stock_ratio > 100 else ''
             # 100% 초과 시 목표 마커 위치 계산
             target_pos = 100 / stock_ratio * 100 if stock_ratio > 100 else 100
             gauges_html += f'''
                 <div class="ct-gauge{overflow_class}">
                     <div class="ct-gauge-header">
-                        <span class="ct-gauge-label">📦 재고</span>
+                        <span class="ct-gauge-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 2px;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>재고</span>
                         <span class="ct-gauge-current">현재고: <strong>{drug['stock']:.0f}</strong></span>
                     </div>
                     <div class="ct-gauge-bar">
@@ -1052,14 +1056,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
         if has_runway_th:
             runway_ratio = (drug['runway'] / drug['runway_threshold']) * 100 if drug['runway_threshold'] > 0 else 100
-            runway_color = '#38a169' if runway_ratio >= 100 else '#dd6b20' if runway_ratio >= 50 else '#e53e3e'
+            runway_color = 'var(--color-success)' if runway_ratio >= 100 else 'var(--color-warning)' if runway_ratio >= 50 else 'var(--color-danger)'
             overflow_class = ' overflow' if runway_ratio > 100 else ''
             # 100% 초과 시 목표 마커 위치 계산
             target_pos = 100 / runway_ratio * 100 if runway_ratio > 100 else 100
             gauges_html += f'''
                 <div class="ct-gauge{overflow_class}">
                     <div class="ct-gauge-header">
-                        <span class="ct-gauge-label">⏱️ 런웨이</span>
+                        <span class="ct-gauge-label"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 2px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>런웨이</span>
                         <span class="ct-gauge-current">현재: <strong>{drug['runway']:.1f}</strong>개월</span>
                     </div>
                     <div class="ct-gauge-bar">
@@ -1075,22 +1079,22 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
         # 액션 결정
         if status == 'safe':
-            action_html = '<div class="ct-card-status safe">✅ 재고 충분</div>'
+            action_html = '<div class="ct-card-status safe"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>재고 충분</div>'
         else:
             if has_stock_th and drug['order_qty'] and drug['order_qty'] > 0:
-                action_html = f'<div class="ct-card-status warning">📦 <strong>{drug["order_qty"]}개</strong> 주문 권장</div>'
+                action_html = f'<div class="ct-card-status warning"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg><strong>{drug["order_qty"]}개</strong> 주문 권장</div>'
             elif has_runway_th and drug.get('runway_order_qty'):
-                action_html = f'<div class="ct-card-status warning">⏱️ <strong>{drug["runway_order_qty"]}개</strong> 추가 확보</div>'
+                action_html = f'<div class="ct-card-status warning"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><strong>{drug["runway_order_qty"]}개</strong> 추가 확보</div>'
             elif has_runway_th and drug.get('runway_gap'):
-                action_html = f'<div class="ct-card-status warning">⏱️ <strong>{drug["runway_gap"]:.1f}개월분</strong> 추가 필요</div>'
+                action_html = f'<div class="ct-card-status warning"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><strong>{drug["runway_gap"]:.1f}개월분</strong> 추가 필요</div>'
             else:
-                action_html = '<div class="ct-card-status warning">⚠️ 확인 필요</div>'
+                action_html = '<div class="ct-card-status warning"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>확인 필요</div>'
 
         # 메모 표시 (있는 경우)
         memo_html = ""
         if drug.get('memo'):
             memo_text = drug['memo'][:25] + '...' if len(drug['memo']) > 25 else drug['memo']
-            memo_html = f'<div class="ct-card-memo" title="{drug["memo"]}">📝 {memo_text}</div>'
+            memo_html = f'<div class="ct-card-memo" title="{drug["memo"]}"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg>{memo_text}</div>'
 
         return f"""
             <div class="ct-status-card {status_class}">
@@ -1130,10 +1134,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 """
 
     # 개별 설정 버튼 HTML (테이블 상단에 표시)
-    attention_badge = f'<span class="ct-btn-attention">⚠️ {attention_count}</span>' if attention_count > 0 else ''
+    attention_badge = f'<span class="ct-btn-attention"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> {attention_count}</span>' if attention_count > 0 else ''
     custom_threshold_button = f"""
         <button class="custom-threshold-btn" onclick="openCustomThresholdModal()">
-            ⚙️ 개별 임계값 설정 약품
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>개별 임계값 설정 약품
             {attention_badge}
         </button>
     """ if custom_threshold_count > 0 else ""
@@ -1146,7 +1150,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 <!-- 주의 필요 섹션 -->
                 {"" if attention_count == 0 else f'''
                 <div class="ct-attention-header">
-                    <span class="ct-attention-icon">⚠️</span>
+                    <span class="ct-attention-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
                     <span class="ct-attention-title">주의 필요</span>
                     <span class="ct-attention-count">({attention_count}개)</span>
                 </div>
@@ -1159,10 +1163,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 {"" if safe_count == 0 else f'''
                 <div class="ct-safe-section">
                     <div class="ct-safe-header" onclick="toggleSafeCards()">
-                        <span class="ct-safe-icon">✅</span>
+                        <span class="ct-safe-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span>
                         <span class="ct-safe-title">안전</span>
                         <span class="ct-safe-count">({safe_count}개)</span>
-                        <span class="ct-safe-toggle" id="safeToggleIcon">▼</span>
+                        <span class="ct-safe-toggle" id="safeToggleIcon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
                     </div>
                     <div class="ct-safe-cards" id="safeCardsContainer" style="display: none;">
                         {safe_cards_html}
@@ -1176,8 +1180,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     custom_threshold_modal = f"""
     <div id="customThresholdModal" class="modal">
         <div class="modal-content" style="max-width: 1200px;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);">
-                <h3>⚙️ 개별 임계값 설정 약품 (<span id="customThresholdModalCount">{custom_threshold_count}</span>개)</h3>
+            <div class="modal-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> 개별 임계값 설정 약품 (<span id="customThresholdModalCount">{custom_threshold_count}</span>개)</h3>
                 <span class="modal-close" onclick="closeCustomThresholdModal()">&times;</span>
             </div>
             <div class="modal-body">
@@ -1186,8 +1190,8 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 <!-- 전체 목록 테이블 (토글) -->
                 <div class="ct-table-section">
                     <div class="ct-table-header" onclick="toggleFullList()">
-                        <span>📋 전체 목록 ({custom_threshold_count}개)</span>
-                        <span class="ct-table-toggle" id="fullListToggle">▶</span>
+                        <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>전체 목록 ({custom_threshold_count}개)</span>
+                        <span class="ct-table-toggle" id="fullListToggle"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
                     </div>
                     <div class="ct-table-content" id="fullListContent" style="display: none;">
                         <table class="modal-table-threshold">
@@ -1225,57 +1229,149 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <meta charset="UTF-8">
     <title>약 주문 수량 산출 보고서</title>
     <style>
+        :root {{
+            /* Brand Colors - Slate Blue */
+            --brand-primary: #475569;
+            --brand-primary-dark: #334155;
+            --brand-primary-light: #64748b;
+            --brand-secondary: #94a3b8;
+
+            /* Semantic Colors */
+            --color-success: #10b981;
+            --color-success-light: #d1fae5;
+            --color-success-dark: #059669;
+            --color-danger: #ef4444;
+            --color-danger-light: #fee2e2;
+            --color-danger-dark: #dc2626;
+            --color-warning: #f59e0b;
+            --color-warning-light: #fffbeb;
+            --color-warning-dark: #d97706;
+            --color-info: #3b82f6;
+            --color-info-light: #dbeafe;
+            --color-info-dark: #2563eb;
+            --color-purple: #8b5cf6;
+            --color-purple-light: #ede9fe;
+            --color-purple-dark: #7c3aed;
+
+            /* Text Colors */
+            --text-primary: #18181b;
+            --text-secondary: #52525b;
+            --text-muted: #71717a;
+            --text-light: #a1a1aa;
+
+            /* Background Colors */
+            --bg-page: #fafafa;
+            --bg-card: #ffffff;
+            --bg-muted: #f4f4f5;
+            --bg-hover: #f8fafc;
+
+            /* Border Colors */
+            --border-default: #e4e4e7;
+            --border-light: #f4f4f5;
+
+            /* Spacing */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-5: 20px;
+            --space-6: 24px;
+            --space-8: 32px;
+
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --radius-xl: 12px;
+
+            /* Shadows */
+            --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }}
+
         body {{
-            font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+            margin: 0;
+            padding: var(--space-6);
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }}
+        /* 메인 컨테이너 - 카드 스타일 */
+        .main-container {{
+            max-width: 1600px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-default);
+            padding: var(--space-6);
         }}
         .header {{
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: var(--space-6);
+            padding-bottom: var(--space-5);
+            border-bottom: 1px solid var(--border-default);
         }}
         .header-top {{
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: var(--space-3);
         }}
         .header-top h1 {{
             margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }}
+        .header-top h1 svg {{
+            color: var(--brand-primary);
         }}
         .header-bottom {{
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 8px 20px;
+            gap: var(--space-3) var(--space-5);
         }}
         .header-bottom p {{
             margin: 0;
-            opacity: 0.9;
+            color: var(--text-muted);
+            font-size: 13px;
         }}
         .header-bottom .sales-info {{
             width: 100%;
-            font-size: 0.9em;
-            opacity: 0.8;
+            font-size: 13px;
+            color: var(--text-muted);
         }}
         .help-btn {{
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.7);
-            background: transparent;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
+            border: 1px solid var(--border-default);
+            background: var(--bg-muted);
+            color: var(--text-muted);
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }}
         .help-btn:hover {{
-            background: rgba(255,255,255,0.2);
-            border-color: white;
+            background: var(--bg-hover);
+            border-color: var(--brand-primary);
+            color: var(--brand-primary);
+        }}
+        .help-btn svg {{
+            width: 18px;
+            height: 18px;
         }}
         /* 도움말 모달 */
         .help-modal {{
@@ -1286,159 +1382,186 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.6);
+            background-color: rgba(0,0,0,0.5);
             overflow-y: auto;
         }}
         .help-modal-content {{
-            background-color: #fff;
+            background-color: var(--bg-card);
             margin: 30px auto;
             padding: 0;
             width: 90%;
             max-width: 800px;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl);
         }}
         .help-modal-header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--brand-primary);
             color: white;
-            padding: 20px 25px;
-            border-radius: 12px 12px 0 0;
+            padding: var(--space-5) var(--space-6);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }}
         .help-modal-header h2 {{
             margin: 0;
-            font-size: 22px;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
         }}
         .help-modal-close {{
-            font-size: 28px;
+            font-size: 24px;
             cursor: pointer;
             opacity: 0.8;
             transition: opacity 0.2s;
+            line-height: 1;
         }}
         .help-modal-close:hover {{
             opacity: 1;
         }}
         .help-modal-body {{
-            padding: 25px;
+            padding: var(--space-6);
             max-height: 70vh;
             overflow-y: auto;
         }}
         .help-section {{
-            margin-bottom: 25px;
+            margin-bottom: var(--space-6);
         }}
         .help-section h3 {{
-            color: #2d3748;
-            font-size: 16px;
-            margin: 0 0 12px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e2e8f0;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 var(--space-3) 0;
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
         }}
         .help-section p {{
-            color: #4a5568;
+            color: var(--text-secondary);
             line-height: 1.6;
-            margin: 0 0 10px 0;
+            margin: 0 0 var(--space-3) 0;
+            font-size: 14px;
         }}
         .help-section ul {{
-            color: #4a5568;
+            color: var(--text-secondary);
             line-height: 1.8;
             margin: 0;
-            padding-left: 20px;
+            padding-left: var(--space-5);
+            font-size: 14px;
         }}
         .help-diagram {{
-            margin: 15px 0;
+            margin: var(--space-4) 0;
         }}
         .diagram-box {{
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 15px;
-            font-family: 'D2Coding', 'Consolas', monospace;
+            background: var(--bg-muted);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
             font-size: 12px;
             line-height: 1.4;
             overflow-x: auto;
             white-space: pre;
-            color: #2d3748;
+            color: var(--text-primary);
         }}
         .help-table {{
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
+            margin-top: var(--space-4);
             font-size: 13px;
         }}
         .help-table th, .help-table td {{
-            padding: 10px 12px;
+            padding: var(--space-3);
             text-align: left;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--border-default);
         }}
         .help-table th {{
-            background: #f7fafc;
-            color: #4a5568;
+            background: var(--bg-muted);
+            color: var(--text-secondary);
             font-weight: 600;
         }}
         .help-table td {{
-            color: #2d3748;
+            color: var(--text-primary);
         }}
         .badge-warning {{
-            background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+            background: var(--color-danger);
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
             font-size: 11px;
+            font-weight: 500;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
         }}
         .badge-info {{
-            background: linear-gradient(135deg, #42a5f5 0%, #1565c0 100%);
+            background: var(--color-info);
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
             font-size: 11px;
+            font-weight: 500;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
         }}
         .badge-intermittent {{
-            background: linear-gradient(135deg, #9b59b6 0%, #7d3c98 100%);
+            background: var(--color-purple);
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
             font-size: 11px;
+            font-weight: 500;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
         }}
         .badge-custom {{
-            background: linear-gradient(135deg, #805ad5 0%, #5b21b6 100%);
+            background: var(--color-purple-dark);
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
             font-size: 11px;
+            font-weight: 500;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
         }}
-        /* 집합 다이어그램 - 무채색 */
+        /* 집합 다이어그램 */
         .category-diagram {{
-            margin: 20px 0;
+            margin: var(--space-5) 0;
         }}
         .set-outer {{
-            background: #fafafa;
-            border: 2px solid #9e9e9e;
-            border-radius: 16px;
-            padding: 12px;
+            background: var(--bg-page);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-xl);
+            padding: var(--space-3);
         }}
         .set-label-outer {{
             font-size: 12px;
             font-weight: 600;
-            color: #424242;
-            margin-bottom: 10px;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-3);
             text-align: center;
         }}
         .set-row {{
             display: flex;
-            gap: 8px;
+            gap: var(--space-2);
             align-items: stretch;
         }}
         .set-new, .set-intermittent, .set-negative, .set-main {{
-            background: #fff;
-            border: 2px solid #757575;
-            border-radius: 8px;
-            padding: 8px 6px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            padding: var(--space-2) var(--space-2);
             text-align: center;
             display: flex;
             flex-direction: column;
@@ -1449,195 +1572,211 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .set-negative, .set-main {{ flex: 1; }}
         .set-existing {{
             flex: 1;
-            background: #f5f5f5;
-            border: 2px solid #bdbdbd;
-            border-radius: 12px;
-            padding: 10px;
+            background: var(--bg-muted);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3);
         }}
         .set-label-existing {{
             font-size: 10px;
             font-weight: 600;
-            color: #616161;
-            margin-bottom: 8px;
+            color: var(--text-muted);
+            margin-bottom: var(--space-2);
         }}
         .set-normal {{
             flex: 1;
-            background: #eeeeee;
-            border: 2px solid #bdbdbd;
-            border-radius: 10px;
-            padding: 8px;
+            background: var(--bg-page);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            padding: var(--space-2);
         }}
         .set-label-normal {{
             font-size: 9px;
             font-weight: 600;
-            color: #616161;
-            margin-bottom: 6px;
+            color: var(--text-muted);
+            margin-bottom: var(--space-2);
         }}
         .set-icon {{
-            font-size: 16px;
             margin-bottom: 2px;
+        }}
+        .set-icon svg {{
+            width: 16px;
+            height: 16px;
+            stroke: var(--text-secondary);
         }}
         .set-title {{
             font-size: 9px;
             font-weight: 600;
-            color: #424242;
+            color: var(--text-primary);
             margin-bottom: 1px;
         }}
         .set-desc {{
             font-size: 8px;
-            color: #757575;
+            color: var(--text-muted);
         }}
         .diagram-overlay-note {{
-            margin-top: 12px;
-            padding: 10px 15px;
-            background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
-            border-radius: 8px;
+            margin-top: var(--space-3);
+            padding: var(--space-3) var(--space-4);
+            background: var(--color-purple-light);
+            border-radius: var(--radius-lg);
             font-size: 12px;
-            color: #553c9a;
+            color: var(--color-purple-dark);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: var(--space-3);
+        }}
+        .diagram-overlay-note svg {{
+            flex-shrink: 0;
         }}
         /* 북마크 리스트 */
         .bookmark-list {{
-            margin-top: 20px;
+            margin-top: var(--space-5);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: var(--space-3);
         }}
         .bookmark-item {{
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 12px 15px;
-            background: #f8fafc;
-            border-radius: 8px;
-            border-left: 3px solid #e2e8f0;
+            gap: var(--space-4);
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-muted);
+            border-radius: var(--radius-lg);
+            border-left: 3px solid var(--border-default);
         }}
-        .bookmark-item:nth-child(1) {{ border-left-color: #c62828; }}
-        .bookmark-item:nth-child(2) {{ border-left-color: #1565c0; }}
-        .bookmark-item:nth-child(3) {{ border-left-color: #7d3c98; }}
-        .bookmark-item:nth-child(4) {{ border-left-color: #5b21b6; }}
+        .bookmark-item:nth-child(1) {{ border-left-color: var(--color-danger); }}
+        .bookmark-item:nth-child(2) {{ border-left-color: var(--color-info); }}
+        .bookmark-item:nth-child(3) {{ border-left-color: var(--color-purple); }}
+        .bookmark-item:nth-child(4) {{ border-left-color: var(--color-purple-dark); }}
         .bookmark-condition {{
             flex: 0 0 140px;
             font-size: 12px;
-            color: #4a5568;
+            color: var(--text-secondary);
             font-weight: 500;
         }}
         .bookmark-desc {{
             flex: 1;
             font-size: 12px;
-            color: #718096;
+            color: var(--text-muted);
             line-height: 1.4;
         }}
         /* 요약 대시보드 스타일 */
         .summary-dashboard {{
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background-color: var(--bg-muted);
+            padding: var(--space-5);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-5);
+            border: 1px solid var(--border-default);
         }}
         .summary-dashboard h2 {{
-            margin: 0 0 20px 0;
-            color: #2d3748;
-            font-size: 18px;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 12px;
+            margin: 0 0 var(--space-5) 0;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-default);
+            padding-bottom: var(--space-3);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
         }}
         .summary-cards {{
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 20px;
+            gap: var(--space-4);
+            margin-bottom: var(--space-5);
         }}
         .summary-card {{
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-            border-radius: 10px;
-            padding: 16px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
             text-align: center;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border-default);
             transition: transform 0.2s, box-shadow 0.2s;
         }}
         .summary-card:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-sm);
         }}
         .summary-card .icon {{
-            font-size: 24px;
-            margin-bottom: 8px;
+            margin-bottom: var(--space-2);
+        }}
+        .summary-card .icon svg {{
+            width: 24px;
+            height: 24px;
+            stroke: var(--text-muted);
         }}
         .summary-card .label {{
             font-size: 12px;
-            color: #718096;
-            margin-bottom: 4px;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
         }}
         .summary-card .value {{
-            font-size: 32px;
-            font-weight: bold;
-            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
         }}
         .summary-card .unit {{
             font-size: 14px;
-            color: #718096;
+            color: var(--text-muted);
             font-weight: normal;
         }}
         .summary-card.dispense {{
-            border-left: 4px solid #3182ce;
+            border-left: 3px solid var(--color-info);
         }}
         .summary-card.sale {{
-            border-left: 4px solid #38a169;
+            border-left: 3px solid var(--color-success);
         }}
         .summary-card.total {{
-            border-left: 4px solid #805ad5;
+            border-left: 3px solid var(--color-purple);
         }}
         .urgent-section {{
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 16px 20px;
-            margin-bottom: 16px;
+            background: var(--bg-muted);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-5);
+            margin-bottom: var(--space-4);
         }}
         .urgent-section h3 {{
-            margin: 0 0 12px 0;
-            color: #4a5568;
+            margin: 0 0 var(--space-3) 0;
+            color: var(--text-secondary);
             font-size: 14px;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: var(--space-2);
         }}
         .urgent-cards {{
             display: flex;
-            gap: 16px;
+            gap: var(--space-4);
             flex-wrap: wrap;
         }}
         .urgent-card {{
-            background: white;
-            border-radius: 8px;
-            padding: 12px 20px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3) var(--space-5);
             display: flex;
             align-items: center;
-            gap: 12px;
-            border: 1px solid #e2e8f0;
+            gap: var(--space-3);
+            border: 1px solid var(--border-default);
         }}
         .urgent-card .dot {{
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: #718096;
+            background: var(--text-muted);
         }}
         .urgent-card .type {{
             font-size: 13px;
-            color: #718096;
+            color: var(--text-muted);
         }}
         .urgent-card .count {{
             font-size: 20px;
-            font-weight: bold;
-            color: #2d3748;
+            font-weight: 700;
+            color: var(--text-primary);
         }}
         .urgent-card.total-urgent {{
-            background: #4a5568;
-            border-color: #4a5568;
+            background: var(--brand-primary);
+            border-color: var(--brand-primary);
         }}
         .urgent-card.total-urgent .type,
         .urgent-card.total-urgent .count {{
@@ -1647,31 +1786,37 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             background: white;
         }}
         .negative-stock-alert {{
-            background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);
-            border: 1px solid #ed8936;
-            border-radius: 8px;
-            padding: 12px 20px;
+            background: var(--color-warning-light);
+            border: 1px solid var(--color-warning);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3) var(--space-5);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: var(--space-3);
             cursor: pointer;
             transition: all 0.2s;
         }}
         .negative-stock-alert:hover {{
-            background: linear-gradient(135deg, #feebc8 0%, #fbd38d 100%);
+            background: #fde68a;
         }}
         .negative-stock-alert .icon {{
-            font-size: 20px;
+            display: flex;
+            align-items: center;
+        }}
+        .negative-stock-alert .icon svg {{
+            width: 20px;
+            height: 20px;
+            stroke: var(--color-warning-dark);
         }}
         .negative-stock-alert .text {{
             flex: 1;
             font-size: 14px;
-            color: #c05621;
+            color: var(--color-warning-dark);
         }}
         .negative-stock-alert .count {{
             font-size: 24px;
-            font-weight: bold;
-            color: #c05621;
+            font-weight: 700;
+            color: var(--color-warning-dark);
         }}
 
         /* 알림 사이드바 (책갈피 스타일) */
@@ -1682,68 +1827,66 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             z-index: 999;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: var(--space-3);
         }}
         .alert-bookmark {{
             position: relative;
             right: -120px;
-            padding: 12px 16px;
-            border-radius: 12px 0 0 12px;
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-lg) 0 0 var(--radius-lg);
             cursor: pointer;
             transition: right 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
             min-width: 160px;
             font-weight: 600;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: var(--space-1);
             user-select: none;
-            /* Glassmorphism */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--border-default);
             border-right: none;
+            box-shadow: var(--shadow-md);
         }}
         .alert-bookmark:hover {{
             right: 0;
             transform: scale(1.02);
         }}
         .alert-bookmark .alert-icon {{
-            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+        }}
+        .alert-bookmark .alert-icon svg {{
+            width: 18px;
+            height: 18px;
         }}
         .alert-bookmark .alert-title {{
-            font-size: 0.85em;
+            font-size: 12px;
             opacity: 0.85;
         }}
         .alert-bookmark .alert-count {{
-            font-size: 1.5em;
-            font-weight: bold;
+            font-size: 18px;
+            font-weight: 700;
         }}
         .alert-bookmark.warning {{
-            background: linear-gradient(135deg, rgba(239, 83, 80, 0.75) 0%, rgba(198, 40, 40, 0.85) 100%);
-            box-shadow: -4px 4px 20px rgba(198, 40, 40, 0.3);
+            background: var(--brand-primary);
             color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }}
         .alert-bookmark.warning:hover {{
-            box-shadow: -6px 6px 24px rgba(198, 40, 40, 0.4);
+            box-shadow: var(--shadow-lg);
         }}
         .alert-bookmark.info {{
-            background: linear-gradient(135deg, rgba(66, 165, 245, 0.75) 0%, rgba(21, 101, 192, 0.85) 100%);
-            box-shadow: -4px 4px 20px rgba(21, 101, 192, 0.3);
+            background: var(--brand-primary-light);
             color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }}
         .alert-bookmark.info:hover {{
-            box-shadow: -6px 6px 24px rgba(21, 101, 192, 0.4);
+            box-shadow: var(--shadow-lg);
         }}
         .alert-bookmark.intermittent {{
-            background: linear-gradient(135deg, rgba(155, 89, 182, 0.75) 0%, rgba(125, 60, 152, 0.85) 100%);
-            box-shadow: -4px 4px 20px rgba(125, 60, 152, 0.3);
+            background: var(--brand-secondary);
             color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }}
         .alert-bookmark.intermittent:hover {{
-            box-shadow: -6px 6px 24px rgba(125, 60, 152, 0.4);
+            box-shadow: var(--shadow-lg);
         }}
 
         /* 모달 스타일 */
@@ -1758,44 +1901,74 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             background-color: rgba(0,0,0,0.5);
         }}
         .modal-content {{
-            background-color: #fff;
+            background-color: var(--bg-card);
             margin: 3% auto;
             padding: 0;
-            border-radius: 8px;
+            border-radius: var(--radius-xl);
             width: 95%;
             max-width: 1400px;
             max-height: 90vh;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-xl);
         }}
         .modal-header {{
-            background-color: #6c757d;
+            background-color: var(--brand-primary);
             color: white;
-            padding: 15px 20px;
+            padding: var(--space-4) var(--space-5);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }}
         .modal-header h3 {{
             margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
         }}
         .modal-close {{
-            font-size: 28px;
+            font-size: 24px;
             cursor: pointer;
             color: white;
+            line-height: 1;
+            opacity: 0.8;
         }}
         .modal-close:hover {{
-            color: #e9ecef;
+            opacity: 1;
         }}
         .modal-body {{
-            padding: 20px;
+            padding: var(--space-5);
             max-height: 80vh;
             overflow-y: auto;
+        }}
+        .modal-description {{
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: var(--space-4);
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-muted);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--brand-primary);
         }}
         /* 모달 테이블 공통 스타일 */
         .modal-body table {{
             table-layout: auto;
             width: 100%;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }}
+        .modal-body table th {{
+            background: var(--bg-muted);
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-default);
+        }}
+        .modal-body table td {{
+            border-bottom: 1px solid var(--border-light);
+        }}
+        .modal-body table tr:last-child td {{
+            border-bottom: none;
         }}
         /* 음수 재고 모달 (7컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 1년MA, 3개월MA */
         .modal-table-zero-stock th:nth-child(1),
@@ -1850,17 +2023,17 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             cursor: pointer;
         }}
         .modal-table-intermittent .clickable-row:hover {{
-            background-color: rgba(155, 89, 182, 0.1);
+            background-color: var(--bg-hover);
         }}
         .modal-table-intermittent .clickable-row.chart-expanded {{
-            background-color: rgba(155, 89, 182, 0.15) !important;
-            border-left: 3px solid #9b59b6;
+            background-color: var(--bg-muted) !important;
+            border-left: 3px solid var(--brand-primary);
         }}
         .modal-table-intermittent .intermittent-chart-row {{
-            background: #f8fafc;
+            background: var(--bg-muted);
         }}
         .modal-table-intermittent .intermittent-chart-row:hover {{
-            background: #f8fafc !important;
+            background: var(--bg-muted) !important;
         }}
         /* 개별 임계값 모달 (8컬럼): 약품명, 약품코드, 제약회사, 현재재고, 약품유형, 재고임계값, 런웨이임계값, 메모 */
         .modal-table-threshold th:nth-child(1),
@@ -1882,59 +2055,65 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
         /* 상태 카드 섹션 스타일 */
         .ct-status-section {{
-            margin-bottom: 24px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: var(--space-6);
+            padding-bottom: var(--space-5);
+            border-bottom: 1px solid var(--border-default);
         }}
         .ct-attention-header {{
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
-            font-size: 16px;
+            gap: var(--space-3);
+            margin-bottom: var(--space-4);
+            font-size: 15px;
             font-weight: 600;
-            color: #c53030;
+            color: var(--color-danger);
         }}
         .ct-attention-icon {{
-            font-size: 20px;
+            display: flex;
+            align-items: center;
+        }}
+        .ct-attention-icon svg {{
+            width: 20px;
+            height: 20px;
+            stroke: var(--color-danger);
         }}
         .ct-attention-count {{
-            background: #fed7d7;
-            color: #c53030;
-            padding: 4px 12px;
-            border-radius: 12px;
+            background: var(--color-danger-light);
+            color: var(--color-danger);
+            padding: var(--space-1) var(--space-3);
+            border-radius: var(--radius-xl);
             font-size: 13px;
             font-weight: 600;
         }}
         .ct-cards-container {{
             display: flex;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: var(--space-4);
         }}
         /* 개별 상태 카드 - 게이지 스타일 */
         .ct-status-card {{
             width: 320px;
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 18px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+            border: 1px solid var(--border-default);
+            box-shadow: var(--shadow-xs);
             transition: all 0.2s ease;
         }}
         .ct-status-card:hover {{
-            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-md);
             transform: translateY(-2px);
         }}
-        .ct-status-card.urgent {{ border-left: 5px solid #e53e3e; }}
-        .ct-status-card.warning {{ border-left: 5px solid #dd6b20; }}
-        .ct-status-card.safe {{ border-left: 5px solid #38a169; }}
+        .ct-status-card.urgent {{ border-left: 4px solid var(--color-danger); }}
+        .ct-status-card.warning {{ border-left: 4px solid var(--color-warning); }}
+        .ct-status-card.safe {{ border-left: 4px solid var(--color-success); }}
 
         /* 약품명 */
         .ct-card-name {{
-            font-size: 16px;
-            font-weight: 700;
-            color: #1a202c;
-            margin-bottom: 16px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-4);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1944,14 +2123,14 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .ct-gauges {{
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            margin-bottom: 16px;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
         }}
         .ct-gauge {{
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            padding-bottom: 20px;
+            gap: var(--space-2);
+            padding-bottom: var(--space-5);
         }}
         .ct-gauge-header {{
             display: flex;
@@ -1959,31 +2138,31 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             align-items: center;
         }}
         .ct-gauge-label {{
-            font-size: 14px;
-            color: #4a5568;
+            font-size: 13px;
+            color: var(--text-secondary);
             font-weight: 500;
         }}
         .ct-gauge-current {{
-            font-size: 14px;
-            color: #718096;
+            font-size: 13px;
+            color: var(--text-muted);
         }}
         .ct-gauge-current strong {{
             font-weight: 700;
-            font-size: 16px;
-            color: #2d3748;
+            font-size: 15px;
+            color: var(--text-primary);
         }}
         .ct-gauge-bar {{
             position: relative;
-            height: 18px;
-            background: #e2e8f0;
-            border-radius: 9px;
+            height: 16px;
+            background: var(--bg-muted);
+            border-radius: var(--radius-lg);
             overflow: visible;
-            margin-top: 4px;
+            margin-top: var(--space-1);
         }}
         .ct-gauge-fill {{
             position: relative;
             height: 100%;
-            border-radius: 9px;
+            border-radius: var(--radius-lg);
             transition: width 0.3s ease;
             min-width: 45px;
         }}
@@ -1991,19 +2170,19 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             position: absolute;
             top: -4px;
             width: 3px;
-            height: 26px;
-            background: #2d3748;
-            border-radius: 2px;
+            height: 24px;
+            background: var(--text-primary);
+            border-radius: var(--radius-sm);
             transform: translateX(-50%);
         }}
         .ct-target-label {{
             position: absolute;
-            top: 28px;
+            top: 26px;
             left: 50%;
             transform: translateX(-50%);
             font-size: 11px;
             font-weight: 600;
-            color: #4a5568;
+            color: var(--text-secondary);
             white-space: nowrap;
         }}
         .ct-gauge-percent {{
@@ -2011,86 +2190,97 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             right: 8px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: white;
             text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }}
         /* 100% 초과 시 오버플로우 표시 */
         .ct-gauge.overflow .ct-gauge-bar {{
-            background: linear-gradient(90deg, #c6f6d5 0%, #9ae6b4 100%);
+            background: var(--color-success-light);
         }}
         .ct-gauge.overflow .ct-gauge-fill {{
-            box-shadow: 0 0 8px rgba(56, 161, 105, 0.5);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
         }}
 
         /* 상태 표시 */
         .ct-card-status {{
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 500;
-            padding: 12px 14px;
-            border-radius: 8px;
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-lg);
             text-align: center;
         }}
         .ct-card-status.safe {{
-            background: #f0fff4;
-            color: #276749;
+            background: var(--color-success-light);
+            color: var(--color-success-dark);
         }}
         .ct-card-status.warning {{
-            background: #fffbeb;
-            color: #975a16;
+            background: var(--color-warning-light);
+            color: var(--color-warning-dark);
         }}
         .ct-card-status strong {{
             font-weight: 700;
-            font-size: 17px;
+            font-size: 16px;
         }}
 
         /* 메모 표시 */
         .ct-card-memo {{
             font-size: 13px;
-            color: #718096;
-            margin-top: 12px;
-            padding: 10px 12px;
-            background: #f7fafc;
-            border-radius: 6px;
-            border-left: 3px solid #a0aec0;
+            color: var(--text-muted);
+            margin-top: var(--space-3);
+            padding: var(--space-3);
+            background: var(--bg-muted);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--text-light);
         }}
         /* 안전 섹션 (접기/펼치기) */
         .ct-safe-section {{
-            margin-top: 20px;
+            margin-top: var(--space-5);
         }}
         .ct-safe-header {{
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 12px 16px;
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-left: 4px solid #38a169;
-            border-radius: 8px;
+            gap: var(--space-2);
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-muted);
+            border: 1px solid var(--border-default);
+            border-left: 3px solid var(--color-success);
+            border-radius: var(--radius-lg);
             cursor: pointer;
             transition: all 0.2s;
             font-size: 14px;
         }}
         .ct-safe-header:hover {{
-            background: #edf2f7;
+            background: var(--bg-hover);
         }}
         .ct-safe-icon {{
-            font-size: 16px;
+            display: flex;
+            align-items: center;
+        }}
+        .ct-safe-icon svg {{
+            width: 16px;
+            height: 16px;
+            stroke: var(--color-success);
         }}
         .ct-safe-title {{
             font-weight: 600;
-            color: #276749;
+            color: var(--color-success-dark);
         }}
         .ct-safe-count {{
-            color: #38a169;
+            color: var(--color-success);
             font-weight: 500;
         }}
         .ct-safe-toggle {{
             margin-left: auto;
-            color: #38a169;
+            color: var(--color-success);
             transition: transform 0.3s;
-            font-size: 12px;
+            display: flex;
+            align-items: center;
+        }}
+        .ct-safe-toggle svg {{
+            width: 16px;
+            height: 16px;
         }}
         .ct-safe-toggle.expanded {{
             transform: rotate(180deg);
@@ -2098,41 +2288,46 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .ct-safe-cards {{
             display: flex;
             flex-wrap: wrap;
-            gap: 14px;
-            padding: 16px 0;
+            gap: var(--space-4);
+            padding: var(--space-4) 0;
         }}
         /* 테이블 섹션 */
         .ct-table-section {{
-            margin-top: 24px;
+            margin-top: var(--space-6);
             overflow-x: hidden;
         }}
         .ct-table-header {{
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
-            color: #4a5568;
-            padding: 12px 16px;
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            color: var(--text-secondary);
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-muted);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
             cursor: pointer;
             transition: all 0.2s ease;
         }}
         .ct-table-header:hover {{
-            background: #edf2f7;
+            background: var(--bg-hover);
         }}
         .ct-table-toggle {{
-            font-size: 12px;
-            color: #718096;
+            color: var(--text-muted);
             transition: transform 0.2s ease;
+            display: flex;
+            align-items: center;
+        }}
+        .ct-table-toggle svg {{
+            width: 16px;
+            height: 16px;
         }}
         .ct-table-toggle.open {{
             transform: rotate(90deg);
         }}
         .ct-table-content {{
-            margin-top: 12px;
+            margin-top: var(--space-3);
             overflow-x: auto;
         }}
         .modal-table-threshold {{
@@ -2142,80 +2337,85 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         }}
         /* 테이블 상태 행 스타일 */
         .modal-table-threshold tr.status-urgent {{
-            background-color: rgba(229, 62, 62, 0.08);
+            background-color: rgba(239, 68, 68, 0.06);
         }}
         .modal-table-threshold tr.status-warning {{
-            background-color: rgba(221, 107, 32, 0.08);
+            background-color: rgba(245, 158, 11, 0.06);
         }}
         .modal-table-threshold tr.status-safe {{
-            background-color: rgba(56, 161, 105, 0.05);
+            background-color: rgba(16, 185, 129, 0.04);
         }}
 
-        /* 탭 스타일 */
+        /* 탭 스타일 - 모던 Pill 스타일 */
         .tab-container {{
-            margin-bottom: 20px;
+            margin-bottom: var(--space-5);
         }}
         .tab-buttons {{
-            display: flex;
-            gap: 0;
-            border-bottom: 2px solid #dee2e6;
+            display: inline-flex;
+            gap: var(--space-1);
+            padding: var(--space-1);
+            background: var(--bg-muted);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-5);
         }}
         .tab-btn {{
-            padding: 12px 24px;
+            padding: var(--space-2) var(--space-5);
             border: none;
-            background-color: #e9ecef;
+            background: transparent;
             cursor: pointer;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 500;
-            color: #495057;
-            border-radius: 8px 8px 0 0;
-            margin-right: 4px;
+            color: var(--text-muted);
+            border-radius: var(--radius-md);
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: var(--space-2);
         }}
         .tab-btn:hover {{
-            background-color: #dee2e6;
+            color: var(--text-secondary);
         }}
         .tab-btn.active {{
-            background-color: #fff;
-            color: #2c3e50;
-            border: 2px solid #dee2e6;
-            border-bottom: 2px solid #fff;
-            margin-bottom: -2px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-xs);
             font-weight: 600;
         }}
         .urgent-badge {{
-            background-color: #f56565;
-            color: white;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 13px;
+            background-color: var(--color-danger-light);
+            color: var(--color-danger);
+            padding: 2px var(--space-3);
+            border-radius: var(--radius-xl);
+            font-size: 12px;
             font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
         }}
         .custom-threshold-btn {{
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 18px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #2d3748;
-            border: 1px solid rgba(255, 255, 255, 0.95);
-            border-radius: 8px;
+            gap: var(--space-3);
+            padding: var(--space-2) var(--space-4);
+            background: var(--bg-muted);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 500;
             transition: all 0.2s ease;
         }}
         .custom-threshold-btn:hover {{
-            background: rgba(255, 255, 255, 1);
-            border-color: rgba(255, 255, 255, 1);
+            background: var(--bg-hover);
+            border-color: var(--brand-primary);
+            color: var(--brand-primary);
         }}
         .ct-btn-attention {{
-            background: #f56565;
-            padding: 2px 8px;
-            border-radius: 10px;
+            background: var(--color-danger);
+            color: white;
+            padding: 2px var(--space-2);
+            border-radius: var(--radius-md);
             font-size: 11px;
             font-weight: 600;
             animation: pulse-attention 2s ease-in-out infinite;
@@ -2223,20 +2423,15 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         @keyframes pulse-attention {{
             0%, 100% {{
                 transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
             }}
             50% {{
                 transform: scale(1.1);
-                box-shadow: 0 0 0 8px rgba(245, 101, 101, 0);
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
             }}
         }}
         .tab-content {{
             display: none;
-            background-color: #fff;
-            border: 2px solid #dee2e6;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-            padding: 20px;
         }}
         .tab-content.active {{
             display: block;
@@ -2245,15 +2440,23 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         table {{
             width: 100%;
             border-collapse: collapse;
-            background-color: white;
+            background-color: var(--bg-card);
             table-layout: fixed;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
         }}
         th {{
-            background-color: #34495e;
-            color: white;
-            padding: 12px;
+            background-color: var(--bg-muted);
+            color: var(--text-primary);
+            padding: var(--space-3);
             text-align: left;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border-default);
+        }}
+        th svg {{
+            color: var(--text-muted);
         }}
         /* 컬럼 너비 지정 (9개 컬럼) */
         th:nth-child(1), td:nth-child(1) {{ width: 50px; }}   /* 메모 */
@@ -2266,30 +2469,31 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         th:nth-child(8), td:nth-child(8) {{ width: 6%; }}     /* 당일 소모 */
         th:nth-child(9), td:nth-child(9) {{ width: 80px; }}   /* 트렌드 */
         td {{
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
+            padding: var(--space-3);
+            border-bottom: 1px solid var(--border-default);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            font-size: 13px;
         }}
         tr:hover {{
-            background-color: #f9f9f9;
+            background-color: var(--bg-hover);
         }}
         .urgent-row {{
-            background-color: #fffbeb !important;
+            background-color: var(--color-warning-light) !important;
         }}
         .urgent-cell {{
-            color: #c05621;
-            font-weight: bold;
+            color: var(--color-danger);
+            font-weight: 600;
         }}
         .normal-cell {{
-            color: #2e7d32;
+            color: var(--color-success-dark);
         }}
         .empty-message {{
             text-align: center;
-            padding: 40px;
-            color: #6c757d;
-            font-size: 16px;
+            padding: var(--space-8);
+            color: var(--text-muted);
+            font-size: 15px;
         }}
 
         /* 인라인 차트용 클릭 가능 행 스타일 */
@@ -2298,7 +2502,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             transition: background-color 0.2s;
         }}
         .clickable-row:hover {{
-            background-color: #edf2f7 !important;
+            background-color: var(--bg-hover) !important;
         }}
 
         /* 개별 임계값 표시 아이콘 - 클릭 가능한 툴팁 */
@@ -2306,11 +2510,15 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-right: 6px;
+            margin-right: var(--space-2);
             cursor: pointer;
-            font-size: 14px;
             opacity: 0.85;
             position: relative;
+        }}
+        .threshold-indicator svg {{
+            width: 14px;
+            height: 14px;
+            stroke: var(--color-purple);
         }}
         .threshold-indicator:hover {{
             opacity: 1;
@@ -2318,15 +2526,15 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         /* Floating tooltip (body에 append) */
         .threshold-tooltip-floating {{
             position: fixed;
-            background: #2d3748;
+            background: var(--text-primary);
             color: white;
-            padding: 10px 14px;
-            border-radius: 8px;
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-lg);
             font-size: 12px;
             white-space: pre-line;
             font-weight: normal;
             line-height: 1.5;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: var(--shadow-lg);
             z-index: 9999;
             pointer-events: none;
         }}
@@ -2335,26 +2543,29 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         .memo-btn {{
             width: 28px;
             height: 28px;
-            border: 2px solid #cbd5e0;
-            border-radius: 6px;
-            background: white;
-            color: #718096;
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            color: var(--text-muted);
             cursor: pointer;
-            font-size: 14px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
         }}
+        .memo-btn svg {{
+            width: 14px;
+            height: 14px;
+        }}
         .memo-btn:hover {{
-            border-color: #f6ad55;
-            color: #f6ad55;
-            background-color: #fffaf0;
+            border-color: var(--color-warning);
+            color: var(--color-warning);
+            background-color: var(--color-warning-light);
         }}
         .memo-btn.has-memo {{
-            border-color: #f6ad55;
-            color: #f6ad55;
-            background-color: #fffaf0;
+            border-color: var(--color-warning);
+            color: var(--color-warning);
+            background-color: var(--color-warning-light);
         }}
 
         /* 메모 모달 스타일 */
@@ -2369,229 +2580,239 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             background-color: rgba(0, 0, 0, 0.5);
         }}
         .memo-modal-content {{
-            background-color: white;
+            background-color: var(--bg-card);
             margin: 10% auto;
             padding: 0;
-            border-radius: 12px;
+            border-radius: var(--radius-xl);
             width: 500px;
             max-width: 90%;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            box-shadow: var(--shadow-xl);
         }}
         .memo-modal-header {{
-            background: linear-gradient(135deg, #f6ad55, #ed8936);
+            background: var(--color-warning);
             color: white;
-            padding: 16px 20px;
-            border-radius: 12px 12px 0 0;
+            padding: var(--space-4) var(--space-5);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }}
         .memo-modal-header h3 {{
             margin: 0;
-            font-size: 16px;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
         }}
         .memo-modal-close {{
             color: white;
-            font-size: 24px;
+            font-size: 22px;
             cursor: pointer;
             line-height: 1;
-        }}
-        .memo-modal-close:hover {{
             opacity: 0.8;
         }}
+        .memo-modal-close:hover {{
+            opacity: 1;
+        }}
         .memo-modal-body {{
-            padding: 20px;
+            padding: var(--space-5);
         }}
         .memo-modal-body textarea {{
             width: 100%;
             height: 120px;
-            padding: 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            padding: var(--space-3);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
             font-size: 14px;
             resize: vertical;
             font-family: inherit;
+            box-sizing: border-box;
         }}
         .memo-modal-body textarea:focus {{
             outline: none;
-            border-color: #f6ad55;
-            box-shadow: 0 0 0 3px rgba(246, 173, 85, 0.1);
+            border-color: var(--color-warning);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
         }}
         .memo-modal-footer {{
-            padding: 12px 20px 20px;
+            padding: var(--space-3) var(--space-5) var(--space-5);
             display: flex;
             justify-content: flex-end;
-            gap: 10px;
+            gap: var(--space-3);
         }}
         .memo-modal-footer button {{
-            padding: 8px 20px;
-            border-radius: 6px;
+            padding: var(--space-2) var(--space-5);
+            border-radius: var(--radius-md);
             font-size: 14px;
             cursor: pointer;
             transition: all 0.2s;
         }}
         .memo-btn-cancel {{
-            background: white;
-            border: 1px solid #e2e8f0;
-            color: #4a5568;
+            background: var(--bg-card);
+            border: 1px solid var(--border-default);
+            color: var(--text-secondary);
         }}
         .memo-btn-cancel:hover {{
-            background: #f7fafc;
+            background: var(--bg-muted);
         }}
         .memo-btn-save {{
-            background: linear-gradient(135deg, #f6ad55, #ed8936);
+            background: var(--color-warning);
             border: none;
             color: white;
         }}
         .memo-btn-save:hover {{
-            opacity: 0.9;
+            background: var(--color-warning-dark);
         }}
 
         /* 트렌드 아이콘 스타일 */
         .trend-up {{
-            color: #e53e3e;
+            color: var(--color-danger);
         }}
         .trend-down {{
-            color: #3182ce;
+            color: var(--color-info);
         }}
         .trend-stable {{
-            color: #718096;
+            color: var(--text-muted);
         }}
         .clickable-row.chart-expanded {{
-            background-color: rgba(79, 172, 254, 0.15) !important;
-            border-left: 3px solid #4facfe;
+            background-color: rgba(71, 85, 105, 0.08) !important;
+            border-left: 3px solid var(--brand-primary);
         }}
         .inline-chart-row {{
-            background: #f8fafc;
+            background: var(--bg-muted);
         }}
         .inline-chart-row:hover {{
-            background: #f8fafc !important;
+            background: var(--bg-muted) !important;
         }}
 
         /* 주문량 계산기 스타일 */
         .order-calculator {{
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4);
+            margin-bottom: var(--space-4);
         }}
         .order-calculator h4 {{
-            margin: 0 0 12px 0;
-            color: #2d3748;
+            margin: 0 0 var(--space-3) 0;
+            color: var(--text-primary);
             font-size: 14px;
+            font-weight: 600;
         }}
         .runway-buttons {{
             display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
         }}
         .runway-btn {{
-            padding: 8px 16px;
-            border: 2px solid #e2e8f0;
-            background: #fff;
-            border-radius: 6px;
+            padding: var(--space-2) var(--space-4);
+            border: 1px solid var(--border-default);
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
             transition: all 0.2s;
         }}
         .runway-btn:hover {{
-            border-color: #4facfe;
-            background: #f0f9ff;
+            border-color: var(--brand-primary);
+            background: var(--bg-hover);
         }}
         .runway-btn.active {{
-            border-color: #4facfe;
-            background: #4facfe;
+            border-color: var(--brand-primary);
+            background: var(--brand-primary);
             color: white;
         }}
         .order-result {{
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: var(--space-3);
         }}
         .order-result-item {{
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 12px;
+            background: var(--bg-muted);
+            border: 1px solid var(--border-default);
+            border-radius: var(--radius-md);
+            padding: var(--space-3);
             text-align: center;
         }}
         .order-result-item .label {{
             font-size: 12px;
-            color: #718096;
-            margin-bottom: 4px;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
         }}
         .order-result-item .ma-value {{
             font-size: 11px;
-            color: #a0aec0;
-            margin-bottom: 8px;
+            color: var(--text-light);
+            margin-bottom: var(--space-2);
         }}
         .order-result-item .value {{
             font-size: 20px;
-            font-weight: bold;
-            color: #2d3748;
+            font-weight: 700;
+            color: var(--text-primary);
         }}
         .order-context-header {{
-            font-size: 14px;
-            color: #4a5568;
-            margin-bottom: 16px;
-            padding: 10px 12px;
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border-radius: 6px;
-            border-left: 3px solid #4facfe;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-4);
+            padding: var(--space-3);
+            background: var(--color-info-light);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--color-info);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
         }}
-        .order-context-header .emoji {{
-            margin-right: 6px;
+        .order-context-header svg {{
+            flex-shrink: 0;
         }}
         .order-context-header .months {{
-            font-weight: bold;
-            color: #2563eb;
+            font-weight: 700;
+            color: var(--color-info-dark);
         }}
         /* 단일 프로그레스바 스타일 (목표 마커 포함) */
         .runway-progress-single {{
-            margin: 8px 0;
+            margin: var(--space-2) 0;
         }}
         .runway-progress-labels {{
             font-size: 11px;
-            color: #718096;
-            margin-bottom: 4px;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
             display: flex;
             justify-content: space-between;
         }}
         .runway-progress-labels .current-label {{
-            color: #2d3748;
+            color: var(--text-primary);
             font-weight: 600;
         }}
         .runway-progress-labels .target-label {{
-            color: #718096;
+            color: var(--text-muted);
         }}
         .progress-bar-wrapper {{
             position: relative;
             width: 100%;
-            height: 16px;
-            background: #e2e8f0;
-            border-radius: 8px;
+            height: 14px;
+            background: var(--bg-muted);
+            border-radius: var(--radius-lg);
             overflow: hidden;
         }}
         .progress-bar-fill {{
             height: 100%;
-            border-radius: 8px;
+            border-radius: var(--radius-lg);
             transition: width 0.3s ease, background 0.3s ease;
         }}
         .progress-bar-fill.shortage {{
-            background: linear-gradient(90deg, #f56565 0%, #fc8181 100%);
+            background: var(--color-danger);
         }}
         .progress-bar-fill.sufficient {{
-            background: linear-gradient(90deg, #48bb78 0%, #68d391 100%);
+            background: var(--color-success);
         }}
         .target-marker {{
             position: absolute;
             top: -2px;
             bottom: -2px;
             width: 3px;
-            background: #2d3748;
-            border-radius: 2px;
+            background: var(--text-primary);
+            border-radius: var(--radius-sm);
             z-index: 2;
         }}
         .target-marker::after {{
@@ -2601,60 +2822,61 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             left: 50%;
             transform: translateX(-50%);
             font-size: 8px;
-            color: #2d3748;
+            color: var(--text-primary);
         }}
         .order-value {{
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            margin-top: 8px;
+            gap: var(--space-2);
+            margin-top: var(--space-2);
             font-size: 16px;
-            font-weight: bold;
-            color: #2d3748;
+            font-weight: 700;
+            color: var(--text-primary);
         }}
         .order-value.no-order {{
-            color: #38a169;
+            color: var(--color-success);
         }}
         .order-value .arrow {{
-            color: #4facfe;
+            color: var(--brand-primary);
         }}
         .current-stock-note {{
             font-size: 12px;
-            color: #718096;
-            margin-top: 12px;
+            color: var(--text-muted);
+            margin-top: var(--space-3);
         }}
     </style>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 <body>
-    <div class="header">
-        <div class="header-top">
-            <h1>📦 약 주문 수량 산출 보고서</h1>
-            <button class="help-btn" onclick="openHelpModal()" title="사용 설명서">?</button>
-        </div>
-        <div class="header-bottom">
-            <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 강조 기준: 런웨이 {runway_threshold}개월 미만</p>
-            {custom_threshold_button}
-            {f'<p class="sales-info">오늘 전문약 조제금액: {today_sales["조제금액"]:,}원 | 일반약 판매금액: {today_sales["판매금액"]:,}원</p>' if today_sales else ''}
-        </div>
-    </div>
-
     <div class="alert-sidebar">
         {zero_stock_bookmark}
         {new_drugs_bookmark}
         {intermittent_bookmark}
     </div>
 
-    <div class="tab-container">
+    <div class="main-container">
+        <div class="header">
+            <div class="header-top">
+                <h1><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg> 약 주문 수량 산출 보고서</h1>
+                <button class="help-btn" onclick="openHelpModal()" title="사용 설명서"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
+            </div>
+            <div class="header-bottom">
+                <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 강조 기준: 런웨이 {runway_threshold}개월 미만</p>
+                {custom_threshold_button}
+                {f'<p class="sales-info">오늘 전문약 조제금액: {today_sales["조제금액"]:,}원 | 일반약 판매금액: {today_sales["판매금액"]:,}원</p>' if today_sales else ''}
+            </div>
+        </div>
+
+        <div class="tab-container">
         <div class="tab-buttons">
             <button class="tab-btn active" onclick="switchTab('dispense')">
                 전문약
-                {f'<span class="urgent-badge">⚠️ {dispense_urgent}</span>' if dispense_urgent > 0 else ''}
+                {f'<span class="urgent-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> {dispense_urgent}</span>' if dispense_urgent > 0 else ''}
             </button>
             <button class="tab-btn" onclick="switchTab('sale')">
                 일반약
-                {f'<span class="urgent-badge">⚠️ {sale_urgent}</span>' if sale_urgent > 0 else ''}
+                {f'<span class="urgent-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> {sale_urgent}</span>' if sale_urgent > 0 else ''}
             </button>
         </div>
 
@@ -2666,10 +2888,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                         <th>약품명</th>
                         <th>약품코드</th>
                         <th>제약회사</th>
-                        <th>📦 현재 재고</th>
+                        <th><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>현재 재고</th>
                         <th>3개월 이동평균</th>
                         <th>런웨이 (개월)</th>
-                        <th>📅 당일 소모량</th>
+                        <th><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>당일 소모량</th>
                         <th>트렌드</th>
                     </tr>
                 </thead>
@@ -2687,10 +2909,10 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                         <th>약품명</th>
                         <th>약품코드</th>
                         <th>제약회사</th>
-                        <th>📦 현재 재고</th>
+                        <th><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>현재 재고</th>
                         <th>3개월 이동평균</th>
                         <th>런웨이 (개월)</th>
-                        <th>📅 당일 소모량</th>
+                        <th><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>당일 소모량</th>
                         <th>트렌드</th>
                     </tr>
                 </thead>
@@ -2700,6 +2922,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             </table>''' if sale_count > 0 else '<div class="empty-message">오늘 나간 일반약이 없습니다.</div>'}
         </div>
     </div>
+    </div><!-- end main-container -->
 
     {zero_stock_modal}
     {new_drugs_modal}
@@ -2710,7 +2933,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <div id="memoModal" class="memo-modal">
         <div class="memo-modal-content">
             <div class="memo-modal-header">
-                <h3>📝 메모</h3>
+                <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg> 메모</h3>
                 <span class="memo-modal-close" onclick="closeMemoModal()">&times;</span>
             </div>
             <div class="memo-modal-body">
@@ -2727,34 +2950,34 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
     <div id="helpModal" class="help-modal">
         <div class="help-modal-content">
             <div class="help-modal-header">
-                <h2>📖 사용 설명서</h2>
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg> 사용 설명서</h2>
                 <span class="help-modal-close" onclick="closeHelpModal()">&times;</span>
             </div>
             <div class="help-modal-body">
                 <section class="help-section">
-                    <h3>📦 보고서 개요</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg> 보고서 개요</h3>
                     <p>이 보고서는 <strong>오늘 사용된 약품</strong>만 표시합니다. 업로드한 파일(today.csv/xls/xlsx)에 포함된 약품들의 재고 상태와 주문 필요성을 분석합니다.</p>
                 </section>
 
                 <section class="help-section">
-                    <h3>📊 메인 테이블</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16l4-8 4 4 4-8"/></svg> 메인 테이블</h3>
                     <ul>
                         <li><strong>전문약/일반약 탭</strong>: 정상적으로 사용되는 약품 (3개월 이동평균 > 0, 재고 ≥ 0)</li>
                         <li><strong>노란색 행</strong>: 런웨이가 임계값 미만인 긴급 주문 필요 약품</li>
                         <li><strong>행 클릭</strong>: 트렌드 차트 + 주문량 계산기 확장</li>
-                        <li><strong>트렌드 아이콘</strong>: 📈 상승 (+15% 이상) | ➖ 유지 (±15%) | 📉 하락 (-15% 이상)</li>
+                        <li><strong>트렌드 아이콘</strong>: 상승 (+15% 이상) | 유지 (±15%) | 하락 (-15% 이상)</li>
                     </ul>
                 </section>
 
                 <section class="help-section">
-                    <h3>🔖 우측 책갈피 분류 기준</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg> 우측 책갈피 분류 기준</h3>
                     <p>오늘 사용된 약품은 아래 기준에 따라 분류되며, <strong>신규/간헐적/음수재고는 상호 배타적</strong>입니다.</p>
                     <div class="category-diagram">
                         <div class="set-outer">
-                            <div class="set-label-outer">📦 오늘 사용된 약품</div>
+                            <div class="set-label-outer"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg> 오늘 사용된 약품</div>
                             <div class="set-row">
                                 <div class="set-new">
-                                    <div class="set-icon">🆕</div>
+                                    <div class="set-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></div>
                                     <div class="set-title">신규</div>
                                     <div class="set-desc">사용 &lt;3개월</div>
                                 </div>
@@ -2762,7 +2985,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                     <div class="set-label-existing">기존 약품</div>
                                     <div class="set-row">
                                         <div class="set-intermittent">
-                                            <div class="set-icon">🔄</div>
+                                            <div class="set-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></div>
                                             <div class="set-title">간헐적</div>
                                             <div class="set-desc">3개월=0</div>
                                         </div>
@@ -2770,12 +2993,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                             <div class="set-label-normal">정상 (3개월 > 0)</div>
                                             <div class="set-row">
                                                 <div class="set-negative">
-                                                    <div class="set-icon">⚠️</div>
+                                                    <div class="set-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
                                                     <div class="set-title">음수</div>
                                                     <div class="set-desc">&lt;0</div>
                                                 </div>
                                                 <div class="set-main">
-                                                    <div class="set-icon">📋</div>
+                                                    <div class="set-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></div>
                                                     <div class="set-title">메인</div>
                                                     <div class="set-desc">≥0</div>
                                                 </div>
@@ -2786,22 +3009,22 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                             </div>
                         </div>
                         <div class="diagram-overlay-note">
-                            💡 <strong>개별 임계값 설정 약품</strong>은 위 분류와 별개로, 테이블 상단 버튼에서 확인
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> <strong>개별 임계값 설정 약품</strong>은 위 분류와 별개로, 테이블 상단 버튼에서 확인
                         </div>
                     </div>
                     <div class="bookmark-list">
                         <div class="bookmark-item">
-                            <span class="badge-warning">⚠️ 음수 재고</span>
+                            <span class="badge-warning"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 음수 재고</span>
                             <span class="bookmark-condition">재고 &lt; 0</span>
                             <span class="bookmark-desc">비정상 상황 징후. 원인 확인 및 교정 필요</span>
                         </div>
                         <div class="bookmark-item">
-                            <span class="badge-info">🆕 신규 약품</span>
+                            <span class="badge-info"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> 신규 약품</span>
                             <span class="bookmark-condition">사용 기간 3개월 미만</span>
                             <span class="bookmark-desc">시계열 데이터가 없거나 사용 시작 후 3개월 미만. 런웨이 계산 불가</span>
                         </div>
                         <div class="bookmark-item">
-                            <span class="badge-intermittent">🔄 간헐적 사용</span>
+                            <span class="badge-intermittent"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> 간헐적 사용</span>
                             <span class="bookmark-condition">3개월 이동평균 = 0</span>
                             <span class="bookmark-desc">최근 3개월간 미사용이나 오늘 사용됨. 주문 시기 놓치지 않도록 주의</span>
                         </div>
@@ -2809,7 +3032,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 </section>
 
                 <section class="help-section">
-                    <h3>🧮 런웨이(Runway) 계산</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg> 런웨이(Runway) 계산</h3>
                     <ul>
                         <li><strong>런웨이</strong> = 현재 재고 ÷ 월평균 사용량</li>
                         <li><strong>1년 이동평균 런웨이</strong>: 장기 트렌드 기반 (계절성 반영)</li>
@@ -2819,12 +3042,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 </section>
 
                 <section class="help-section">
-                    <h3>💡 팁</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> 팁</h3>
                     <ul>
                         <li>테이블 행 클릭 시 <strong>트렌드 차트</strong>와 <strong>주문량 계산기</strong>가 펼쳐집니다</li>
                         <li><strong>메모 아이콘</strong>을 클릭하여 약품별 메모를 저장할 수 있습니다</li>
                         <li>약품 관리 페이지에서 <strong>개별 임계값</strong>을 설정할 수 있습니다</li>
-                        <li>테이블 상단의 <strong>⚙️ 개별 임계값 설정 약품</strong> 버튼으로 설정된 약품 현황 확인</li>
+                        <li>테이블 상단의 <strong>개별 임계값 설정 약품</strong> 버튼으로 설정된 약품 현황 확인</li>
                     </ul>
                 </section>
             </div>
@@ -2952,36 +3175,36 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             const chartRow = document.createElement('tr');
             chartRow.className = 'intermittent-chart-row';
             chartRow.innerHTML = `
-                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #9b59b6; position: relative;">
+                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid var(--color-purple); position: relative;">
                     <button onclick="event.stopPropagation(); this.closest('tr').previousElementSibling.click();"
                             style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #718096; z-index: 10;">&times;</button>
 
                     <div style="display: flex; gap: 20px; align-items: stretch;">
                         <!-- 차트 영역 (70%) -->
                         <div style="flex: 7; min-width: 0;">
-                            <h4 style="margin: 0 0 10px 0; color: #333;">📊 ${{chartData.drug_name}} 사용량 추이</h4>
+                            <h4 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16l4-8 4 4 4-8"/></svg>${{chartData.drug_name}} 사용량 추이</h4>
                             <div id="intermittent-chart-${{drugCode}}" style="width: 100%; height: 280px;"></div>
                         </div>
 
                         <!-- 정보 영역 (30%) -->
-                        <div style="flex: 3; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <h4 style="margin: 0 0 15px 0; color: #333; font-size: 14px;">📋 약품 정보</h4>
+                        <div style="flex: 3; background: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border-default);">
+                            <h4 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>약품 정보</h4>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
-                                <div style="padding: 10px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="color: #718096; font-size: 11px; margin-bottom: 4px;">현재 재고</div>
-                                    <div style="font-size: 18px; font-weight: bold; color: ${{chartData.stock <= 0 ? '#e53e3e' : '#2d3748'}};">${{chartData.stock.toFixed(0)}}개</div>
+                                <div style="padding: 10px; background: var(--bg-muted); border-radius: 6px;">
+                                    <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 4px;">현재 재고</div>
+                                    <div style="font-size: 18px; font-weight: 700; color: ${{chartData.stock <= 0 ? 'var(--color-danger)' : 'var(--text-primary)'}};">${{chartData.stock.toFixed(0)}}개</div>
                                 </div>
-                                <div style="padding: 10px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="color: #718096; font-size: 11px; margin-bottom: 4px;">1년 이동평균</div>
-                                    <div style="font-size: 18px; font-weight: bold; color: #2d3748;">${{chartData.ma12.toFixed(1)}}</div>
+                                <div style="padding: 10px; background: var(--bg-muted); border-radius: 6px;">
+                                    <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 4px;">1년 이동평균</div>
+                                    <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${{chartData.ma12.toFixed(1)}}</div>
                                 </div>
-                                <div style="padding: 10px; background: #f8fafc; border-radius: 6px;">
-                                    <div style="color: #718096; font-size: 11px; margin-bottom: 4px;">런웨이 (1년 MA 기준)</div>
-                                    <div style="font-size: 18px; font-weight: bold; color: ${{typeof chartData.runway === 'number' && chartData.runway < 1 ? '#e53e3e' : '#2d3748'}};">${{chartData.runway}}${{typeof chartData.runway === 'number' ? '개월' : ''}}</div>
+                                <div style="padding: 10px; background: var(--bg-muted); border-radius: 6px;">
+                                    <div style="color: var(--text-muted); font-size: 11px; margin-bottom: 4px;">런웨이 (1년 MA 기준)</div>
+                                    <div style="font-size: 18px; font-weight: 700; color: ${{typeof chartData.runway === 'number' && chartData.runway < 1 ? 'var(--color-danger)' : 'var(--text-primary)'}};">${{chartData.runway}}${{typeof chartData.runway === 'number' ? '개월' : ''}}</div>
                                 </div>
-                                <div style="padding: 10px; background: #fefcbf; border-radius: 6px; border: 1px solid #f6e05e;">
-                                    <div style="color: #744210; font-size: 11px;">💡 간헐적 사용 약품</div>
-                                    <div style="color: #744210; font-size: 12px; margin-top: 4px;">최근 3개월간 사용 기록이 없습니다. 필요시 재고 확보를 검토하세요.</div>
+                                <div style="padding: 10px; background: var(--color-warning-light); border-radius: 6px; border: 1px solid var(--color-warning);">
+                                    <div style="color: var(--color-warning-dark); font-size: 11px; display: flex; align-items: center; gap: 4px;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>간헐적 사용 약품</div>
+                                    <div style="color: var(--color-warning-dark); font-size: 12px; margin-top: 4px;">최근 3개월간 사용 기록이 없습니다. 필요시 재고 확보를 검토하세요.</div>
                                 </div>
                             </div>
                         </div>
@@ -3015,7 +3238,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             const stockLine = months.map(() => currentStock);
 
             // 바 색상 (0인 달은 회색, 있는 달은 보라색)
-            const barColors = timeseries.map(v => v === 0 ? '#e2e8f0' : '#9b59b6');
+            const barColors = timeseries.map(v => v === 0 ? '#e4e4e7' : '#8b5cf6');
 
             // 막대 그래프 (월별 조제수량)
             const barTrace = {{
@@ -3034,7 +3257,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 type: 'scatter',
                 mode: 'lines',
                 name: '3개월 이동평균',
-                line: {{ color: '#e67e22', width: 2, dash: 'solid' }},
+                line: {{ color: '#f59e0b', width: 2, dash: 'solid' }},
                 hovertemplate: '%{{x}}<br>3개월 MA: %{{y:.1f}}<extra></extra>'
             }};
 
@@ -3045,7 +3268,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 type: 'scatter',
                 mode: 'lines',
                 name: '현재 재고',
-                line: {{ color: '#38a169', width: 2, dash: 'dash' }},
+                line: {{ color: '#10b981', width: 2, dash: 'dash' }},
                 hovertemplate: '현재 재고: %{{y}}<extra></extra>'
             }};
 
@@ -3211,6 +3434,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
         window.onclick = function(event) {{
             var zeroModal = document.getElementById('zeroStockModal');
             var newDrugsModal = document.getElementById('newDrugsModal');
+            var intermittentModal = document.getElementById('intermittentModal');
             var customModal = document.getElementById('customThresholdModal');
             var memoModal = document.getElementById('memoModal');
             if (event.target == zeroModal) {{
@@ -3218,6 +3442,9 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             }}
             if (event.target == newDrugsModal) {{
                 newDrugsModal.style.display = 'none';
+            }}
+            if (event.target == intermittentModal) {{
+                intermittentModal.style.display = 'none';
             }}
             if (event.target == customModal) {{
                 customModal.style.display = 'none';
@@ -3273,7 +3500,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             const chartRow = document.createElement('tr');
             chartRow.className = 'inline-chart-row';
             chartRow.innerHTML = `
-                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #4facfe; position: relative;">
+                <td colspan="${{colSpan}}" style="padding: 20px; background: #f8fafc; border-left: 4px solid var(--brand-primary); position: relative;">
                     <button onclick="closeInlineChart('${{drugCode}}')"
                             style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #718096; z-index: 10;">&times;</button>
 
@@ -3291,12 +3518,12 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                     <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">1년 런웨이</div>
                                     <div style="font-size: 18px; font-weight: 600; color: ${{chartData.ma12 > 0 ? (chartData.stock / chartData.ma12 < 1 ? '#e53e3e' : '#2d3748') : '#a0aec0'}};">${{chartData.ma12 > 0 ? (chartData.stock / chartData.ma12).toFixed(2) : '-'}}<span style="font-size: 12px; color: #a0aec0;">개월</span></div>
                                 </div>
-                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid #4facfe; border-radius: 8px; padding: 10px 14px; text-align: center;">
-                                    <div style="font-size: 11px; color: #4facfe; margin-bottom: 4px;">3개월 이동평균</div>
+                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid var(--brand-primary); border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                    <div style="font-size: 11px; color: var(--brand-primary); margin-bottom: 4px;">3개월 이동평균</div>
                                     <div style="font-size: 18px; font-weight: 600; color: #2d3748;">${{chartData.ma3.toFixed(1)}}<span style="font-size: 12px; color: #a0aec0;">/월</span></div>
                                 </div>
-                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid #4facfe; border-radius: 8px; padding: 10px 14px; text-align: center;">
-                                    <div style="font-size: 11px; color: #4facfe; margin-bottom: 4px;">3개월 런웨이</div>
+                                <div class="stat-card" style="flex: 1; background: #fff; border: 1px solid var(--brand-primary); border-radius: 8px; padding: 10px 14px; text-align: center;">
+                                    <div style="font-size: 11px; color: var(--brand-primary); margin-bottom: 4px;">3개월 런웨이</div>
                                     <div style="font-size: 18px; font-weight: 600; color: ${{chartData.ma3 > 0 ? (chartData.stock / chartData.ma3 < 1 ? '#e53e3e' : '#2d3748') : '#a0aec0'}};">${{chartData.ma3 > 0 ? (chartData.stock / chartData.ma3).toFixed(2) : '-'}}<span style="font-size: 12px; color: #a0aec0;">개월</span></div>
                                 </div>
                             </div>
@@ -3306,7 +3533,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
 
                         <!-- 주문량 계산기 (40%) -->
                         <div class="order-calculator" style="flex: 4; margin-bottom: 0;">
-                            <h4>📦 주문량 계산기</h4>
+                            <h4><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>주문량 계산기</h4>
                             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
                                 <div class="runway-buttons" style="margin-bottom: 0;">
                                     <button class="runway-btn" onclick="calculateOrder(1, '${{drugCode}}')">1개월</button>
@@ -3314,7 +3541,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                     <button class="runway-btn active" onclick="calculateOrder(3, '${{drugCode}}')">3개월</button>
                                 </div>
                                 <div class="order-context-header" id="order-context-${{drugCode}}" style="margin: 0; flex: 1;">
-                                    <span class="emoji">💡</span><span class="months">3개월</span>치 재고를 확보하려면:
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span class="months">3개월</span>치 재고를 확보하려면:
                                 </div>
                             </div>
                             <div class="order-result">
@@ -3332,7 +3559,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                         </div>
                                     </div>
                                     <div class="order-value" id="order-value-ma3-${{drugCode}}">
-                                        <span class="arrow">👉</span>
+                                        <span class="arrow"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
                                         <span id="order-ma3-${{drugCode}}">-</span>
                                         <span style="font-size:13px; font-weight:normal; color:#718096;">주문 필요</span>
                                     </div>
@@ -3351,7 +3578,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                                         </div>
                                     </div>
                                     <div class="order-value" id="order-value-ma12-${{drugCode}}">
-                                        <span class="arrow">👉</span>
+                                        <span class="arrow"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
                                         <span id="order-ma12-${{drugCode}}">-</span>
                                         <span style="font-size:13px; font-weight:normal; color:#718096;">주문 필요</span>
                                     </div>
@@ -3407,7 +3634,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
             // 컨텍스트 헤더 업데이트
             const contextHeader = document.getElementById(`order-context-${{drugCode}}`);
             if (contextHeader) {{
-                contextHeader.innerHTML = `<span class="emoji">💡</span><span class="months">${{targetMonths}}개월</span>치 재고를 확보하려면:`;
+                contextHeader.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span class="months">${{targetMonths}}개월</span>치 재고를 확보하려면:`;
             }}
 
             // 단일 프로그레스바 업데이트 함수
@@ -3446,7 +3673,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                 if (orderQty > 0) {{
                     orderValueEl.classList.remove('no-order');
                     orderValueEl.innerHTML = `
-                        <span class="arrow">👉</span>
+                        <span class="arrow"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
                         <span>${{orderQty.toLocaleString()}}개</span>
                         <span style="font-size:13px; font-weight:normal; color:#718096;">주문 필요</span>
                     `;
@@ -3454,7 +3681,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                     orderValueEl.classList.add('no-order');
                     const surplus = Math.round((currentRunway - targetRunway) * 10) / 10;
                     orderValueEl.innerHTML = `
-                        <span>✅</span>
+                        <span><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span>
                         <span>주문 불필요</span>
                         <span style="font-size:13px; font-weight:normal;">(+${{surplus.toFixed(1)}}개월 여유)</span>
                     `;
@@ -3502,7 +3729,7 @@ def generate_order_report_html(df, col_map=None, months=None, runway_threshold=1
                     y: ma3List,
                     mode: 'lines',
                     name: '3개월 이동평균',
-                    line: {{color: '#4facfe', width: 3}},
+                    line: {{color: '#475569', width: 3}},
                     hovertemplate: '3개월 평균: %{{y:,.1f}}개<extra></extra>'
                 }},
                 {{

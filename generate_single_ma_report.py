@@ -443,6 +443,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 background: var(--bg-surface);
                 transition: border-color var(--duration-fast) var(--ease-out),
                             box-shadow var(--duration-fast) var(--ease-out);
+                box-sizing: border-box;
             }}
 
             .search-box:hover {{
@@ -2394,7 +2395,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 </h2>
                 <p style="color: var(--text-muted); margin-bottom: var(--space-3); font-size: 0.875rem;">약품코드: <strong style="color: var(--text-primary);" id="memo-drug-code-generic"></strong></p>
                 <textarea id="memo-textarea-generic"
-                          style="width: 100%; height: 200px; padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 0.875rem; font-family: inherit; resize: vertical; color: var(--text-primary);"
+                          style="width: 100%; height: 200px; padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 0.875rem; font-family: inherit; resize: vertical; color: var(--text-primary); box-sizing: border-box;"
                           placeholder="메모를 입력하세요..."></textarea>
                 <div style="display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5);">
                     <button onclick="closeMemoModalGeneric()" style="padding: var(--space-2) var(--space-4); border: 1px solid var(--border-default); background: var(--bg-surface); border-radius: var(--radius-md); cursor: pointer; font-size: 0.875rem; color: var(--text-secondary); transition: all var(--duration-fast) var(--ease-out);">취소</button>
@@ -2650,7 +2651,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                     <h2 style="margin-bottom: 20px;">📝 메모 작성</h2>
                     <p style="color: #718096; margin-bottom: 10px;">약품코드: <strong id="memo-drug-code"></strong></p>
                     <textarea id="memo-textarea"
-                              style="width: 100%; height: 200px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"
+                              style="width: 100%; height: 200px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box;"
                               placeholder="메모를 입력하세요..."></textarea>
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                         <button onclick="closeMemoModal()" style="padding: 10px 20px; border: 2px solid #cbd5e0; background: white; border-radius: 5px; cursor: pointer; font-size: 14px;">취소</button>
