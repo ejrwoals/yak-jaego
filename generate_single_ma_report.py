@@ -10,6 +10,62 @@ import checked_items_db
 import drug_memos_db
 import drug_thresholds_db
 
+def get_usage_period_info(timeseries):
+    """
+    시계열 데이터에서 첫 사용 시점과 사용 기간 정보를 반환
+
+    Returns:
+        tuple: (first_usage_idx, usage_months)
+        - first_usage_idx: 첫 사용 시점 인덱스 (None이면 사용 이력 없음)
+        - usage_months: 첫 사용 시점부터 현재까지의 개월 수
+    """
+    first_usage_idx = None
+    for i, val in enumerate(timeseries):
+        if val is not None and val > 0:
+            first_usage_idx = i
+            break
+
+    if first_usage_idx is None:
+        return None, 0
+
+    usage_months = len(timeseries) - first_usage_idx
+    return first_usage_idx, usage_months
+
+
+def get_corrected_ma(timeseries, n_months):
+    """
+    보정된 N개월 이동평균의 최신값을 반환
+
+    신규 약품(사용 기간 < n_months)의 경우:
+    - 실제 사용 기간으로 나눠서 계산
+
+    Returns:
+        tuple: (latest_ma, usage_months, is_corrected)
+        - latest_ma: 보정된 최신 이동평균
+        - usage_months: 첫 사용 시점부터 현재까지의 개월 수
+        - is_corrected: 보정이 적용되었는지 여부
+    """
+    first_usage_idx, usage_months = get_usage_period_info(timeseries)
+
+    # 사용 이력이 없으면
+    if first_usage_idx is None:
+        return None, 0, False
+
+    # 신규 약품: 사용 기간 < n_months
+    is_corrected = usage_months < n_months
+
+    if is_corrected:
+        # 첫 사용 시점부터 끝까지의 평균
+        window = timeseries[first_usage_idx:]
+        latest_ma = sum(window) / len(window)
+    else:
+        # 기존 방식: 최근 n_months의 평균
+        window = timeseries[-n_months:]
+        latest_ma = sum(window) / n_months
+
+    return latest_ma, usage_months, is_corrected
+
+
 def calculate_custom_ma(timeseries, n_months):
     """
     N개월 이동평균 계산
@@ -390,6 +446,35 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             }}
             .threshold-indicator:hover {{
                 opacity: 1;
+            }}
+            /* 신규 약품 태그 (데이터 부족 약품) */
+            .new-drug-tag {{
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+                color: white;
+                font-size: 10px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                margin-left: 6px;
+                font-weight: 500;
+                vertical-align: middle;
+            }}
+            .new-drug-tag .help-icon {{
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 14px;
+                height: 14px;
+                background: rgba(255,255,255,0.3);
+                border-radius: 50%;
+                font-size: 9px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }}
+            .new-drug-tag .help-icon:hover {{
+                background: rgba(255,255,255,0.5);
             }}
             /* 개별 임계값 플로팅 툴팁 */
             .threshold-tooltip-floating {{
@@ -830,19 +915,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
     # N개월 이동평균 계산 및 정렬 준비
     print(f"\n📊 약품 목록을 {ma_months}개월 이동평균 기준으로 정렬 중...")
 
-    # 각 약품의 N개월 이동평균 계산
+    # 각 약품의 N개월 이동평균 계산 (보정 버전)
     ma_values = []
     for _, row in df.iterrows():
         timeseries = row['월별_조제수량_리스트']
-        ma = calculate_custom_ma(timeseries, ma_months)
-
-        # 최신 N-MA 값 추출
-        latest_ma = None
-        for val in reversed(ma):
-            if val is not None:
-                latest_ma = val
-                break
-
+        latest_ma, _, _ = get_corrected_ma(timeseries, ma_months)
         ma_values.append(latest_ma if latest_ma else 0)
 
     # DataFrame에 N-MA 컬럼 추가
@@ -890,18 +967,20 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         # 경량 SVG 스파크라인 생성
         timeseries = row['월별_조제수량_리스트']
 
-        # N개월 이동평균 계산
+        # N개월 이동평균 계산 (스파크라인용 - 기존 방식)
         ma = calculate_custom_ma(timeseries, ma_months)
         sparkline_html = create_sparkline_svg(timeseries, ma, ma_months)
 
-        # N개월 이동평균 (최신값)
-        latest_ma = None
-        for val in reversed(ma):
-            if val is not None:
-                latest_ma = val
-                break
+        # 보정된 N개월 이동평균 (신규 약품 보정)
+        latest_ma, usage_months, is_corrected = get_corrected_ma(timeseries, ma_months)
 
-        # 런웨이 계산
+        # 신규 약품 태그 (사용 기간 < 선택 기간)
+        drug_code = str(row['약품코드'])
+        new_drug_tag = ""
+        if is_corrected and usage_months > 0:
+            new_drug_tag = f'<span class="new-drug-tag">신규<span class="help-icon" onclick="event.stopPropagation(); openNewDrugInfoModal(\'{drug_code}\', {usage_months}, {ma_months})">?</span></span>'
+
+        # 런웨이 계산 (보정된 MA 사용)
         runway_display = "재고만 있음"  # 기본값 통일
         if latest_ma and latest_ma > 0:
             runway_months = row['최종_재고수량'] / latest_ma
@@ -915,7 +994,6 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         runway_class = get_runway_class(runway_display)
 
         # 인라인 차트용 데이터를 JSON으로 변환
-        drug_code = str(row['약품코드'])
         chart_data_json = html_escape(create_chart_data_json(
             months=months,
             timeseries_data=timeseries,
@@ -986,7 +1064,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                             <td>{company_display}</td>
                             <td>{drug_code}</td>
                             <td>{row['최종_재고수량']:,.0f}</td>
-                            <td>{"N/A" if latest_ma is None else f"{latest_ma:.2f}"}</td>
+                            <td>{"N/A" if latest_ma is None else f"{latest_ma:.2f}"}{new_drug_tag}</td>
                             <td class="runway-cell">{runway_display}</td>
                             <td>{sparkline_html}</td>
                         </tr>
@@ -1831,7 +1909,50 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     event.target.style.display = 'none';
                 }
             }
+
+            // 신규 약품 정보 모달 열기
+            function openNewDrugInfoModal(drugCode, usageMonths, maMonths) {
+                const modal = document.getElementById('new-drug-info-modal');
+                document.getElementById('new-drug-info-code').textContent = drugCode;
+                document.getElementById('new-drug-info-usage').textContent = usageMonths;
+                document.getElementById('new-drug-info-ma').textContent = maMonths;
+                modal.style.display = 'block';
+            }
+
+            // 신규 약품 정보 모달 닫기
+            function closeNewDrugInfoModal() {
+                document.getElementById('new-drug-info-modal').style.display = 'none';
+            }
         </script>
+
+        <!-- 신규 약품 정보 모달 -->
+        <div id="new-drug-info-modal" class="modal" onclick="if(event.target === this) closeNewDrugInfoModal()">
+            <div class="modal-content" style="max-width: 500px; text-align: center;">
+                <span class="close-btn" onclick="closeNewDrugInfoModal()">&times;</span>
+                <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
+                <h2 style="margin-bottom: 20px; color: #3b82f6;">신규 약품 안내</h2>
+                <div style="background: #eff6ff; border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: left;">
+                    <p style="margin: 0 0 12px 0; color: #1e40af; font-weight: bold;">
+                        이 약품은 사용 기간이 <span id="new-drug-info-ma" style="color: #dc2626;"></span>개월 미만입니다.
+                    </p>
+                    <p style="margin: 0 0 12px 0; color: #3b82f6;">
+                        • 약품코드: <strong id="new-drug-info-code"></strong>
+                    </p>
+                    <p style="margin: 0 0 12px 0; color: #3b82f6;">
+                        • 실제 사용 기간: <strong><span id="new-drug-info-usage"></span>개월</strong>
+                    </p>
+                </div>
+                <div style="background: #fef3c7; border-radius: 12px; padding: 15px; text-align: left;">
+                    <p style="margin: 0; color: #92400e; font-size: 13px;">
+                        💡 <strong>보정된 이동평균</strong>: 데이터가 부족하여 실제 사용 기간으로 나눈 값입니다.<br>
+                        데이터가 더 쌓이면 정확한 이동평균이 계산됩니다.
+                    </p>
+                </div>
+                <button onclick="closeNewDrugInfoModal()" style="margin-top: 20px; padding: 12px 30px; border: none; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                    확인
+                </button>
+            </div>
+        </div>
 
         <!-- 범용 메모 모달 -->
         <div id="memo-modal-generic" class="modal">
@@ -1874,20 +1995,21 @@ def classify_drugs_by_special_cases(df, ma_months):
         negative_stock_drugs: 재고가 음수인 약품 (음수 재고)
     """
 
-    # 각 약품의 N개월 이동평균 계산
+    # 각 약품의 N개월 이동평균 계산 (보정 버전)
     ma_values = []
+    usage_months_list = []
+    is_corrected_list = []
     for _, row in df.iterrows():
         timeseries = row['월별_조제수량_리스트']
-        ma = calculate_custom_ma(timeseries, ma_months)
-        latest_ma = None
-        for val in reversed(ma):
-            if val is not None:
-                latest_ma = val
-                break
+        latest_ma, usage_months, is_corrected = get_corrected_ma(timeseries, ma_months)
         ma_values.append(latest_ma if latest_ma else 0)
+        usage_months_list.append(usage_months)
+        is_corrected_list.append(is_corrected)
 
     df_with_ma = df.copy()
     df_with_ma['N개월_이동평균'] = ma_values
+    df_with_ma['사용기간'] = usage_months_list
+    df_with_ma['신규여부'] = is_corrected_list
 
     # Case 1: 긴급 - 사용되는데 재고 없음 (N개월 이동평균 > 0 AND 재고 = 0)
     urgent_drugs = df_with_ma[
@@ -2027,6 +2149,12 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                 tooltip_text = '<br>'.join(tooltip_parts)
                 threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
 
+        # 신규 약품 태그 (데이터에 포함된 경우)
+        new_drug_tag = ""
+        if row.get('신규여부', False) and row.get('사용기간', 0) > 0:
+            usage_months_val = row['사용기간']
+            new_drug_tag = f'<span class="new-drug-tag">신규<span class="help-icon" onclick="event.stopPropagation(); openNewDrugInfoModal(\'{drug_code}\', {usage_months_val}, {ma_months})">?</span></span>'
+
         # 인라인 차트용 데이터 생성
         chart_data = {
             'drug_name': row['약품명'] if row['약품명'] else "정보없음",
@@ -2067,7 +2195,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td style="color: #c53030; font-weight: bold;">0</td>
-                                    <td style="color: #2d5016; font-weight: bold;">{latest_ma:.2f}</td>
+                                    <td style="color: #2d5016; font-weight: bold;">{latest_ma:.2f}{new_drug_tag}</td>
                                     <td style="color: #c53030; font-style: italic;">재고 없음</td>
                                     <td>{last_use_month}</td>
                                     <td>{sparkline_html}</td>
@@ -2197,6 +2325,12 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
         hidden_title = "숨김 해제" if is_checked else "숨김 처리"
 
+        # 신규 약품 태그 (데이터에 포함된 경우)
+        new_drug_tag = ""
+        if row.get('신규여부', False) and row.get('사용기간', 0) > 0:
+            usage_months_val = row['사용기간']
+            new_drug_tag = f'<span class="new-drug-tag">신규<span class="help-icon" onclick="event.stopPropagation(); openNewDrugInfoModal(\'{drug_code}\', {usage_months_val}, {ma_months})">?</span></span>'
+
         # 인라인 차트용 데이터 생성
         latest_ma = row['N개월_이동평균']
         chart_data = {
@@ -2233,7 +2367,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{row['최종_재고수량']:,.0f}</td>
-                                    <td>{row['N개월_이동평균']:.2f}</td>
+                                    <td>{row['N개월_이동평균']:.2f}{new_drug_tag}</td>
                                     <td style="color: #ca8a04; font-weight: bold;">{runway_display}</td>
                                     <td>{sparkline_html}</td>
                                 </tr>
@@ -2342,6 +2476,12 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
         hidden_title = "숨김 해제" if is_checked else "숨김 처리"
 
+        # 신규 약품 태그 (데이터에 포함된 경우)
+        new_drug_tag = ""
+        if row.get('신규여부', False) and row.get('사용기간', 0) > 0:
+            usage_months_val = row['사용기간']
+            new_drug_tag = f'<span class="new-drug-tag">신규<span class="help-icon" onclick="event.stopPropagation(); openNewDrugInfoModal(\'{drug_code}\', {usage_months_val}, {ma_months})">?</span></span>'
+
         # 인라인 차트용 데이터 생성
         latest_ma = row['N개월_이동평균']
         chart_data = {
@@ -2378,7 +2518,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{row['최종_재고수량']:,.0f}</td>
-                                    <td>{row['N개월_이동평균']:.2f}</td>
+                                    <td>{row['N개월_이동평균']:.2f}{new_drug_tag}</td>
                                     <td style="color: #16a34a; font-weight: bold;">{runway_display}</td>
                                     <td>{sparkline_html}</td>
                                 </tr>
@@ -2493,6 +2633,12 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
         hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
         hidden_title = "숨김 해제" if is_checked else "숨김 처리"
 
+        # 신규 약품 태그 (데이터에 포함된 경우)
+        new_drug_tag = ""
+        if row.get('신규여부', False) and row.get('사용기간', 0) > 0:
+            usage_months_val = row['사용기간']
+            new_drug_tag = f'<span class="new-drug-tag">신규<span class="help-icon" onclick="event.stopPropagation(); openNewDrugInfoModal(\'{drug_code}\', {usage_months_val}, {ma_months})">?</span></span>'
+
         # 인라인 차트용 데이터 생성
         latest_ma = row['N개월_이동평균']
         chart_data = {
@@ -2529,7 +2675,7 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>
                                     <td>{row['최종_재고수량']:,.0f}</td>
-                                    <td>{row['N개월_이동평균']:.2f}</td>
+                                    <td>{row['N개월_이동평균']:.2f}{new_drug_tag}</td>
                                     <td style="color: #2563eb; font-weight: bold;">{runway_display}</td>
                                     <td>{sparkline_html}</td>
                                 </tr>
@@ -3004,15 +3150,9 @@ def analyze_runway(df, months, ma_months, threshold_low=3, threshold_high=12):
         excess_drugs_list = []  # threshold_high 초과 (테이블용) - 과다
 
         for idx, row in df.iterrows():
-            # N개월 이동평균 계산
+            # N개월 이동평균 계산 (보정 버전)
             timeseries = row['월별_조제수량_리스트']
-            ma = calculate_custom_ma(timeseries, ma_months)
-
-            latest_ma = None
-            for val in reversed(ma):
-                if val is not None:
-                    latest_ma = val
-                    break
+            latest_ma, usage_months, is_corrected = get_corrected_ma(timeseries, ma_months)
 
             # N-MA 런웨이 계산
             ma_runway_months = None
@@ -3027,7 +3167,7 @@ def analyze_runway(df, months, ma_months, threshold_low=3, threshold_high=12):
                     latest_ma
                 )
 
-                # 테이블용 데이터 (전체 row 정보 + 계산된 값)
+                # 테이블용 데이터 (전체 row 정보 + 계산된 값 + 신규 정보)
                 drug_data = {
                     '약품코드': row['약품코드'],
                     '약품명': row['약품명'],
@@ -3035,7 +3175,9 @@ def analyze_runway(df, months, ma_months, threshold_low=3, threshold_high=12):
                     '최종_재고수량': row['최종_재고수량'],
                     'N개월_이동평균': latest_ma,
                     '런웨이_개월': ma_runway_months,
-                    '월별_조제수량_리스트': timeseries
+                    '월별_조제수량_리스트': timeseries,
+                    '사용기간': usage_months,
+                    '신규여부': is_corrected
                 }
 
                 if ma_runway_months <= threshold_low:
