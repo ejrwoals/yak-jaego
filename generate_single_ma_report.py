@@ -115,16 +115,16 @@ def create_sparkline_svg(timeseries_data, ma_data, ma_months):
         """인덱스를 X 좌표로 변환"""
         return padding + (index / (total - 1)) * (width - 2 * padding) if total > 1 else width / 2
 
-    # 실제 값 라인 (검정 점선)
+    # 실제 값 라인 (회색 점선)
     points = []
     for i, val in enumerate(timeseries_data):
         x = scale_x(i, len(timeseries_data))
         y = scale_y(val)
         points.append(f"{x:.2f},{y:.2f}")
 
-    actual_line = f'<polyline points="{" ".join(points)}" fill="none" stroke="black" stroke-width="1" stroke-dasharray="2,2" />'
+    actual_line = f'<polyline points="{" ".join(points)}" fill="none" stroke="#a1a1aa" stroke-width="1" stroke-dasharray="2,2" />'
 
-    # N개월 이동평균 라인 (파란색 실선)
+    # N개월 이동평균 라인 (브랜드 색상 실선)
     ma_line = ''
     if ma_data and any(v is not None for v in ma_data):
         ma_points = []
@@ -135,7 +135,7 @@ def create_sparkline_svg(timeseries_data, ma_data, ma_months):
                 ma_points.append(f"{x:.2f},{y:.2f}")
 
         if ma_points:
-            ma_line = f'<polyline points="{" ".join(ma_points)}" fill="none" stroke="#4facfe" stroke-width="2" />'
+            ma_line = f'<polyline points="{" ".join(ma_points)}" fill="none" stroke="#475569" stroke-width="2" />'
 
     svg = f'<svg width="{width}" height="{height}" style="display:block;">{actual_line}{ma_line}</svg>'
     return svg
@@ -193,129 +193,311 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         <title>{report_title}</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
         <style>
-            body {{
-                font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background: #f5f5f5;
-                min-height: 100vh;
+            /* ===== Design Tokens from design-principles.md ===== */
+            :root {{
+                /* 브랜드 Primary - 차분하고 모던한 슬레이트 블루 */
+                --brand-primary: #475569;
+                --brand-primary-dark: #334155;
+                --brand-primary-light: #64748b;
+                --brand-primary-subtle: #f1f5f9;
+
+                /* 시맨틱 색상 */
+                --color-success: #10b981;
+                --color-success-dark: #059669;
+                --color-success-light: #d1fae5;
+                --color-danger: #ef4444;
+                --color-danger-dark: #dc2626;
+                --color-danger-light: #fee2e2;
+                --color-warning: #f59e0b;
+                --color-warning-dark: #d97706;
+                --color-warning-light: #fef3c7;
+                --color-info: #3b82f6;
+                --color-info-dark: #2563eb;
+                --color-info-light: #dbeafe;
+
+                /* 재고 상태 색상 */
+                --status-shortage: #ef4444;
+                --status-shortage-bg: #fef2f2;
+                --status-sufficient: #22c55e;
+                --status-sufficient-bg: #f0fdf4;
+                --status-excess: #3b82f6;
+                --status-excess-bg: #eff6ff;
+
+                /* 텍스트 계층 */
+                --text-primary: #18181b;
+                --text-secondary: #52525b;
+                --text-muted: #a1a1aa;
+                --text-disabled: #d4d4d8;
+
+                /* 배경 계층 */
+                --bg-page: #fafafa;
+                --bg-surface: #ffffff;
+                --bg-subtle: #f4f4f5;
+                --bg-hover: #e4e4e7;
+
+                /* 테두리 */
+                --border-default: #e4e4e7;
+                --border-strong: #d4d4d8;
+                --border-subtle: #f4f4f5;
+
+                /* 간격 */
+                --space-1: 0.25rem;
+                --space-2: 0.5rem;
+                --space-3: 0.75rem;
+                --space-4: 1rem;
+                --space-5: 1.25rem;
+                --space-6: 1.5rem;
+                --space-8: 2rem;
+
+                /* 그림자 */
+                --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+                --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+                --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+                --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+
+                /* 모서리 곡률 */
+                --radius-sm: 4px;
+                --radius-md: 6px;
+                --radius-lg: 8px;
+                --radius-xl: 12px;
+
+                /* 트랜지션 */
+                --duration-fast: 100ms;
+                --duration-normal: 200ms;
+                --ease-out: cubic-bezier(0, 0, 0.2, 1);
             }}
+
+            /* ===== Base Styles ===== */
+            body {{
+                font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+                margin: 0;
+                padding: var(--space-6);
+                background: var(--bg-page);
+                min-height: 100vh;
+                color: var(--text-primary);
+                line-height: 1.5;
+            }}
+
             .container {{
                 max-width: 1400px;
                 margin: 0 auto;
-                background: white;
-                border-radius: 20px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                padding: 40px;
+                background: var(--bg-surface);
+                border-radius: var(--radius-xl);
+                box-shadow: var(--shadow-lg);
+                padding: var(--space-8);
+                border: 1px solid var(--border-subtle);
             }}
+
             h1 {{
-                color: #2d3748;
+                color: var(--text-primary);
                 text-align: center;
-                margin-bottom: 10px;
-                font-size: 2.5em;
+                margin-bottom: var(--space-3);
+                font-size: 1.875rem;
+                font-weight: 700;
+                letter-spacing: -0.025em;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--space-3);
             }}
+
+            h2 {{
+                color: var(--text-primary);
+                font-size: 1.25rem;
+                font-weight: 600;
+                margin: var(--space-6) 0 var(--space-4) 0;
+                display: flex;
+                align-items: center;
+                gap: var(--space-2);
+            }}
+
             .date {{
                 text-align: left;
-                color: #718096;
-                margin-bottom: 10px;
+                color: var(--text-muted);
+                margin-bottom: var(--space-2);
+                font-size: 0.875rem;
             }}
+
+            /* ===== Icon Styles ===== */
+            .icon {{
+                width: 20px;
+                height: 20px;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                flex-shrink: 0;
+            }}
+            .icon-sm {{ width: 16px; height: 16px; }}
+            .icon-lg {{ width: 24px; height: 24px; }}
+            .icon-xl {{ width: 32px; height: 32px; }}
+
+            /* ===== Summary Cards (Unused but kept for compatibility) ===== */
             .summary-grid {{
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 20px;
-                margin: 30px 0;
+                gap: var(--space-5);
+                margin: var(--space-6) 0;
             }}
+
             .summary-card {{
-                background: #f5f5f5;
-                color: white;
-                padding: 25px;
-                border-radius: 15px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                background: var(--bg-subtle);
+                padding: var(--space-6);
+                border-radius: var(--radius-lg);
+                box-shadow: var(--shadow-xs);
+                border: 1px solid var(--border-subtle);
             }}
+
             .summary-card h3 {{
-                margin: 0 0 10px 0;
-                font-size: 1em;
-                opacity: 0.9;
+                margin: 0 0 var(--space-2) 0;
+                font-size: 0.875rem;
+                color: var(--text-muted);
+                font-weight: 500;
             }}
+
             .summary-card .value {{
-                font-size: 2em;
-                font-weight: bold;
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: var(--text-primary);
             }}
+
+            /* ===== Table Styles ===== */
             .table-container {{
-                margin: 30px 0;
+                margin: var(--space-6) 0;
                 overflow-x: auto;
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--border-default);
             }}
+
             table {{
                 width: 100%;
                 border-collapse: collapse;
-                font-size: 14px;
+                font-size: 0.875rem;
             }}
+
             th {{
-                background: #4a5568;
+                background: var(--brand-primary);
                 color: white;
-                padding: 12px;
+                padding: var(--space-3) var(--space-4);
                 text-align: left;
                 position: sticky;
                 top: 0;
+                font-weight: 600;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
             }}
+
             th.runway-header {{
-                background: #5a6570;
+                background: var(--brand-primary-light);
             }}
+
             td {{
-                padding: 10px 12px;
-                border-bottom: 1px solid #e2e8f0;
+                padding: var(--space-3) var(--space-4);
+                border-bottom: 1px solid var(--border-default);
+                color: var(--text-secondary);
             }}
+
             td.runway-cell {{
-                background: #f5f5f5;
+                background: var(--bg-subtle);
+                font-weight: 600;
             }}
+
             tr:hover {{
-                background: rgba(247, 250, 252, 0.8);
+                background: var(--bg-hover);
             }}
+
             tr:hover td.runway-cell {{
-                background: rgba(245, 245, 245, 0.9);
+                background: var(--border-default);
             }}
+
             .warning {{
-                background: rgba(255, 245, 245, 0.7);
-                color: #c53030;
+                background: var(--color-danger-light);
             }}
+
+            .warning td {{
+                color: var(--color-danger-dark);
+            }}
+
             .warning td.runway-cell {{
-                background: rgba(245, 245, 245, 0.9);
+                background: rgba(254, 226, 226, 0.7);
             }}
+
             .good {{
-                background: #f0fff4;
-                color: #22543d;
+                background: var(--color-success-light);
             }}
+
+            .good td {{
+                color: var(--color-success-dark);
+            }}
+
+            /* ===== Search Box ===== */
             .search-box {{
-                margin: 20px 0;
-                padding: 12px;
+                margin: var(--space-4) 0;
+                padding: var(--space-3) var(--space-4);
                 width: 100%;
-                border: 2px solid #e2e8f0;
-                border-radius: 8px;
-                font-size: 16px;
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-md);
+                font-size: 1rem;
+                color: var(--text-primary);
+                background: var(--bg-surface);
+                transition: border-color var(--duration-fast) var(--ease-out),
+                            box-shadow var(--duration-fast) var(--ease-out);
             }}
+
+            .search-box:hover {{
+                border-color: var(--border-strong);
+            }}
+
+            .search-box:focus {{
+                outline: none;
+                border-color: var(--brand-primary);
+                box-shadow: 0 0 0 3px var(--brand-primary-subtle);
+            }}
+
+            .search-box::placeholder {{
+                color: var(--text-muted);
+            }}
+
+            /* ===== Chart Container ===== */
             .chart-container {{
-                margin: 30px 0;
-                padding: 20px;
-                background: #f7fafc;
-                border-radius: 10px;
+                margin: var(--space-6) 0;
+                padding: var(--space-5);
+                background: var(--bg-subtle);
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--border-subtle);
             }}
+
+            /* ===== Buttons ===== */
             .nav-btn {{
-                background: #4a5568;
+                background: var(--brand-primary);
                 color: white;
                 border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
+                padding: var(--space-2) var(--space-4);
+                border-radius: var(--radius-md);
                 cursor: pointer;
-                font-size: 14px;
-                transition: background 0.3s;
+                font-size: 0.875rem;
+                font-weight: 600;
+                transition: all var(--duration-fast) var(--ease-out);
             }}
+
             .nav-btn:hover {{
-                background: #2d3748;
+                background: var(--brand-primary-dark);
+                transform: translateY(-1px);
+                box-shadow: var(--shadow-sm);
             }}
+
+            .nav-btn:active {{
+                transform: translateY(0);
+            }}
+
             .nav-btn:disabled {{
-                background: #cbd5e0;
+                background: var(--text-disabled);
                 cursor: not-allowed;
+                transform: none;
             }}
+
+            /* ===== Modal Styles ===== */
             .modal {{
                 display: none;
                 position: fixed;
@@ -325,142 +507,194 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 width: 100%;
                 height: 100%;
                 overflow: auto;
-                background-color: rgba(0,0,0,0.7);
+                background-color: rgba(0, 0, 0, 0.5);
+                animation: fadeIn var(--duration-normal) var(--ease-out);
             }}
+
             .modal-content {{
-                background-color: white;
+                background-color: var(--bg-surface);
                 margin: 5% auto;
-                padding: 30px;
-                border-radius: 15px;
+                padding: var(--space-6);
+                border-radius: var(--radius-xl);
                 width: 90%;
                 max-width: 1200px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                box-shadow: var(--shadow-xl);
+                animation: scaleIn 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
             }}
+
+            @keyframes scaleIn {{
+                from {{
+                    opacity: 0;
+                    transform: scale(0.95);
+                }}
+                to {{
+                    opacity: 1;
+                    transform: scale(1);
+                }}
+            }}
+
             .close-btn {{
-                color: #aaa;
+                color: var(--text-muted);
                 float: right;
-                font-size: 28px;
+                font-size: 1.5rem;
                 font-weight: bold;
                 cursor: pointer;
-                line-height: 20px;
+                line-height: 1;
+                transition: color var(--duration-fast) var(--ease-out);
             }}
+
             .close-btn:hover {{
-                color: #000;
+                color: var(--text-primary);
             }}
+
+            /* ===== Clickable Row Styles ===== */
             .clickable-row {{
                 cursor: pointer;
             }}
+
             .clickable-row:hover {{
-                background: #edf2f7 !important;
+                background: var(--bg-hover) !important;
             }}
+
+            /* ===== Toggle Section Styles ===== */
             .toggle-header {{
                 cursor: pointer;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 15px 20px;
+                padding: var(--space-4) var(--space-5);
                 user-select: none;
-                background: rgba(255, 255, 255, 0.5);
-                border-radius: 10px;
-                transition: background 0.3s ease;
+                background: var(--bg-subtle);
+                border-radius: var(--radius-lg);
+                transition: background var(--duration-normal) var(--ease-out);
             }}
+
             .toggle-header:hover {{
-                background: rgba(230, 230, 250, 0.7);
+                background: var(--bg-hover);
             }}
+
             .toggle-icon {{
-                font-size: 1.8em;
+                font-size: 1.25rem;
                 font-weight: bold;
-                transition: transform 0.3s ease;
-                display: inline-block;
-                color: #6b7280;
-                min-width: 30px;
-                text-align: center;
+                transition: transform var(--duration-normal) var(--ease-out);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-muted);
+                width: 24px;
+                height: 24px;
             }}
+
             .toggle-icon.collapsed {{
                 transform: rotate(-90deg);
             }}
+
             .toggle-content {{
                 max-height: 10000px;
                 overflow: hidden;
-                transition: max-height 0.3s ease, opacity 0.3s ease;
+                transition: max-height var(--duration-normal) var(--ease-out),
+                            opacity var(--duration-normal) var(--ease-out);
                 opacity: 1;
             }}
+
             .toggle-content.collapsed {{
                 max-height: 0;
                 opacity: 0;
             }}
+
+            /* ===== Checked Row ===== */
             .checked-row {{
-                background: rgba(200, 200, 200, 0.3) !important;
+                background: var(--bg-subtle) !important;
                 opacity: 0.6;
-                color: #718096;
             }}
+
             .checked-row td {{
-                color: #718096 !important;
+                color: var(--text-muted) !important;
             }}
-            /* 인라인 차트용 클릭 가능 행 스타일 */
+
+            /* ===== Inline Chart Row Styles ===== */
             .tab-clickable-row {{
                 cursor: pointer;
-                transition: background-color 0.2s;
+                transition: background-color var(--duration-fast) var(--ease-out);
             }}
+
             .tab-clickable-row:hover {{
-                background-color: rgba(79, 172, 254, 0.1) !important;
+                background-color: var(--brand-primary-subtle) !important;
             }}
+
             .tab-clickable-row.chart-expanded {{
-                background-color: rgba(79, 172, 254, 0.15) !important;
-                border-left: 3px solid #4facfe;
+                background-color: var(--brand-primary-subtle) !important;
+                border-left: 3px solid var(--brand-primary);
             }}
+
             .inline-chart-row {{
-                background: #f8fafc;
+                background: var(--bg-subtle);
             }}
+
             .inline-chart-row:hover {{
-                background: #f8fafc !important;
+                background: var(--bg-subtle) !important;
             }}
+
+            /* ===== Memo Button ===== */
             .memo-btn {{
                 background: transparent;
-                border: 2px solid #cbd5e0;
-                padding: 4px 8px;
-                border-radius: 4px;
+                border: 1px solid var(--border-default);
+                padding: var(--space-1) var(--space-2);
+                border-radius: var(--radius-sm);
                 cursor: pointer;
-                font-size: 14px;
-                transition: all 0.2s;
-                color: #718096;
+                font-size: 0.875rem;
+                transition: all var(--duration-fast) var(--ease-out);
+                color: var(--text-muted);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }}
+
             .memo-btn:hover {{
-                border-color: #a0aec0;
-                color: #4a5568;
+                border-color: var(--brand-primary);
+                color: var(--brand-primary);
             }}
+
             .memo-btn.has-memo {{
-                border-color: #f6ad55;
-                color: #f6ad55;
+                border-color: var(--color-warning);
+                color: var(--color-warning);
+                background: var(--color-warning-light);
             }}
+
             .memo-btn.has-memo:hover {{
-                border-color: #ed8936;
-                color: #ed8936;
+                border-color: var(--color-warning-dark);
+                color: var(--color-warning-dark);
             }}
-            /* 개별 임계값 표시 아이콘 */
+
+            /* ===== Threshold Indicator ===== */
             .threshold-indicator {{
-                margin-right: 6px;
+                margin-right: var(--space-2);
                 cursor: pointer;
-                font-size: 14px;
-                opacity: 0.8;
+                opacity: 0.7;
+                display: inline-flex;
+                align-items: center;
+                transition: opacity var(--duration-fast) var(--ease-out);
             }}
+
             .threshold-indicator:hover {{
                 opacity: 1;
             }}
-            /* 신규 약품 태그 (데이터 부족 약품) */
+
+            /* ===== New Drug Tag ===== */
             .new-drug-tag {{
                 display: inline-flex;
                 align-items: center;
                 gap: 3px;
-                background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+                background: var(--color-info);
                 color: white;
-                font-size: 10px;
+                font-size: 0.625rem;
                 padding: 2px 6px;
-                border-radius: 4px;
-                margin-left: 6px;
+                border-radius: var(--radius-sm);
+                margin-left: var(--space-2);
                 font-weight: 500;
                 vertical-align: middle;
             }}
+
             .new-drug-tag .help-icon {{
                 display: inline-flex;
                 align-items: center;
@@ -471,63 +705,76 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 border-radius: 50%;
                 font-size: 9px;
                 cursor: pointer;
-                transition: background 0.2s;
+                transition: background var(--duration-fast) var(--ease-out);
             }}
+
             .new-drug-tag .help-icon:hover {{
                 background: rgba(255,255,255,0.5);
             }}
-            /* 개별 임계값 플로팅 툴팁 */
+
+            /* ===== Threshold Tooltip ===== */
             .threshold-tooltip-floating {{
                 position: fixed;
-                background: #2d3748;
+                background: var(--brand-primary-dark);
                 color: white;
-                padding: 10px 14px;
-                border-radius: 8px;
-                font-size: 12px;
+                padding: var(--space-3) var(--space-4);
+                border-radius: var(--radius-lg);
+                font-size: 0.75rem;
                 white-space: pre-line;
                 font-weight: normal;
                 line-height: 1.5;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                box-shadow: var(--shadow-lg);
                 z-index: 9999;
                 pointer-events: none;
             }}
+
+            /* ===== Checkbox Memo Container ===== */
             .checkbox-memo-container {{
                 display: flex;
                 align-items: center;
-                gap: 8px;
-            }}
-            .visibility-btn {{
-                background: none;
-                border: 2px solid #cbd5e0;
-                border-radius: 5px;
-                padding: 4px 8px;
-                cursor: pointer;
-                font-size: 16px;
-                transition: all 0.2s;
-                color: #4a5568;
-            }}
-            .visibility-btn:hover {{
-                border-color: #4facfe;
-                background: rgba(79, 172, 254, 0.1);
-            }}
-            .visibility-btn.hidden {{
-                color: #a0aec0;
-                border-color: #e2e8f0;
-                background: #f7fafc;
-            }}
-            .hidden-row {{
-                background: #f8f9fa !important;
-                color: #9ca3af !important;
-                opacity: 0.7;
-            }}
-            .hidden-row td {{
-                color: #9ca3af !important;
-            }}
-            .hidden-row .visibility-btn {{
-                color: #9ca3af;
+                gap: var(--space-2);
             }}
 
-            /* 책갈피 사이드바 스타일 */
+            /* ===== Visibility Button ===== */
+            .visibility-btn {{
+                background: none;
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                padding: var(--space-1) var(--space-2);
+                cursor: pointer;
+                transition: all var(--duration-fast) var(--ease-out);
+                color: var(--text-secondary);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }}
+
+            .visibility-btn:hover {{
+                border-color: var(--brand-primary);
+                background: var(--brand-primary-subtle);
+            }}
+
+            .visibility-btn.hidden {{
+                color: var(--text-muted);
+                border-color: var(--border-subtle);
+                background: var(--bg-subtle);
+            }}
+
+            /* ===== Hidden Row ===== */
+            .hidden-row {{
+                background: var(--bg-subtle) !important;
+                opacity: 0.6;
+            }}
+
+            .hidden-row td {{
+                color: var(--text-muted) !important;
+            }}
+
+            .hidden-row .visibility-btn {{
+                color: var(--text-muted);
+            }}
+
+            /* ===== Bookmark Sidebar ===== */
             .bookmark-sidebar {{
                 position: fixed;
                 right: 0;
@@ -536,60 +783,91 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 z-index: 999;
                 display: flex;
                 flex-direction: column;
-                gap: 15px;
-                padding-right: 0;
-            }}
-            .bookmark-item {{
-                position: relative;
-                right: -140px;
-                padding: 15px 20px;
-                border-radius: 10px 0 0 10px;
-                cursor: pointer;
-                transition: right 0.3s ease, box-shadow 0.3s ease;
-                box-shadow: -4px 4px 12px rgba(0, 0, 0, 0.3);
-                min-width: 180px;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-                display: flex;
-                flex-direction: column;
-                gap: 5px;
-                user-select: none;
-            }}
-            .bookmark-item:hover {{
-                right: 0;
-                box-shadow: -8px 8px 20px rgba(0, 0, 0, 0.4);
-            }}
-            .bookmark-item .bookmark-icon {{
-                font-size: 1.3em;
-                margin-bottom: 3px;
-            }}
-            .bookmark-item .bookmark-title {{
-                font-size: 1.1em;
-            }}
-            .bookmark-item .bookmark-count {{
-                font-size: 1.8em;
-                font-weight: bold;
-                text-align: center;
-                margin-top: 5px;
-            }}
-            .bookmark-urgent {{
-                background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-            }}
-            .bookmark-low {{
-                background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
-            }}
-            .bookmark-high {{
-                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            }}
-            .bookmark-excess {{
-                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            }}
-            .bookmark-dead {{
-                background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+                gap: var(--space-3);
             }}
 
-            /* 카테고리 모달 스타일 */
+            .bookmark-item {{
+                position: relative;
+                right: -100px;
+                padding: var(--space-3) var(--space-4);
+                border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+                cursor: pointer;
+                transition: right var(--duration-normal) var(--ease-out),
+                            box-shadow var(--duration-normal) var(--ease-out);
+                box-shadow: var(--shadow-md);
+                min-width: 140px;
+                color: white;
+                font-weight: 600;
+                font-size: 0.875rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: var(--space-1);
+                user-select: none;
+            }}
+
+            .bookmark-item:hover {{
+                right: 0;
+                box-shadow: var(--shadow-lg);
+            }}
+
+            .bookmark-item .bookmark-icon {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.9);
+            }}
+
+            .bookmark-item .bookmark-title {{
+                font-size: 0.875rem;
+                font-weight: 500;
+            }}
+
+            .bookmark-item .bookmark-count {{
+                font-size: 1.5rem;
+                font-weight: 700;
+                text-align: center;
+            }}
+
+            .bookmark-urgent {{
+                background: var(--color-danger);
+            }}
+            .bookmark-urgent .bookmark-icon {{
+                background: var(--color-danger-dark);
+            }}
+
+            .bookmark-low {{
+                background: var(--color-warning);
+            }}
+            .bookmark-low .bookmark-icon {{
+                background: var(--color-warning-dark);
+            }}
+
+            .bookmark-high {{
+                background: var(--color-success);
+            }}
+            .bookmark-high .bookmark-icon {{
+                background: var(--color-success-dark);
+            }}
+
+            .bookmark-excess {{
+                background: var(--color-info);
+            }}
+            .bookmark-excess .bookmark-icon {{
+                background: var(--color-info-dark);
+            }}
+
+            .bookmark-dead {{
+                background: var(--text-muted);
+            }}
+            .bookmark-dead .bookmark-icon {{
+                background: var(--text-secondary);
+            }}
+
+            /* ===== Category Modal ===== */
             .category-modal {{
                 display: none;
                 position: fixed;
@@ -599,28 +877,31 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 width: 100%;
                 height: 100%;
                 overflow: auto;
-                background-color: rgba(0,0,0,0.7);
-                animation: fadeIn 0.3s ease;
+                background-color: rgba(0, 0, 0, 0.5);
+                animation: fadeIn var(--duration-normal) var(--ease-out);
             }}
+
             @keyframes fadeIn {{
                 from {{ opacity: 0; }}
                 to {{ opacity: 1; }}
             }}
+
             .category-modal-content {{
-                background-color: white;
+                background-color: var(--bg-surface);
                 margin: 3% auto;
-                padding: 40px;
-                border-radius: 20px;
+                padding: var(--space-8);
+                border-radius: var(--radius-xl);
                 width: 90%;
                 max-width: 1400px;
                 max-height: 85vh;
                 overflow-y: auto;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-                animation: slideIn 0.3s ease;
+                box-shadow: var(--shadow-xl);
+                animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
             }}
-            @keyframes slideIn {{
+
+            @keyframes slideUp {{
                 from {{
-                    transform: translateY(-50px);
+                    transform: translateY(20px);
                     opacity: 0;
                 }}
                 to {{
@@ -628,31 +909,144 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     opacity: 1;
                 }}
             }}
+
             .category-modal-header {{
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 30px;
-                padding-bottom: 20px;
-                border-bottom: 3px solid #e5e7eb;
+                margin-bottom: var(--space-6);
+                padding-bottom: var(--space-5);
+                border-bottom: 1px solid var(--border-default);
             }}
+
+            .category-modal-header h2 {{
+                margin: 0;
+                font-size: 1.25rem;
+            }}
+
             .category-modal-close {{
-                color: #aaa;
-                font-size: 36px;
+                color: var(--text-muted);
+                font-size: 1.75rem;
                 font-weight: bold;
                 cursor: pointer;
-                line-height: 30px;
-                transition: color 0.2s;
+                line-height: 1;
+                transition: color var(--duration-fast) var(--ease-out);
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: var(--radius-md);
             }}
+
             .category-modal-close:hover {{
-                color: #000;
+                color: var(--text-primary);
+                background: var(--bg-hover);
+            }}
+
+            /* ===== Alert Banner ===== */
+            .alert-banner {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: var(--space-4) var(--space-5);
+                border-radius: var(--radius-lg);
+                margin: var(--space-5) 0;
+                border: 1px solid;
+            }}
+
+            .alert-banner-danger {{
+                background: var(--color-danger-light);
+                border-color: var(--color-danger);
+            }}
+
+            .alert-banner-warning {{
+                background: var(--color-warning-light);
+                border-color: var(--color-warning);
+            }}
+
+            /* ===== Status Distribution Bar ===== */
+            .status-distribution {{
+                margin: var(--space-6) 0;
+                padding: var(--space-6);
+                background: var(--bg-surface);
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--border-default);
+            }}
+
+            .status-distribution h2 {{
+                margin: 0 0 var(--space-4) 0;
+            }}
+
+            .distribution-bar {{
+                display: flex;
+                height: 40px;
+                border-radius: var(--radius-md);
+                overflow: hidden;
+                box-shadow: var(--shadow-xs);
+            }}
+
+            .distribution-bar > div {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: 600;
+                font-size: 0.875rem;
+                transition: flex var(--duration-normal) var(--ease-out);
+            }}
+
+            .distribution-legend {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: var(--space-4);
+                margin-top: var(--space-4);
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+            }}
+
+            .legend-item {{
+                display: flex;
+                align-items: center;
+                gap: var(--space-2);
+            }}
+
+            .legend-dot {{
+                width: 12px;
+                height: 12px;
+                border-radius: 2px;
+            }}
+
+            /* ===== Action Button (for banner) ===== */
+            .btn-action {{
+                padding: var(--space-2) var(--space-4);
+                border: none;
+                border-radius: var(--radius-md);
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 0.875rem;
+                transition: all var(--duration-fast) var(--ease-out);
+            }}
+
+            .btn-action-danger {{
+                background: var(--color-danger);
+                color: white;
+            }}
+
+            .btn-action-danger:hover {{
+                background: var(--color-danger-dark);
             }}
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     </head>
     <body>
         <div class="container">
-            <h1>📊 {report_title}</h1>
+            <h1>
+                <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+                </svg>
+                {report_title}
+            </h1>
             <div class="date">생성일: {datetime.now().strftime('%Y년 %m월 %d일 %H:%M')}</div>
             <div class="date">데이터 기간: {months[0][:4]}년 {months[0][5:]}월 ~ {months[-1][:4]}년 {months[-1][5:]}월 (총 {len(months)}개월)</div>
     """
@@ -677,15 +1071,17 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
     if negative_count > 0:
         html_content += f"""
         <!-- 음수 재고 경고 배너 -->
-        <div id="negative-stock-banner" style="margin: 20px 0; padding: 15px 20px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #ef4444; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span style="font-size: 24px;">⚠️</span>
+        <div id="negative-stock-banner" class="alert-banner alert-banner-danger">
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                </svg>
                 <div>
-                    <span style="font-weight: bold; color: #dc2626; font-size: 15px;">음수 재고 경고:</span>
-                    <span style="color: #7f1d1d; font-size: 15px;">{negative_count}개 약품의 재고가 음수입니다</span>
+                    <span style="font-weight: 600; color: var(--color-danger-dark);">음수 재고 경고:</span>
+                    <span style="color: var(--color-danger-dark); margin-left: var(--space-1);">{negative_count}개 약품의 재고가 음수입니다</span>
                 </div>
             </div>
-            <button onclick="openCategoryModal('negative-modal')" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">
+            <button onclick="openCategoryModal('negative-modal')" class="btn-action btn-action-danger">
                 확인하기
             </button>
         </div>
@@ -694,44 +1090,49 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
     # 통합 인디케이터 생성
     html_content += f"""
         <!-- 통합 재고 현황 인디케이터 -->
-        <div style="margin: 30px 0; padding: 25px; background: white; border-radius: 15px; border: 2px solid #e5e7eb;">
-            <h2 style="margin: 0 0 15px 0; color: #2d3748;">📊 재고 현황 분포</h2>
-            <div id="proportion-graph" style="display: flex; height: 40px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: relative;" data-total="{total_count}">
-                <div id="proportion-bar-urgent" style="background: #dc2626; flex: {urgent_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)">
+        <div class="status-distribution">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+                </svg>
+                재고 현황 분포
+            </h2>
+            <div id="proportion-graph" class="distribution-bar" data-total="{total_count}">
+                <div id="proportion-bar-urgent" style="background: var(--color-danger); flex: {urgent_count};" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)">
                     {urgent_count if urgent_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-low" style="background: #eab308; flex: {low_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-low" style="background: var(--color-warning); flex: {low_count};" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)">
                     {low_count if low_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-high" style="background: #22c55e; flex: {high_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-high" style="background: var(--color-success); flex: {high_count};" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
                     {high_count if high_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-excess" style="background: #3b82f6; flex: {excess_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-excess" style="background: var(--color-info); flex: {excess_count};" title="과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)">
                     {excess_count if excess_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-dead" style="background: #94a3b8; flex: {dead_count}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; position: relative;" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-dead" style="background: var(--text-muted); flex: {dead_count};" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
                     {dead_count if dead_count > 0 else ''}
                 </div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 13px; color: #4a5568; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #dc2626; border-radius: 2px;"></span>
+            <div class="distribution-legend">
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-danger);"></span>
                     <span id="proportion-label-urgent">긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #eab308; border-radius: 2px;"></span>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-warning);"></span>
                     <span id="proportion-label-low">부족: {low_count}개 ({low_count/total_count*100:.1f}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-success);"></span>
                     <span id="proportion-label-high">충분: {high_count}개 ({high_count/total_count*100:.1f}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #3b82f6; border-radius: 2px;"></span>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-info);"></span>
                     <span id="proportion-label-excess">과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #94a3b8; border-radius: 2px;"></span>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--text-muted);"></span>
                     <span id="proportion-label-dead">악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)</span>
                 </div>
             </div>
@@ -740,34 +1141,34 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         <!-- 책갈피 사이드바 -->
         <div class="bookmark-sidebar">
             <div class="bookmark-item bookmark-urgent" onclick="openCategoryModal('urgent-modal')">
-                <div class="bookmark-icon">🔴</div>
+                <div class="bookmark-icon"></div>
                 <div class="bookmark-title">긴급</div>
                 <div class="bookmark-count">{urgent_count}</div>
             </div>
             <div class="bookmark-item bookmark-low" onclick="openCategoryModal('low-modal')">
-                <div class="bookmark-icon">🟡</div>
+                <div class="bookmark-icon"></div>
                 <div class="bookmark-title">부족</div>
                 <div class="bookmark-count">{low_count}</div>
             </div>
             <div class="bookmark-item bookmark-high" onclick="openCategoryModal('high-modal')">
-                <div class="bookmark-icon">🟢</div>
+                <div class="bookmark-icon"></div>
                 <div class="bookmark-title">충분</div>
                 <div class="bookmark-count">{high_count}</div>
             </div>
             <div class="bookmark-item bookmark-excess" onclick="openCategoryModal('excess-modal')">
-                <div class="bookmark-icon">🔵</div>
+                <div class="bookmark-icon"></div>
                 <div class="bookmark-title">과다</div>
                 <div class="bookmark-count">{excess_count}</div>
             </div>
             <div class="bookmark-item bookmark-dead" onclick="openCategoryModal('dead-modal')">
-                <div class="bookmark-icon">⚪</div>
+                <div class="bookmark-icon"></div>
                 <div class="bookmark-title">악성재고</div>
                 <div class="bookmark-count">{dead_count}</div>
             </div>
-            <div class="bookmark-item bookmark-hidden" onclick="openCategoryModal('hidden-modal')" style="background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);">
-                <div class="bookmark-icon" style="color: #6b7280;"><i class="bi bi-eye-slash"></i></div>
-                <div class="bookmark-title" style="color: #6b7280;">숨김 약품</div>
-                <div class="bookmark-count" style="color: #6b7280;">{hidden_count}</div>
+            <div class="bookmark-item" onclick="openCategoryModal('hidden-modal')" style="background: var(--bg-surface); border: 1px solid var(--border-default); color: var(--text-muted);">
+                <div class="bookmark-icon" style="background: var(--border-default);"></div>
+                <div class="bookmark-title">숨김 약품</div>
+                <div class="bookmark-count">{hidden_count}</div>
             </div>
         </div>
     """
@@ -787,9 +1188,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             <div id="urgent-modal" class="category-modal">
                 <div class="category-modal-content">
                     <div class="category-modal-header">
-                        <h2 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.5em;">🔴</span>
-                            <span>긴급: 재고 0인 약품 ({ma_months}개월 내 사용이력 있음)</span>
+                        <h2 style="color: var(--color-danger);">
+                            <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>
+                            </svg>
+                            긴급: 재고 0인 약품 ({ma_months}개월 내 사용이력 있음)
                         </h2>
                         <span class="category-modal-close" onclick="closeCategoryModal('urgent-modal')">&times;</span>
                     </div>
@@ -806,9 +1209,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             <div id="low-modal" class="category-modal">
                 <div class="category-modal-content">
                     <div class="category-modal-header">
-                        <h2 style="margin: 0; color: #ca8a04; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.5em;">🟡</span>
-                            <span>재고 부족 약품 (런웨이 {threshold_low}개월 이하)</span>
+                        <h2 style="color: var(--color-warning-dark);">
+                            <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                            </svg>
+                            재고 부족 약품 (런웨이 {threshold_low}개월 이하)
                         </h2>
                         <span class="category-modal-close" onclick="closeCategoryModal('low-modal')">&times;</span>
                     </div>
@@ -825,9 +1230,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             <div id="high-modal" class="category-modal">
                 <div class="category-modal-content">
                     <div class="category-modal-header">
-                        <h2 style="margin: 0; color: #16a34a; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.5em;">🟢</span>
-                            <span>재고 충분 약품 (런웨이 {threshold_low}~{threshold_high}개월)</span>
+                        <h2 style="color: var(--color-success-dark);">
+                            <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            재고 충분 약품 (런웨이 {threshold_low}~{threshold_high}개월)
                         </h2>
                         <span class="category-modal-close" onclick="closeCategoryModal('high-modal')">&times;</span>
                     </div>
@@ -844,9 +1251,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             <div id="excess-modal" class="category-modal">
                 <div class="category-modal-content">
                     <div class="category-modal-header">
-                        <h2 style="margin: 0; color: #2563eb; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.5em;">🔵</span>
-                            <span>과다 재고 약품 (런웨이 {threshold_high}개월 초과)</span>
+                        <h2 style="color: var(--color-info-dark);">
+                            <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/>
+                            </svg>
+                            과다 재고 약품 (런웨이 {threshold_high}개월 초과)
                         </h2>
                         <span class="category-modal-close" onclick="closeCategoryModal('excess-modal')">&times;</span>
                     </div>
@@ -863,9 +1272,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             <div id="dead-modal" class="category-modal">
                 <div class="category-modal-content">
                     <div class="category-modal-header">
-                        <h2 style="margin: 0; color: #475569; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.5em;">⚪</span>
-                            <span>악성 재고 ({ma_months}개월간 미사용 약품)</span>
+                        <h2 style="color: var(--text-secondary);">
+                            <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>
+                            </svg>
+                            악성 재고 ({ma_months}개월간 미사용 약품)
                         </h2>
                         <span class="category-modal-close" onclick="closeCategoryModal('dead-modal')">&times;</span>
                     </div>
@@ -883,9 +1294,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
             <div id="negative-modal" class="category-modal">
                 <div class="category-modal-content">
                     <div class="category-modal-header">
-                        <h2 style="margin: 0; color: #dc2626; display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.5em;">⚠️</span>
-                            <span>음수 재고 약품</span>
+                        <h2 style="color: var(--color-danger);">
+                            <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                            </svg>
+                            음수 재고 약품
                         </h2>
                         <span class="category-modal-close" onclick="closeCategoryModal('negative-modal')">&times;</span>
                     </div>
@@ -901,9 +1314,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         <div id="hidden-modal" class="category-modal">
             <div class="category-modal-content">
                 <div class="category-modal-header">
-                    <h2 style="margin: 0; color: #64748b; display: flex; align-items: center; gap: 10px;">
-                        <i class="bi bi-eye-slash" style="font-size: 1.5em;"></i>
-                        <span>숨김 처리된 약품</span>
+                    <h2 style="color: var(--text-secondary);">
+                        <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/>
+                        </svg>
+                        숨김 처리된 약품
                     </h2>
                     <span class="category-modal-close" onclick="closeCategoryModal('hidden-modal')">&times;</span>
                 </div>
@@ -936,7 +1351,12 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
     # 테이블 생성 (기본 숨김, 검색 시에만 표시)
     html_content += f"""
-            <h2>🔍 약품 검색</h2>
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/>
+                </svg>
+                약품 검색
+            </h2>
             <input type="text" class="search-box" id="searchInput" placeholder="약품명, 제약회사, 약품코드로 검색...">
             <p id="searchHint" style="color: #718096; font-size: 14px; margin: 10px 0 20px 0;">검색어를 입력하면 일치하는 약품이 표시됩니다.</p>
 
@@ -1030,7 +1450,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 숨김 상태 확인
         is_hidden = drug_code in main_checked_codes
@@ -1568,24 +1988,26 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 const chartRow = document.createElement('tr');
                 chartRow.className = 'inline-chart-row';
                 chartRow.innerHTML = `
-                    <td colspan="${colSpan}" style="padding: 20px; background: #f8fafc; border-left: 4px solid #4facfe;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h4 style="margin: 0; color: #2d3748;">${chartData.drug_name} (${chartData.drug_code}) 상세 트렌드</h4>
+                    <td colspan="${colSpan}" style="padding: var(--space-5); background: var(--bg-subtle); border-left: 3px solid var(--brand-primary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+                            <h4 style="margin: 0; color: var(--text-primary); font-size: 1rem; font-weight: 600;">${chartData.drug_name} (${chartData.drug_code}) 상세 트렌드</h4>
                             <button onclick="closeInlineChart('${drugCode}')"
-                                    style="background: none; border: none; font-size: 20px; cursor: pointer; color: #718096;">&times;</button>
+                                    style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted); padding: var(--space-1); border-radius: var(--radius-sm); transition: all var(--duration-fast) var(--ease-out);"
+                                    onmouseover="this.style.background='var(--bg-hover)'; this.style.color='var(--text-primary)'"
+                                    onmouseout="this.style.background='none'; this.style.color='var(--text-muted)'">&times;</button>
                         </div>
-                        <div style="display: flex; gap: 12px; margin-bottom: 15px;">
-                            <div style="flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center;">
-                                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">재고수량</div>
-                                <div style="font-size: 18px; font-weight: 600; color: ${chartData.stock <= 0 ? '#e53e3e' : '#2d3748'};">${chartData.stock.toLocaleString()}<span style="font-size: 12px; color: #a0aec0;">개</span></div>
+                        <div style="display: flex; gap: var(--space-3); margin-bottom: var(--space-4);">
+                            <div style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 0.6875rem; color: var(--text-muted); margin-bottom: var(--space-1); text-transform: uppercase; letter-spacing: 0.05em;">재고수량</div>
+                                <div style="font-size: 1.125rem; font-weight: 600; color: ${chartData.stock <= 0 ? 'var(--color-danger)' : 'var(--text-primary)'};">${chartData.stock.toLocaleString()}<span style="font-size: 0.75rem; color: var(--text-muted);">개</span></div>
                             </div>
-                            <div style="flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; text-align: center;">
-                                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">${chartData.ma_months}개월 이동평균</div>
-                                <div style="font-size: 18px; font-weight: 600; color: #2d3748;">${chartData.latest_ma !== null ? chartData.latest_ma.toFixed(1) : 'N/A'}<span style="font-size: 12px; color: #a0aec0;">/월</span></div>
+                            <div style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 0.6875rem; color: var(--text-muted); margin-bottom: var(--space-1); text-transform: uppercase; letter-spacing: 0.05em;">${chartData.ma_months}개월 이동평균</div>
+                                <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">${chartData.latest_ma !== null ? chartData.latest_ma.toFixed(1) : 'N/A'}<span style="font-size: 0.75rem; color: var(--text-muted);">/월</span></div>
                             </div>
-                            <div style="flex: 1; background: #fff; border: 1px solid #4facfe; border-radius: 8px; padding: 10px 14px; text-align: center;">
-                                <div style="font-size: 11px; color: #4facfe; margin-bottom: 4px;">런웨이</div>
-                                <div style="font-size: 18px; font-weight: 600; color: ${chartData.latest_ma > 0 && chartData.stock / chartData.latest_ma < 1 ? '#e53e3e' : '#2d3748'};">${chartData.runway}</div>
+                            <div style="flex: 1; background: var(--bg-surface); border: 1px solid var(--brand-primary); border-radius: var(--radius-md); padding: var(--space-3); text-align: center;">
+                                <div style="font-size: 0.6875rem; color: var(--brand-primary); margin-bottom: var(--space-1); text-transform: uppercase; letter-spacing: 0.05em;">런웨이</div>
+                                <div style="font-size: 1.125rem; font-weight: 600; color: ${chartData.latest_ma > 0 && chartData.stock / chartData.latest_ma < 1 ? 'var(--color-danger)' : 'var(--text-primary)'};">${chartData.runway}</div>
                             </div>
                         </div>
                         <div id="inline-chart-${drugCode}" style="width: 100%; height: 350px;"></div>
@@ -1620,8 +2042,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                         y: chartData.timeseries,
                         mode: 'lines+markers',
                         name: '실제 조제수량',
-                        line: {color: 'black', width: 2, dash: 'dot'},
-                        marker: {size: 6, color: 'black'},
+                        line: {color: '#52525b', width: 2, dash: 'dot'},
+                        marker: {size: 6, color: '#52525b'},
                         hovertemplate: '실제 조제수량: %{y:,.0f}개<extra></extra>'
                     },
                     {
@@ -1629,7 +2051,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                         y: maClean,
                         mode: 'lines',
                         name: chartData.ma_months + '개월 이동평균',
-                        line: {color: '#4facfe', width: 3},
+                        line: {color: '#475569', width: 3},
                         hovertemplate: chartData.ma_months + '개월 이동평균: %{y:,.2f}개<extra></extra>'
                     },
                     {
@@ -1637,7 +2059,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                         y: stockLine,
                         mode: 'lines',
                         name: '현재 재고',
-                        line: {color: '#e53e3e', width: 2, dash: 'dash'},
+                        line: {color: '#ef4444', width: 2, dash: 'dash'},
                         hovertemplate: '현재 재고: %{y:,.0f}개<extra></extra>'
                     }
                 ];
@@ -1679,10 +2101,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     annotations.push({
                         x: maxMonth, y: maxValue,
                         text: '최대: ' + maxValue.toFixed(0),
-                        showarrow: true, arrowhead: 2, arrowsize: 1, arrowwidth: 2, arrowcolor: 'red',
+                        showarrow: true, arrowhead: 2, arrowsize: 1, arrowwidth: 2, arrowcolor: '#ef4444',
                         ax: 0, ay: -30,
-                        bgcolor: 'rgba(255,255,255,0.9)', bordercolor: 'red', borderwidth: 1, borderpad: 3,
-                        font: {color: 'red', size: 10, weight: 'bold'}
+                        bgcolor: 'rgba(255,255,255,0.95)', bordercolor: '#ef4444', borderwidth: 1, borderpad: 3,
+                        font: {color: '#ef4444', size: 10, weight: 'bold'}
                     });
                 }
                 // 현재 재고 annotation
@@ -1693,18 +2115,18 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                     showarrow: false,
                     xanchor: 'left',
                     xshift: 10,
-                    font: {color: '#e53e3e', size: 10}
+                    font: {color: '#ef4444', size: 10}
                 });
 
                 const layout = {
-                    xaxis: { title: '월', type: 'category', showgrid: true, gridcolor: '#e2e8f0' },
-                    yaxis: { title: '조제수량', showgrid: true, gridcolor: '#e2e8f0' },
+                    xaxis: { title: '월', type: 'category', showgrid: true, gridcolor: '#e4e4e7' },
+                    yaxis: { title: '조제수량', showgrid: true, gridcolor: '#e4e4e7' },
                     height: 350,
                     margin: { t: 30, b: 50, l: 60, r: 100 },
                     hovermode: 'x unified',
-                    plot_bgcolor: 'white',
-                    paper_bgcolor: '#f8fafc',
-                    font: {size: 11},
+                    plot_bgcolor: '#ffffff',
+                    paper_bgcolor: '#f4f4f5',
+                    font: {size: 11, color: '#52525b'},
                     shapes: winterShapes,
                     annotations: annotations
                 };
@@ -1929,26 +2351,32 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         <div id="new-drug-info-modal" class="modal" onclick="if(event.target === this) closeNewDrugInfoModal()">
             <div class="modal-content" style="max-width: 500px; text-align: center;">
                 <span class="close-btn" onclick="closeNewDrugInfoModal()">&times;</span>
-                <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
-                <h2 style="margin-bottom: 20px; color: #3b82f6;">신규 약품 안내</h2>
-                <div style="background: #eff6ff; border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: left;">
-                    <p style="margin: 0 0 12px 0; color: #1e40af; font-weight: bold;">
-                        이 약품은 사용 기간이 <span id="new-drug-info-ma" style="color: #dc2626;"></span>개월 미만입니다.
+                <div style="margin-bottom: var(--space-4); display: flex; justify-content: center;">
+                    <svg class="icon-xl" style="width: 48px; height: 48px; color: var(--color-info);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+                    </svg>
+                </div>
+                <h2 style="margin-bottom: var(--space-5); color: var(--color-info);">신규 약품 안내</h2>
+                <div style="background: var(--color-info-light); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-5); text-align: left;">
+                    <p style="margin: 0 0 var(--space-3) 0; color: var(--color-info-dark); font-weight: 600;">
+                        이 약품은 사용 기간이 <span id="new-drug-info-ma" style="color: var(--color-danger);"></span>개월 미만입니다.
                     </p>
-                    <p style="margin: 0 0 12px 0; color: #3b82f6;">
-                        • 약품코드: <strong id="new-drug-info-code"></strong>
+                    <p style="margin: 0 0 var(--space-3) 0; color: var(--color-info-dark);">
+                        약품코드: <strong id="new-drug-info-code"></strong>
                     </p>
-                    <p style="margin: 0 0 12px 0; color: #3b82f6;">
-                        • 실제 사용 기간: <strong><span id="new-drug-info-usage"></span>개월</strong>
+                    <p style="margin: 0; color: var(--color-info-dark);">
+                        실제 사용 기간: <strong><span id="new-drug-info-usage"></span>개월</strong>
                     </p>
                 </div>
-                <div style="background: #fef3c7; border-radius: 12px; padding: 15px; text-align: left;">
-                    <p style="margin: 0; color: #92400e; font-size: 13px;">
-                        💡 <strong>보정된 이동평균</strong>: 데이터가 부족하여 실제 사용 기간으로 나눈 값입니다.<br>
-                        데이터가 더 쌓이면 정확한 이동평균이 계산됩니다.
+                <div style="background: var(--color-warning-light); border-radius: var(--radius-lg); padding: var(--space-4); text-align: left; display: flex; gap: var(--space-3); align-items: flex-start;">
+                    <svg class="icon" style="flex-shrink: 0; color: var(--color-warning-dark);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/>
+                    </svg>
+                    <p style="margin: 0; color: var(--color-warning-dark); font-size: 0.8125rem;">
+                        <strong>보정된 이동평균</strong>: 데이터가 부족하여 실제 사용 기간으로 나눈 값입니다. 데이터가 더 쌓이면 정확한 이동평균이 계산됩니다.
                     </p>
                 </div>
-                <button onclick="closeNewDrugInfoModal()" style="margin-top: 20px; padding: 12px 30px; border: none; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                <button onclick="closeNewDrugInfoModal()" class="nav-btn" style="margin-top: var(--space-5); padding: var(--space-3) var(--space-6);">
                     확인
                 </button>
             </div>
@@ -1958,14 +2386,19 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         <div id="memo-modal-generic" class="modal">
             <div class="modal-content" style="max-width: 600px;">
                 <span class="close-btn" onclick="closeMemoModalGeneric()">&times;</span>
-                <h2 style="margin-bottom: 20px;">메모 작성</h2>
-                <p style="color: #718096; margin-bottom: 10px;">약품코드: <strong id="memo-drug-code-generic"></strong></p>
+                <h2 style="margin-bottom: var(--space-5); display: flex; align-items: center; gap: var(--space-2);">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
+                    </svg>
+                    메모 작성
+                </h2>
+                <p style="color: var(--text-muted); margin-bottom: var(--space-3); font-size: 0.875rem;">약품코드: <strong style="color: var(--text-primary);" id="memo-drug-code-generic"></strong></p>
                 <textarea id="memo-textarea-generic"
-                          style="width: 100%; height: 200px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;"
+                          style="width: 100%; height: 200px; padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); font-size: 0.875rem; font-family: inherit; resize: vertical; color: var(--text-primary);"
                           placeholder="메모를 입력하세요..."></textarea>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button onclick="closeMemoModalGeneric()" style="padding: 10px 20px; border: 2px solid #cbd5e0; background: white; border-radius: 5px; cursor: pointer; font-size: 14px;">취소</button>
-                    <button onclick="saveMemoGeneric()" style="padding: 10px 20px; border: none; background: #4b5563; color: white; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">저장</button>
+                <div style="display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5);">
+                    <button onclick="closeMemoModalGeneric()" style="padding: var(--space-2) var(--space-4); border: 1px solid var(--border-default); background: var(--bg-surface); border-radius: var(--radius-md); cursor: pointer; font-size: 0.875rem; color: var(--text-secondary); transition: all var(--duration-fast) var(--ease-out);">취소</button>
+                    <button onclick="saveMemoGeneric()" class="nav-btn">저장</button>
                 </div>
             </div>
         </div>
@@ -2066,13 +2499,16 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
-                    <div style="padding: 15px; background: #fff8f8; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #c53030; font-weight: bold;">
-                            ⚠️ 총 {len(urgent_drugs)}개 약품이 현재 사용되고 있으나 재고가 소진되었습니다. 즉시 주문이 필요합니다!
+                    <div style="padding: var(--space-4); background: var(--color-danger-light); border-radius: var(--radius-lg); margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3);">
+                        <svg class="icon" style="color: var(--color-danger); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                        </svg>
+                        <p style="margin: 0; color: var(--color-danger-dark); font-weight: 600;">
+                            총 {len(urgent_drugs)}개 약품이 현재 사용되고 있으나 재고가 소진되었습니다. 즉시 주문이 필요합니다!
                         </p>
                     </div>
                     <div class="table-container">
-                        <table id="urgent-drugs-table" style="font-size: 13px;">
+                        <table id="urgent-drugs-table">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">숨김</th>
@@ -2147,7 +2583,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 신규 약품 태그 (데이터에 포함된 경우)
         new_drug_tag = ""
@@ -2250,13 +2686,16 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
-                    <div style="padding: 15px; background: #fffbeb; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #ca8a04; font-weight: bold;">
-                            ⚠️ 총 {len(low_drugs_df)}개 약품의 런웨이가 {threshold_low}개월 이하입니다. 재고 보충을 고려하세요.
+                    <div style="padding: var(--space-4); background: var(--color-warning-light); border-radius: var(--radius-lg); margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3);">
+                        <svg class="icon" style="color: var(--color-warning-dark); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                        </svg>
+                        <p style="margin: 0; color: var(--color-warning-dark); font-weight: 600;">
+                            총 {len(low_drugs_df)}개 약품의 런웨이가 {threshold_low}개월 이하입니다. 재고 보충을 고려하세요.
                         </p>
                     </div>
                     <div class="table-container">
-                        <table id="low-drugs-table" style="font-size: 13px;">
+                        <table id="low-drugs-table">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">숨김</th>
@@ -2318,7 +2757,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2405,13 +2844,16 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
-                    <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #16a34a; font-weight: bold;">
-                            ✅ 총 {len(high_drugs_df)}개 약품의 런웨이가 {threshold_low}~{threshold_high}개월입니다. 재고가 충분합니다.
+                    <div style="padding: var(--space-4); background: var(--color-success-light); border-radius: var(--radius-lg); margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3);">
+                        <svg class="icon" style="color: var(--color-success-dark); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        <p style="margin: 0; color: var(--color-success-dark); font-weight: 600;">
+                            총 {len(high_drugs_df)}개 약품의 런웨이가 {threshold_low}~{threshold_high}개월입니다. 재고가 충분합니다.
                         </p>
                     </div>
                     <div class="table-container">
-                        <table id="high-drugs-table" style="font-size: 13px;">
+                        <table id="high-drugs-table">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">숨김</th>
@@ -2469,7 +2911,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2559,16 +3001,21 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
-                    <div style="padding: 15px; background: #eff6ff; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #2563eb; font-weight: bold;">
-                            📦 총 {len(excess_drugs_df)}개 약품의 런웨이가 {threshold_high}개월을 초과합니다.
-                        </p>
-                        <p style="margin: 5px 0 0 0; color: #3b82f6; font-size: 14px;">
-                            💡 재고 소진에 {threshold_high}개월 이상 걸리므로, 유효기간 만료 전에 사용하지 못할 수 있습니다. 재고 조정을 고려해보세요.
+                    <div style="padding: var(--space-4); background: var(--color-info-light); border-radius: var(--radius-lg); margin-bottom: var(--space-4);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2);">
+                            <svg class="icon" style="color: var(--color-info-dark); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>
+                            </svg>
+                            <p style="margin: 0; color: var(--color-info-dark); font-weight: 600;">
+                                총 {len(excess_drugs_df)}개 약품의 런웨이가 {threshold_high}개월을 초과합니다.
+                            </p>
+                        </div>
+                        <p style="margin: 0 0 0 30px; color: var(--color-info); font-size: 0.875rem;">
+                            재고 소진에 {threshold_high}개월 이상 걸리므로, 유효기간 만료 전에 사용하지 못할 수 있습니다. 재고 조정을 고려해보세요.
                         </p>
                     </div>
                     <div class="table-container">
-                        <table id="excess-drugs-table" style="font-size: 13px;">
+                        <table id="excess-drugs-table">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">숨김</th>
@@ -2626,7 +3073,7 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2712,16 +3159,21 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
-                    <div style="padding: 15px; background: #edf2f7; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #4a5568; font-weight: bold;">
-                            📊 총 {len(dead_stock_drugs)}개 약품이 {ma_months}개월 동안 사용되지 않았으나 재고가 {total_dead_stock:,.0f}개 남아있습니다.
-                        </p>
-                        <p style="margin: 5px 0 0 0; color: #718096; font-size: 14px;">
-                            💡 재고 정리 또는 반품을 고려해보세요.
+                    <div style="padding: var(--space-4); background: var(--bg-subtle); border-radius: var(--radius-lg); margin-bottom: var(--space-4);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2);">
+                            <svg class="icon" style="color: var(--text-secondary); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>
+                            </svg>
+                            <p style="margin: 0; color: var(--text-secondary); font-weight: 600;">
+                                총 {len(dead_stock_drugs)}개 약품이 {ma_months}개월 동안 사용되지 않았으나 재고가 {total_dead_stock:,.0f}개 남아있습니다.
+                            </p>
+                        </div>
+                        <p style="margin: 0 0 0 30px; color: var(--text-muted); font-size: 0.875rem;">
+                            재고 정리 또는 반품을 고려해보세요.
                         </p>
                     </div>
                     <div class="table-container">
-                        <table id="dead-drugs-table" style="font-size: 13px;">
+                        <table id="dead-drugs-table">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">숨김</th>
@@ -2778,7 +3230,7 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
@@ -2856,16 +3308,21 @@ def generate_negative_stock_section(negative_stock_drugs, ma_months, months):
     memos = drug_memos_db.get_all_memos()
 
     html = f"""
-                    <div style="padding: 15px; background: #fef2f2; border-radius: 8px; margin-bottom: 15px;">
-                        <p style="margin: 0; color: #dc2626; font-weight: bold;">
-                            ⚠️ 총 {len(negative_stock_drugs)}개 약품의 재고가 음수입니다. (총 {total_negative_stock:,.0f}개)
-                        </p>
-                        <p style="margin: 5px 0 0 0; color: #7f1d1d; font-size: 14px;">
-                            💡 음수 재고는 실제 재고보다 더 많이 출고된 상태를 의미합니다. 재고 실사 또는 데이터 확인이 필요합니다.
+                    <div style="padding: var(--space-4); background: var(--color-danger-light); border-radius: var(--radius-lg); margin-bottom: var(--space-4);">
+                        <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2);">
+                            <svg class="icon" style="color: var(--color-danger); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                            </svg>
+                            <p style="margin: 0; color: var(--color-danger-dark); font-weight: 600;">
+                                총 {len(negative_stock_drugs)}개 약품의 재고가 음수입니다. (총 {total_negative_stock:,.0f}개)
+                            </p>
+                        </div>
+                        <p style="margin: 0 0 0 30px; color: var(--color-danger); font-size: 0.875rem;">
+                            음수 재고는 실제 재고보다 더 많이 출고된 상태를 의미합니다. 재고 실사 또는 데이터 확인이 필요합니다.
                         </p>
                     </div>
                     <div class="table-container">
-                        <table id="negative-drugs-table" style="font-size: 13px;">
+                        <table id="negative-drugs-table">
                             <thead>
                                 <tr>
                                     <th style="width: 50px;">숨김</th>
@@ -2989,14 +3446,17 @@ def generate_hidden_drugs_section(df, ma_months, months):
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
-                    <div id="hidden-empty-message" style="padding: 40px; text-align: center; color: #718096; display: none;">
-                        <p style="font-size: 18px;">숨김 처리된 약품이 없습니다.</p>
-                        <p style="font-size: 14px;">각 탭에서 <i class="bi bi-eye"></i> 버튼을 클릭하여 약품을 숨김 처리할 수 있습니다.</p>
+                    <div id="hidden-empty-message" style="padding: var(--space-8); text-align: center; color: var(--text-muted); display: none;">
+                        <svg class="icon-xl" style="width: 48px; height: 48px; margin: 0 auto var(--space-4);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/>
+                        </svg>
+                        <p style="font-size: 1.125rem; margin-bottom: var(--space-2);">숨김 처리된 약품이 없습니다.</p>
+                        <p style="font-size: 0.875rem;">각 탭에서 숨김 버튼을 클릭하여 약품을 숨김 처리할 수 있습니다.</p>
                     </div>
-                    <div style="padding: 20px; max-height: 70vh; overflow-y: auto;">
-                        <table id="hidden-drugs-table" class="data-table" style="width: 100%; margin-top: 0;">
+                    <div class="table-container" style="max-height: 70vh; overflow-y: auto;">
+                        <table id="hidden-drugs-table">
                             <thead>
-                                <tr style="background: linear-gradient(135deg, #64748b, #475569); color: white;">
+                                <tr>
                                     <th style="width: 50px;">숨김</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
@@ -3088,7 +3548,7 @@ def generate_hidden_drugs_section(df, ma_months, months):
                 tooltip_parts.append(f"<span style='color:#a0aec0'>👤 복용 환자:</span> <span style='color:#90cdf4'>{patient_names}</span>")
             if tooltip_parts:
                 tooltip_text = '<br>'.join(tooltip_parts)
-                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)">⚙️</span>'
+                threshold_icon = f'<span class="threshold-indicator" data-tooltip="{tooltip_text}" onclick="event.stopPropagation(); showThresholdTooltip(event, this)"><svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>'
 
         html += f"""
                                 <tr class="hidden-row-item tab-clickable-row" data-drug-code="{drug_code}"
