@@ -550,21 +550,21 @@
             <div class="db-info-panel-body">
                 <div class="db-stats-grid">
                     <div class="db-stat-card">
-                        <div class="stat-value" id="recent-count">{{ db_stats.recent_count }}</div>
-                        <div class="stat-label">최신 재고</div>
-                    </div>
-                    <div class="db-stat-card">
                         <div class="stat-value" id="processed-total">{{ db_stats.processed_stats.total }}</div>
-                        <div class="stat-label">시계열 통계</div>
+                        <div class="stat-label">시계열 분석 가능 약품</div>
                     </div>
                     {% if db_stats.processed_stats.by_type %}
                     {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
                     <div class="db-stat-card">
-                        <div class="stat-value">{{ count }}</div>
+                        <div class="stat-value" id="drug-type-{{ drug_type }}">{{ count }}</div>
                         <div class="stat-label">{{ drug_type }}</div>
                     </div>
                     {% endfor %}
                     {% endif %}
+                    <div class="db-stat-card">
+                        <div class="stat-value" id="new-drug-count">{{ db_stats.new_drug_count }}</div>
+                        <div class="stat-label">신규약품</div>
+                    </div>
                 </div>
 
                 <div class="db-bottom-row">
@@ -793,8 +793,18 @@
                 statusDiv.innerHTML = '\u2705 ' + data.message;
 
                 if (data.stats) {
-                    document.getElementById('recent-count').textContent = data.stats.recent_count;
                     document.getElementById('processed-total').textContent = data.stats.processed_stats.total;
+                    document.getElementById('new-drug-count').textContent = data.stats.new_drug_count;
+
+                    // 약품 유형별 카운트 업데이트
+                    if (data.stats.processed_stats.by_type) {
+                        for (var drugType in data.stats.processed_stats.by_type) {
+                            var typeElement = document.getElementById('drug-type-' + drugType);
+                            if (typeElement) {
+                                typeElement.textContent = data.stats.processed_stats.by_type[drugType];
+                            }
+                        }
+                    }
 
                     if (data.stats.data_period) {
                         var dataPeriod = document.getElementById('data-period');

@@ -268,33 +268,44 @@
         text-overflow: ellipsis;
     }
 
+    .drug-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #718096;
+        margin-top: 2px;
+    }
+
     .drug-code {
         font-size: 12px;
         color: #718096;
     }
 
+    .drug-meta-separator {
+        color: #cbd5e0;
+    }
+
     .drug-company {
         font-size: 12px;
         color: #a0aec0;
-        margin-bottom: 8px;
     }
 
     .drug-stock {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        background: #4a5568;
-        color: white;
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-size: 14px;
+        background: #e8f4f8;
+        color: #3d7a8c;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 13px;
         font-weight: 600;
         margin-bottom: 10px;
     }
 
     .drug-stock-label {
-        font-weight: 400;
-        opacity: 0.85;
+        font-weight: 500;
     }
 
     /* Tooltip */
@@ -302,16 +313,20 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
+        min-width: 16px;
+        min-height: 16px;
         background: #e2e8f0;
         color: #718096;
         border-radius: 50%;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         cursor: help;
         margin-left: 6px;
         position: relative;
+        line-height: 1;
+        vertical-align: middle;
     }
 
     .help-icon:hover {
@@ -335,6 +350,9 @@
         line-height: 1.5;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         z-index: 1000;
+        overflow: visible;
+        height: auto;
+        min-height: fit-content;
     }
 
     .help-icon .tooltip::after {
@@ -964,7 +982,7 @@
                 <span>⚙️</span>
                 약품 개별 관리
             </h1>
-            <p style="color: #718096; margin-top: 8px;">약품별 모든 설정을 한 곳에서 관리합니다</p>
+            <p style="color: #718096; margin-top: 8px;">개별 약품의 상세 설정을 관리합니다</p>
         </div>
 
         <div id="statusMessage" class="status-message"></div>
@@ -1038,11 +1056,15 @@
                     <div class="drug-search-results" id="modalDrugResults"></div>
                     <div class="selected-drug" id="selectedDrug">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <div class="star-flag" id="addStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글">☆</div>
+                            <div style="display: flex; align-items: flex-start; gap: 10px;">
+                                <div class="star-flag" id="addStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글" style="margin-top: 2px;">☆</div>
                                 <div>
                                     <div style="font-weight: 600;" id="selectedDrugName">-</div>
-                                    <div style="font-size: 13px; color: #718096;" id="selectedDrugCode">-</div>
+                                    <div style="font-size: 13px; color: #718096; margin-top: 2px;">
+                                        <span id="selectedDrugCode">-</span>
+                                        <span id="selectedDrugCompanySeparator" style="color: #cbd5e0; margin: 0 6px; display: none;">·</span>
+                                        <span id="selectedDrugCompany" style="color: #a0aec0; display: none;"></span>
+                                    </div>
                                 </div>
                             </div>
                             <button class="selected-drug-clear" onclick="clearDrugSelection()">&times;</button>
@@ -1052,13 +1074,16 @@
 
                 <!-- Drug Info (for edit) -->
                 <div class="form-section" id="drugInfoSection" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <div class="star-flag" id="editStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글" style="margin-top: 2px;">☆</div>
+                        <div style="flex: 1;">
                             <div style="font-size: 18px; font-weight: 600;" id="editDrugName">-</div>
-                            <div style="font-size: 14px; color: #718096;" id="editDrugCode">-</div>
-                            <div style="font-size: 13px; color: #a0aec0;" id="editDrugCompany">-</div>
+                            <div style="font-size: 13px; color: #718096; margin-top: 4px;">
+                                <span id="editDrugCode">-</span>
+                                <span style="color: #cbd5e0; margin: 0 6px;">·</span>
+                                <span id="editDrugCompany" style="color: #a0aec0;">-</span>
+                            </div>
                         </div>
-                        <div class="star-flag" id="editStarFlag" onclick="toggleModalFlag()" title="특별 관리 토글">☆</div>
                     </div>
                 </div>
 
@@ -1391,12 +1416,15 @@
                             <span class="star-flag ' + starClass + '" onclick="toggleFlag(\'' + drug.drug_code + '\')" title="특별 관리">' + starIcon + '</span>\
                             <div style="min-width: 0; flex: 1;">\
                                 <div class="drug-name" title="' + drug.drug_name + '">' + drug.drug_name + '</div>\
-                                <div class="drug-code">' + drug.drug_code + '</div>\
+                                <div class="drug-meta">\
+                                    <span class="drug-code">' + drug.drug_code + '</span>\
+                                    <span class="drug-meta-separator">·</span>\
+                                    <span class="drug-company">' + drug.company + '</span>\
+                                </div>\
                             </div>\
                         </div>\
                         <button class="btn btn-secondary" onclick="openEditModal(\'' + drug.drug_code + '\')" style="padding: 6px 12px; font-size: 13px;">관리</button>\
                     </div>\
-                    <div class="drug-company">' + drug.company + '</div>\
                     <div class="drug-stock">\
                         <span class="drug-stock-label">현재고 :</span>\
                         <span>' + drug.current_stock.toLocaleString() + '</span>\
@@ -1663,7 +1691,10 @@
     function selectDrugForModal(code, name, company, stock) {
         selectedDrugCode = code;
         document.getElementById('selectedDrugName').textContent = name;
-        document.getElementById('selectedDrugCode').textContent = code + ' | ' + company;
+        document.getElementById('selectedDrugCode').textContent = code;
+        document.getElementById('selectedDrugCompany').textContent = company;
+        document.getElementById('selectedDrugCompany').style.display = 'inline';
+        document.getElementById('selectedDrugCompanySeparator').style.display = 'inline';
         document.getElementById('selectedDrug').classList.add('visible');
         document.getElementById('modalDrugResults').classList.remove('visible');
         document.getElementById('modalDrugSearch').value = '';
@@ -1736,6 +1767,8 @@
     function clearDrugSelection() {
         selectedDrugCode = null;
         document.getElementById('selectedDrug').classList.remove('visible');
+        document.getElementById('selectedDrugCompany').style.display = 'none';
+        document.getElementById('selectedDrugCompanySeparator').style.display = 'none';
 
         // Show hint, hide editable fields
         document.getElementById('unselectedHint').style.display = 'block';

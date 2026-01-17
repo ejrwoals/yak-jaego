@@ -211,24 +211,27 @@
     }
 
     .patient-name {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 700;
         color: #1a202c;
+    }
+
+    .patient-meta {
         display: flex;
         align-items: center;
         gap: 6px;
+        font-size: 12px;
+        color: #718096;
+        margin-top: 2px;
     }
 
-    .patient-birth {
-        font-size: 14px;
-        color: #718096;
-        font-weight: 400;
+    .patient-meta-separator {
+        color: #cbd5e0;
     }
 
     .patient-info {
-        font-size: 13px;
+        font-size: 12px;
         color: #a0aec0;
-        margin-bottom: 8px;
     }
 
     .patient-badges {
@@ -263,8 +266,8 @@
     }
 
     .badge-normal {
-        background: #c6f6d5;
-        color: #276749;
+        background: #f1f5f9;
+        color: #94a3b8;
     }
 
     .btn {
@@ -614,16 +617,20 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
+        min-width: 16px;
+        min-height: 16px;
         background: #e2e8f0;
         color: #718096;
         border-radius: 50%;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         cursor: help;
         margin-left: 6px;
         position: relative;
+        line-height: 1;
+        vertical-align: middle;
     }
 
     .help-icon:hover {
@@ -647,6 +654,9 @@
         line-height: 1.5;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         z-index: 1000;
+        overflow: visible;
+        height: auto;
+        min-height: fit-content;
     }
 
     .help-icon .tooltip::after {
@@ -725,7 +735,7 @@
                 <span class="stat-value" id="statShortage">0</span>명
             </div>
             <div class="stat-item">
-                <span>&#9989; 정상:</span>
+                <span>&#10003; 정상:</span>
                 <span class="stat-value" id="statNormal">0</span>명
             </div>
         </div>
@@ -742,7 +752,7 @@
         <div class="filter-buttons">
             <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">전체</button>
             <button class="filter-btn" data-filter="shortage" onclick="setFilter('shortage')">⚠️ 부족</button>
-            <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">✅ 정상</button>
+            <button class="filter-btn" data-filter="normal" onclick="setFilter('normal')">&#10003; 정상</button>
         </div>
         <div class="sort-buttons">
             <button class="sort-btn active" data-sort="recent" onclick="setSort('recent')">최근순</button>
@@ -984,20 +994,25 @@
                 statusBadges += '<span class="badge badge-exact">&#127919; 딱맞음 ' + patient.exact_count + '개</span>';
             }
             if (!patient.has_shortage && !patient.has_exact && patient.drug_count > 0) {
-                statusBadges = '<span class="badge badge-normal">&#9989; 정상</span>';
+                statusBadges = '<span class="badge badge-normal">&#10003; 정상</span>';
             }
+
+            // 메타 정보 구성 (생년월일, 방문주기)
+            var metaParts = [];
+            if (patient.birth) metaParts.push(patient.birth);
+            if (patient.visit_cycle) metaParts.push('방문주기 ' + patient.visit_cycle + '일');
+            var metaHtml = metaParts.length > 0
+                ? '<div class="patient-meta">' + metaParts.join('<span class="patient-meta-separator">·</span>') + '</div>'
+                : '';
 
             return '<div class="patient-card ' + shortageClass + '" data-id="' + patient.patient_id + '">' +
                 '<div class="patient-card-header">' +
                     '<div class="patient-card-title">' +
-                        '<div class="patient-name">' +
-                            escapeHtml(patient.patient_name) +
-                            (patient.birth ? '<span class="patient-birth">(' + patient.birth + ')</span>' : '') +
-                        '</div>' +
+                        '<div class="patient-name">' + escapeHtml(patient.patient_name) + '</div>' +
+                        metaHtml +
                     '</div>' +
                     '<button class="btn btn-secondary" onclick="openEditModal(' + patient.patient_id + ')" style="padding: 6px 12px; font-size: 13px;">관리</button>' +
                 '</div>' +
-                (patient.visit_cycle ? '<div class="patient-info">방문주기: ' + patient.visit_cycle + '일</div>' : '') +
                 (patient.memo ? '<div class="patient-info">' + escapeHtml(patient.memo.substring(0, 30)) + (patient.memo.length > 30 ? '...' : '') + '</div>' : '') +
                 '<div class="patient-badges">' +
                     '<span class="badge badge-drug">&#128138; 약품 ' + patient.drug_count + '개</span>' +

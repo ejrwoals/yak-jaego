@@ -72,10 +72,14 @@ def check_database_ready():
     # DB에 저장된 데이터 기간 정보 조회
     data_period = processed_inventory_db.get_metadata()
 
+    # 신규 약품 수 계산 (시계열 분석 불가능한 약품)
+    new_drug_count = recent_count - processed_stats['total']
+
     return True, {
         'recent_count': recent_count,
         'processed_stats': processed_stats,
-        'data_period': data_period
+        'data_period': data_period,
+        'new_drug_count': new_drug_count
     }
 
 
@@ -616,6 +620,7 @@ def rebuild_db():
         recent_count = inventory_db.get_inventory_count()
         processed_stats = processed_inventory_db.get_statistics()
         data_period = processed_inventory_db.get_metadata()
+        new_drug_count = recent_count - processed_stats['total']
 
         return jsonify({
             'success': True,
@@ -623,7 +628,8 @@ def rebuild_db():
             'stats': {
                 'recent_count': recent_count,
                 'processed_stats': processed_stats,
-                'data_period': data_period
+                'data_period': data_period,
+                'new_drug_count': new_drug_count
             }
         })
 
