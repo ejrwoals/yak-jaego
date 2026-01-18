@@ -154,10 +154,12 @@
        Z-INDEX SCALE
        ======================================== */
     --z-dropdown: 100;
+    --z-tooltip: 200;
     --z-sticky: 500;
     --z-fixed: 1000;
     --z-modal-backdrop: 2000;
     --z-modal: 3000;
+    --z-confirm-modal: 5000;
     --z-toast: 9999;
 
     /* ========================================

@@ -781,7 +781,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 right: 0;
                 top: 50%;
                 transform: translateY(-50%);
-                z-index: 999;
+                z-index: 900;
                 display: flex;
                 flex-direction: column;
                 gap: var(--space-3);
@@ -789,7 +789,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
             .bookmark-item {{
                 position: relative;
-                right: -100px;
+                right: -130px;
                 padding: var(--space-3) var(--space-4);
                 border-radius: var(--radius-lg) 0 0 var(--radius-lg);
                 cursor: pointer;
@@ -954,6 +954,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 border-radius: var(--radius-lg);
                 margin: var(--space-5) 0;
                 border: 1px solid;
+                position: relative;
+                z-index: 950;
             }}
 
             .alert-banner-danger {{
@@ -1552,6 +1554,16 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
             // 스크롤 시 툴팁 닫기
             window.addEventListener('scroll', hideThresholdTooltip, true);
+
+            // 책갈피 호버 시 z-index 조정
+            document.querySelectorAll('.bookmark-item').forEach(item => {
+                item.addEventListener('mouseenter', function() {
+                    document.querySelector('.bookmark-sidebar').style.zIndex = '1000';
+                });
+                item.addEventListener('mouseleave', function() {
+                    document.querySelector('.bookmark-sidebar').style.zIndex = '900';
+                });
+            });
 
             // 카테고리 모달 열기
             function openCategoryModal(modalId) {
