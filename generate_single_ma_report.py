@@ -996,7 +996,12 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 color: white;
                 font-weight: 600;
                 font-size: 0.875rem;
-                transition: flex var(--duration-normal) var(--ease-out);
+                transition: flex var(--duration-normal) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+                cursor: pointer;
+            }}
+
+            .distribution-bar > div:hover {{
+                opacity: 0.85;
             }}
 
             .distribution-legend {{
@@ -1101,19 +1106,19 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 재고 현황 분포
             </h2>
             <div id="proportion-graph" class="distribution-bar" data-total="{total_count}">
-                <div id="proportion-bar-urgent" style="background: var(--color-danger); flex: {urgent_count};" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-urgent" style="background: var(--color-danger); flex: {urgent_count};" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)" onclick="openCategoryModal('urgent-modal')">
                     {urgent_count if urgent_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-low" style="background: var(--color-warning); flex: {low_count};" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-low" style="background: var(--color-warning); flex: {low_count};" title="부족: {low_count}개 ({low_count/total_count*100:.1f}%)" onclick="openCategoryModal('low-modal')">
                     {low_count if low_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-high" style="background: var(--color-success); flex: {high_count};" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-high" style="background: var(--color-success); flex: {high_count};" title="충분: {high_count}개 ({high_count/total_count*100:.1f}%)" onclick="openCategoryModal('high-modal')">
                     {high_count if high_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-excess" style="background: var(--color-info); flex: {excess_count};" title="과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-excess" style="background: var(--color-info); flex: {excess_count};" title="과다: {excess_count}개 ({excess_count/total_count*100:.1f}%)" onclick="openCategoryModal('excess-modal')">
                     {excess_count if excess_count > 0 else ''}
                 </div>
-                <div id="proportion-bar-dead" style="background: var(--text-muted); flex: {dead_count};" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)">
+                <div id="proportion-bar-dead" style="background: var(--text-muted); flex: {dead_count};" title="악성재고: {dead_count}개 ({dead_count/total_count*100:.1f}%)" onclick="openCategoryModal('dead-modal')">
                     {dead_count if dead_count > 0 else ''}
                 </div>
             </div>
