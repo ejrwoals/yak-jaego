@@ -8,6 +8,7 @@ import numpy as np
 import os
 from datetime import datetime
 import json
+import paths
 
 # 기존 모듈에서 재사용
 from generate_single_ma_report import (
@@ -1574,7 +1575,7 @@ def create_and_save_report(df, months, mode='dispense', threshold_high=0.5, thre
         str: 저장된 파일 경로
     """
     # 보고서 폴더 생성
-    report_dir = 'volatility_reports'
+    report_dir = paths.get_reports_path('volatility')
     os.makedirs(report_dir, exist_ok=True)
 
     # HTML 생성

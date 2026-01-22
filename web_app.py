@@ -38,7 +38,9 @@ import suggestion_engine
 import suggestion_db
 from utils import read_today_file
 
-app = Flask(__name__, template_folder=paths.get_bundle_path('templates'))
+app = Flask(__name__,
+            template_folder=paths.get_bundle_path('templates'),
+            static_folder=paths.get_bundle_path('static'))
 app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
 app.config['UPLOAD_FOLDER'] = paths.UPLOADS_PATH  # 임시 업로드 폴더
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 제한
@@ -370,7 +372,7 @@ def calculate_order():
 
         # HTML 보고서 생성
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        report_dir = 'order_calc_reports'
+        report_dir = paths.get_reports_path('order')
         os.makedirs(report_dir, exist_ok=True)
 
         html_path = os.path.join(report_dir, f'order_calculator_report_{timestamp}.html')
@@ -458,12 +460,12 @@ def list_reports(report_type):
         if report_type == 'timeseries':
             # 분석 보고서: inventory_reports + volatility_reports
             report_dirs = [
-                ('inventory_reports', ['inventory_report_', 'simple_report_']),
-                ('volatility_reports', ['volatility_report_'])
+                (paths.get_reports_path('inventory'), ['inventory_report_', 'simple_report_']),
+                (paths.get_reports_path('volatility'), ['volatility_report_'])
             ]
         elif report_type == 'order':
             report_dirs = [
-                ('order_calc_reports', ['order_calculator_report_'])
+                (paths.get_reports_path('order'), ['order_calculator_report_'])
             ]
         else:
             return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
@@ -741,25 +743,36 @@ def delete_report():
         if '..' in filename or '/' in filename or '\\' in filename:
             return jsonify({'error': '잘못된 파일명입니다.'}), 400
 
-        # 보고서 유형에 따라 디렉토리 결정
+        # 보고서 유형에 따라 디렉토리 및 유효 prefix 결정
         if report_type == 'timeseries':
-            report_dir = 'inventory_reports'
-            valid_prefixes = ['inventory_report_', 'simple_report_']
+            # timeseries: inventory + volatility 보고서 모두 포함
+            report_dirs_map = {
+                'inventory_report_': paths.get_reports_path('inventory'),
+                'simple_report_': paths.get_reports_path('inventory'),
+                'volatility_report_': paths.get_reports_path('volatility')
+            }
         elif report_type == 'order':
-            report_dir = 'order_calc_reports'
-            valid_prefixes = ['order_calculator_report_']
+            report_dirs_map = {
+                'order_calculator_report_': paths.get_reports_path('order')
+            }
         else:
             return jsonify({'error': '잘못된 보고서 유형입니다.'}), 400
 
-        # 파일명 유효성 검증
-        if not any(filename.startswith(prefix) for prefix in valid_prefixes):
+        # 파일명 유효성 검증 및 해당 디렉토리 찾기
+        report_dir = None
+        for prefix, dir_path in report_dirs_map.items():
+            if filename.startswith(prefix):
+                report_dir = dir_path
+                break
+
+        if report_dir is None:
             return jsonify({'error': '허용되지 않는 파일입니다.'}), 400
 
         if not filename.endswith('.html'):
             return jsonify({'error': 'HTML 파일만 삭제할 수 있습니다.'}), 400
 
-        # 파일 경로 생성 (BASE_PATH 기준)
-        file_path = os.path.join(paths.BASE_PATH, report_dir, filename)
+        # 파일 경로 생성
+        file_path = os.path.join(report_dir, filename)
 
         print(f"🗑️  삭제 시도 경로: {file_path}")
         print(f"🗑️  파일 존재 여부: {os.path.exists(file_path)}")
@@ -772,7 +785,7 @@ def delete_report():
             # CSV 파일도 함께 삭제 (주문 보고서의 경우)
             if report_type == 'order':
                 csv_filename = filename.replace('.html', '.csv')
-                csv_path = os.path.join(paths.BASE_PATH, report_dir, csv_filename)
+                csv_path = os.path.join(report_dir, csv_filename)
                 if os.path.exists(csv_path):
                     os.remove(csv_path)
                     print(f"✅ CSV 파일 삭제 완료: {csv_filename}")

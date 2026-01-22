@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import webbrowser
+import paths
 import inventory_db
 import processed_inventory_db
 import drug_thresholds_db
@@ -3825,7 +3826,7 @@ def generate_html_report(df, months=None):
     print("-" * 30)
 
     # 출력 디렉토리 생성
-    output_dir = 'order_calc_reports'
+    output_dir = paths.get_reports_path('order')
     os.makedirs(output_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -3848,7 +3849,7 @@ def generate_html_report(df, months=None):
 def save_csv_report(df):
     """CSV 보고서 저장"""
     # 출력 디렉토리 생성
-    output_dir = 'order_calc_reports'
+    output_dir = paths.get_reports_path('order')
     os.makedirs(output_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

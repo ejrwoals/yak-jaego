@@ -76,6 +76,7 @@ a = Analysis(
     datas=[
         # (소스 경로, 번들 내 경로)
         ('templates', 'templates'),  # HTML 템플릿 포함
+        ('static', 'static'),        # CSS, JS 등 정적 파일 포함
 
         # 주의: 아래 항목들은 포함하지 않음 (사용자 데이터)
         # - data/ 폴더: 월별 CSV/Excel 파일

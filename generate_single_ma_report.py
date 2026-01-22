@@ -5,6 +5,7 @@ from plotly.subplots import make_subplots
 import os
 from datetime import datetime
 import json
+import paths
 import inventory_db
 import checked_items_db
 import drug_memos_db
@@ -3758,7 +3759,7 @@ def create_and_save_report(df, months, mode='dispense', ma_months=3, threshold_l
                 df_final = df_final.drop(columns=['최종_업데이트일시'], errors='ignore')
 
     # 출력 디렉토리 생성
-    output_dir = 'inventory_reports'
+    output_dir = paths.get_reports_path('inventory')
     os.makedirs(output_dir, exist_ok=True)
 
     # HTML 보고서 생성
