@@ -19,10 +19,11 @@ import math
 import json
 from datetime import datetime
 
+import paths
 import processed_inventory_db
 
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'drug_periodicity.sqlite3')
+DB_PATH = paths.get_db_path('drug_periodicity.sqlite3')
 TABLE_NAME = 'drug_periodicity'
 
 

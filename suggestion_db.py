@@ -11,8 +11,10 @@ import os
 import sqlite3
 from datetime import datetime
 
+import paths
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'suggestion_skips.sqlite3')
+
+DB_PATH = paths.get_db_path('suggestion_skips.sqlite3')
 TABLE_NAME = 'suggestion_skips'
 
 

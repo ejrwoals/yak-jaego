@@ -5,9 +5,12 @@ import re
 from datetime import datetime
 import inventory_db
 from utils import normalize_drug_code
+import paths
 
-def select_file_from_directory(directory='data'):
+def select_file_from_directory(directory=None):
     """디렉토리에서 파일을 선택하는 함수"""
+    if directory is None:
+        directory = paths.DATA_PATH
     if not os.path.exists(directory):
         print(f"'{directory}' 디렉토리가 존재하지 않습니다.")
         return None
@@ -101,8 +104,10 @@ def extract_month_from_file(filename):
 
     return None
 
-def load_multiple_csv_files(directory='data'):
+def load_multiple_csv_files(directory=None):
     """여러 월별 데이터 파일을 읽어 월별 데이터로 구성 (CSV, XLS, XLSX 지원)"""
+    if directory is None:
+        directory = paths.DATA_PATH
     if not os.path.exists(directory):
         print(f"'{directory}' 디렉토리가 존재하지 않습니다.")
         return None

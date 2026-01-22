@@ -12,8 +12,10 @@ import os
 import json
 import numpy as np
 
+import paths
 
-DB_PATH = 'processed_inventory.sqlite3'
+
+DB_PATH = paths.get_db_path('processed_inventory.sqlite3')
 TABLE_NAME = 'processed_inventory'
 
 

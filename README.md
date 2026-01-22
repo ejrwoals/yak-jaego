@@ -386,7 +386,11 @@ yak-jaego/
 ├── buffer_calculator.py           # 동시 방문 대비용 재고 계산 모듈 (포아송 이항분포)
 ├── inventory_updater.py           # 재고 업데이트 모듈 (today 파일 → DB)
 ├── utils.py                       # 공통 유틸리티 함수 (Excel 파일 읽기 포함)
+├── paths.py                       # 경로 관리 모듈 (PyInstaller 빌드 지원)
+├── jaego.spec                     # PyInstaller 빌드 설정 파일
 ├── requirements.txt               # Python 의존성 목록
+├── docs/
+│   └── pyinstaller-build-guide.md # PyInstaller 빌드 가이드
 ├── today.csv/xls/xlsx             # 오늘 나간 약품의 재고 현황 (사용자 제공)
 ├── recent_inventory.sqlite3       # 최신 재고 DB (자동 생성)
 ├── processed_inventory.sqlite3    # 시계열 통계 DB (자동 생성)
@@ -687,6 +691,20 @@ for month in months_reversed:
 - 다중 인코딩 지원 (UTF-8, CP949, EUC-KR)
 
 ## 🛠️ 고급 설정
+
+### 독립 실행형 빌드 (PyInstaller)
+
+Python이 설치되지 않은 환경에서도 실행할 수 있는 독립 실행형 파일(.exe)로 빌드할 수 있습니다.
+
+```bash
+# PyInstaller 설치
+pip install pyinstaller
+
+# 빌드 실행
+pyinstaller jaego.spec
+```
+
+빌드 결과물은 `dist/Jaego/` 폴더에 생성됩니다. 상세한 빌드 방법과 배포 가이드는 [PyInstaller 빌드 가이드](docs/pyinstaller-build-guide.md)를 참조하세요.
 
 ### DB 재구축
 

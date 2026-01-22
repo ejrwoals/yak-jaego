@@ -12,6 +12,10 @@
 __pycache__/
 .venv/
 
+# PyInstaller 빌드
+/build/
+/dist/
+
 # Claude Code files
 CLAUDE.md
 .claude/

@@ -11,6 +11,7 @@ dependencies = [
     "plotly>=5.18.0",
     "python-calamine>=0.5.4",
     "scikit-learn>=1.8.0",
+    "pyinstaller>=6.18.0",
 ]
 
 [tool.uv]

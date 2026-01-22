@@ -13,8 +13,10 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
+import paths
 
-DB_PATH = 'drug_thresholds.sqlite3'
+
+DB_PATH = paths.get_db_path('drug_thresholds.sqlite3')
 TABLE_NAME = 'drug_thresholds'
 HISTORY_TABLE = 'threshold_history'
 

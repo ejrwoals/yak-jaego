@@ -18,6 +18,7 @@ import inventory_db
 import processed_inventory_db
 import periodicity_calculator
 import drug_periodicity_db
+import paths
 
 
 def main():
@@ -48,17 +49,17 @@ def main():
 
         print("\n🗑️  기존 DB 삭제 중...")
         if has_recent_db:
-            os.remove('recent_inventory.sqlite3')
+            os.remove(paths.get_db_path('recent_inventory.sqlite3'))
             print("   ✅ recent_inventory.sqlite3 삭제 완료")
         if has_processed_db:
-            os.remove('processed_inventory.sqlite3')
+            os.remove(paths.get_db_path('processed_inventory.sqlite3'))
             print("   ✅ processed_inventory.sqlite3 삭제 완료")
         print()
 
     # Step 1: 월별 CSV 로드
     print("🔍 Step 1: 월별 CSV 파일 로드")
     print("-" * 60)
-    monthly_data = load_multiple_csv_files(directory='data')
+    monthly_data = load_multiple_csv_files()  # paths.DATA_PATH 사용
 
     if not monthly_data:
         print("❌ CSV 파일을 로드할 수 없습니다.")

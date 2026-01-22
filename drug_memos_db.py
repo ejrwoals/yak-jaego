@@ -11,8 +11,10 @@ import os
 import sqlite3
 from datetime import datetime
 
+import paths
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'drug_memos.sqlite3')
+
+DB_PATH = paths.get_db_path('drug_memos.sqlite3')
 TABLE_NAME = 'drug_memos'
 
 

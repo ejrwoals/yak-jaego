@@ -10,8 +10,10 @@ import pandas as pd
 from datetime import datetime
 import os
 
+import paths
 
-DB_PATH = 'recent_inventory.sqlite3'
+
+DB_PATH = paths.get_db_path('recent_inventory.sqlite3')
 TABLE_NAME = 'recent_inventory'
 
 

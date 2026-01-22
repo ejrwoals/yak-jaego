@@ -13,8 +13,10 @@ import sqlite3
 import os
 from datetime import datetime
 
+import paths
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'checked_items.sqlite3')
+
+DB_PATH = paths.get_db_path('checked_items.sqlite3')
 
 
 def init_checked_items_db():

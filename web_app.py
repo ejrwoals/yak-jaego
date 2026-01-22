@@ -18,6 +18,9 @@ from threading import Timer
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
 import pandas as pd
 
+# 경로 관리 모듈 (PyInstaller 빌드 지원)
+import paths
+
 # 로컬 모듈 import
 from generate_single_ma_report import create_and_save_report as create_simple_report
 from drug_order_calculator import run as run_order_calculator, generate_order_report_html
@@ -35,9 +38,9 @@ import suggestion_engine
 import suggestion_db
 from utils import read_today_file
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=paths.get_bundle_path('templates'))
 app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
-app.config['UPLOAD_FOLDER'] = 'uploads'  # 임시 업로드 폴더
+app.config['UPLOAD_FOLDER'] = paths.UPLOADS_PATH  # 임시 업로드 폴더
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 제한
 app.config['VERSION'] = os.getenv('APP_VERSION', str(int(datetime.now().timestamp())))  # 캐시 버스팅용 버전
 
@@ -537,19 +540,19 @@ def serve_report(filename):
     """보고서 파일 제공"""
     # 시계열 보고서 (inventory_reports 디렉토리)
     if filename.startswith('inventory_report_') or filename.startswith('simple_report_'):
-        file_path = os.path.join(os.getcwd(), 'inventory_reports', filename)
+        file_path = os.path.join(paths.BASE_PATH, 'inventory_reports', filename)
         if os.path.exists(file_path):
             return send_file(file_path, mimetype='text/html')
 
     # 고변동성 보고서 (volatility_reports 디렉토리)
     elif filename.startswith('volatility_report_'):
-        file_path = os.path.join(os.getcwd(), 'volatility_reports', filename)
+        file_path = os.path.join(paths.BASE_PATH, 'volatility_reports', filename)
         if os.path.exists(file_path):
             return send_file(file_path, mimetype='text/html')
 
     # 주문 보고서 (order_calc_reports 디렉토리)
     elif filename.startswith('order_calculator_report_'):
-        file_path = os.path.join(os.getcwd(), 'order_calc_reports', filename)
+        file_path = os.path.join(paths.BASE_PATH, 'order_calc_reports', filename)
         if os.path.exists(file_path):
             return send_file(file_path, mimetype='text/html' if filename.endswith('.html') else 'text/csv')
 
@@ -566,7 +569,7 @@ def rebuild_db():
 
         # Step 1: 월별 CSV 로드
         print("🔍 월별 CSV 파일 로드 중...")
-        monthly_data = load_multiple_csv_files(directory='data')
+        monthly_data = load_multiple_csv_files()  # paths.DATA_PATH 사용
 
         if not monthly_data:
             return jsonify({'error': 'CSV 파일을 로드할 수 없습니다.'}), 400
@@ -574,9 +577,9 @@ def rebuild_db():
         # 기존 DB 삭제
         print("🗑️  기존 DB 삭제 중...")
         if inventory_db.db_exists():
-            os.remove('recent_inventory.sqlite3')
+            os.remove(paths.get_db_path('recent_inventory.sqlite3'))
         if processed_inventory_db.db_exists():
-            os.remove('processed_inventory.sqlite3')
+            os.remove(paths.get_db_path('processed_inventory.sqlite3'))
 
         # Step 2: DB 초기화
         print("💽 데이터베이스 초기화 중...")
@@ -755,9 +758,8 @@ def delete_report():
         if not filename.endswith('.html'):
             return jsonify({'error': 'HTML 파일만 삭제할 수 있습니다.'}), 400
 
-        # 파일 경로 생성 (스크립트 위치 기준)
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(base_dir, report_dir, filename)
+        # 파일 경로 생성 (BASE_PATH 기준)
+        file_path = os.path.join(paths.BASE_PATH, report_dir, filename)
 
         print(f"🗑️  삭제 시도 경로: {file_path}")
         print(f"🗑️  파일 존재 여부: {os.path.exists(file_path)}")
@@ -770,7 +772,7 @@ def delete_report():
             # CSV 파일도 함께 삭제 (주문 보고서의 경우)
             if report_type == 'order':
                 csv_filename = filename.replace('.html', '.csv')
-                csv_path = os.path.join(base_dir, report_dir, csv_filename)
+                csv_path = os.path.join(paths.BASE_PATH, report_dir, csv_filename)
                 if os.path.exists(csv_path):
                     os.remove(csv_path)
                     print(f"✅ CSV 파일 삭제 완료: {csv_filename}")
