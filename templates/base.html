@@ -38,6 +38,18 @@
     {% block base_scripts %}
     <script src="{{ url_for('static', filename='js/components/jaego-core.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script src="{{ url_for('static', filename='js/components/confirm-modal.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+    <script>
+        // Heartbeat: 브라우저가 열려있는 동안 서버에 신호를 보냄
+        // PyInstaller 빌드에서 브라우저 종료 시 서버 자동 종료를 위함
+        (function() {
+            function sendHeartbeat() {
+                fetch('/api/heartbeat', { method: 'POST' }).catch(function() {});
+            }
+            // 즉시 한 번 전송 후 5초마다 반복
+            sendHeartbeat();
+            setInterval(sendHeartbeat, 5000);
+        })();
+    </script>
     {% endblock %}
 
     {# Component scripts - Override to include specific components #}

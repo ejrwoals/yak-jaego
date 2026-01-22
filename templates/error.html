@@ -5,12 +5,6 @@
 {# No shutdown button on error page #}
 {% block shutdown_button %}{% endblock %}
 
-{# No confirm modal on error page #}
-{% block confirm_modal %}{% endblock %}
-
-{# No base scripts needed on error page #}
-{% block base_scripts %}{% endblock %}
-
 {% block component_styles %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
 {% endblock %}
@@ -47,6 +41,119 @@
         height: var(--icon-md);
         color: var(--brand-primary);
     }
+
+    /* DB 초기화 버튼 스타일 */
+    .btn-init-db {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        padding: var(--space-4) var(--space-6);
+        font-size: var(--text-lg);
+        font-weight: 600;
+        color: white;
+        background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
+        border: none;
+        border-radius: var(--radius-lg);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-init-db .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
+    }
+
+    .btn-init-db:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .btn-init-db:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* 상태 메시지 */
+    .init-status {
+        margin-top: var(--space-4);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        text-align: center;
+        min-height: 24px;
+    }
+
+    .init-status.loading {
+        background-color: var(--info-light);
+        color: var(--info-dark);
+    }
+
+    .init-status.success {
+        background-color: var(--success-light);
+        color: var(--success-dark);
+    }
+
+    .init-status.error {
+        background-color: var(--danger-light);
+        color: var(--danger-dark);
+    }
+
+    /* 스피너 애니메이션 */
+    .icon-spin {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    /* 안내 박스 스타일 개선 */
+    .guide-box {
+        text-align: left;
+        color: var(--gray-600);
+        margin: var(--space-5) 0;
+        padding: var(--space-4);
+        background: var(--gray-50);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--gray-200);
+    }
+
+    .guide-box h3 {
+        color: var(--gray-800);
+        margin-bottom: var(--space-3);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .guide-box h3 .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
+        color: var(--brand-primary);
+    }
+
+    .guide-box ol {
+        line-height: 2;
+        margin-left: var(--space-5);
+    }
+
+    .guide-box code {
+        background-color: var(--gray-100);
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius-sm);
+        font-family: monospace;
+        font-size: var(--text-sm);
+    }
+
+    /* 버튼 영역 */
+    .action-area {
+        text-align: center;
+        margin: var(--space-6) 0;
+    }
 </style>
 {% endblock %}
 
@@ -72,14 +179,26 @@
 
     <div class="divider"></div>
 
-    <div style="text-align: left; color: var(--gray-500); margin: var(--space-5) 0;">
-        <h3 style="color: var(--gray-800); margin-bottom: var(--space-4);">데이터베이스 초기화 방법</h3>
-        <ol style="line-height: 2; margin-left: var(--space-5);">
-            <li><strong>월별 CSV 파일 준비:</strong> <code>data/</code> 폴더에 월별 약품 데이터 파일을 넣으세요</li>
-            <li><strong>DB 초기화 실행:</strong> 터미널에서 <code style="background-color: var(--gray-800); color: #aed581; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); font-family: monospace;">python init_db.py</code> 명령어를 실행하세요</li>
-            <li><strong>완료 확인:</strong> 초기화가 완료되면 이 페이지로 돌아오세요</li>
+    <div class="guide-box">
+        <h3>
+            <svg class="icon"><use href="#icon-database"></use></svg>
+            데이터베이스 초기화 방법
+        </h3>
+        <ol>
+            <li><strong>월별 데이터 파일 준비:</strong> <code>data/</code> 폴더에 월별 약품 데이터 파일(CSV, XLS, XLSX)을 넣으세요</li>
+            <li><strong>DB 초기화:</strong> 아래 버튼을 클릭하여 데이터베이스를 초기화하세요</li>
         </ol>
     </div>
+
+    <div class="action-area">
+        <button class="btn-init-db" id="btn-init-db" onclick="initDatabase()">
+            <svg class="icon"><use href="#icon-database"></use></svg>
+            <span>DB 초기화</span>
+        </button>
+        <div class="init-status" id="init-status"></div>
+    </div>
+
+    <div class="divider"></div>
 
     <div style="text-align: center;">
         <a href="/" class="home-btn" style="display: inline-flex; align-items: center; gap: var(--space-2);">
@@ -88,4 +207,60 @@
         </a>
     </div>
 </div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+    async function initDatabase() {
+        var confirmed = await showConfirmModal({
+            icon: 'database',
+            title: 'DB 초기화',
+            message: 'data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>data/ 폴더에 월별 데이터 파일이 있는지 확인해주세요.',
+            confirmText: '초기화',
+            isDanger: false
+        });
+        if (!confirmed) return;
+
+        var button = document.getElementById('btn-init-db');
+        var statusDiv = document.getElementById('init-status');
+
+        button.disabled = true;
+        button.innerHTML = '<svg class="icon icon-spin"><use href="#icon-loader"></use></svg><span>DB 초기화 중...</span>';
+
+        statusDiv.className = 'init-status loading';
+        statusDiv.innerHTML = 'DB 초기화 중입니다. 잠시만 기다려주세요...';
+
+        try {
+            var response = await fetch('/api/rebuild-db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            var data = await response.json();
+
+            if (response.ok && data.success) {
+                statusDiv.className = 'init-status success';
+                statusDiv.innerHTML = 'DB 초기화가 완료되었습니다! 잠시 후 메인 페이지로 이동합니다...';
+
+                // 2초 후 메인 페이지로 이동
+                setTimeout(function() {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                statusDiv.className = 'init-status error';
+                statusDiv.innerHTML = (data.error || '알 수 없는 오류가 발생했습니다.');
+
+                button.disabled = false;
+                button.innerHTML = '<svg class="icon"><use href="#icon-database"></use></svg><span>DB 초기화</span>';
+            }
+        } catch (error) {
+            console.error('DB 초기화 실패:', error);
+            statusDiv.className = 'init-status error';
+            statusDiv.innerHTML = 'DB 초기화 중 오류가 발생했습니다: ' + error.message;
+
+            button.disabled = false;
+            button.innerHTML = '<svg class="icon"><use href="#icon-database"></use></svg><span>DB 초기화</span>';
+        }
+    }
+</script>
 {% endblock %}

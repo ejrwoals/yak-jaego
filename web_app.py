@@ -2106,11 +2106,39 @@ def get_drug_suggestion(drug_code):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# ============================================================
+# 브라우저 연결 감지 및 자동 종료 (PyInstaller 빌드용)
+# ============================================================
+
+import time
+import threading
+
+# 마지막 heartbeat 시간 (전역 변수)
+_last_heartbeat = time.time()
+_heartbeat_lock = threading.Lock()
+_shutdown_requested = False
+
+# Heartbeat 설정
+HEARTBEAT_INTERVAL = 5  # 클라이언트가 5초마다 ping
+HEARTBEAT_TIMEOUT = 30  # 30초 동안 ping 없으면 종료
+
+
+@app.route('/api/heartbeat', methods=['POST'])
+def heartbeat():
+    """브라우저 연결 상태 확인용 heartbeat"""
+    global _last_heartbeat
+    with _heartbeat_lock:
+        _last_heartbeat = time.time()
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
     """Flask 앱 종료 API"""
+    global _shutdown_requested
     try:
         print("\n🛑 웹 애플리케이션 종료 요청 받음...")
+        _shutdown_requested = True
 
         # Flask 종료 함수 호출
         shutdown_server = request.environ.get('werkzeug.server.shutdown')
@@ -2128,6 +2156,24 @@ def shutdown():
         return jsonify({'error': str(e)}), 500
 
 
+def check_heartbeat_timeout():
+    """브라우저 연결이 끊어졌는지 주기적으로 확인"""
+    global _shutdown_requested
+    while not _shutdown_requested:
+        time.sleep(5)  # 5초마다 체크
+
+        with _heartbeat_lock:
+            elapsed = time.time() - _last_heartbeat
+
+        if elapsed > HEARTBEAT_TIMEOUT:
+            print(f"\n⏰ 브라우저 연결 타임아웃 ({HEARTBEAT_TIMEOUT}초)")
+            print("🛑 서버를 자동 종료합니다...")
+            _shutdown_requested = True
+            import signal
+            os.kill(os.getpid(), signal.SIGINT)
+            break
+
+
 def open_browser():
     """브라우저 자동 열기"""
     webbrowser.open('http://127.0.0.1:5000/')
@@ -2137,13 +2183,22 @@ if __name__ == '__main__':
     # 브라우저 자동 열기 (1초 후)
     Timer(1, open_browser).start()
 
+    # PyInstaller 빌드 환경에서는 heartbeat 체크 활성화
+    if paths.is_frozen():
+        print("📦 PyInstaller 빌드 모드 - 브라우저 연결 감지 활성화")
+        heartbeat_thread = threading.Thread(target=check_heartbeat_timeout, daemon=True)
+        heartbeat_thread.start()
+
     # Flask 앱 실행
     print("\n" + "=" * 60)
     print("🏥 Jaego - 약국 재고 관리 시스템 (웹 버전)")
     print("=" * 60)
     print("\n📱 웹 브라우저가 자동으로 열립니다...")
     print("   URL: http://127.0.0.1:5000/")
-    print("\n⚠️  종료하려면 Ctrl+C를 누르세요.")
+    if not paths.is_frozen():
+        print("\n⚠️  종료하려면 Ctrl+C를 누르세요.")
+    else:
+        print("\n⚠️  브라우저를 닫으면 자동으로 종료됩니다.")
     print("=" * 60 + "\n")
 
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=False if paths.is_frozen() else True, use_reloader=False)
