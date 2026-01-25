@@ -39,25 +39,12 @@
     <script src="{{ url_for('static', filename='js/components/jaego-core.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script src="{{ url_for('static', filename='js/components/confirm-modal.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script>
-        // Heartbeat: 브라우저가 열려있는 동안 서버에 신호를 보냄
-        // PyInstaller 빌드에서 브라우저 종료 시 서버 자동 종료를 위함
+        // 브라우저 종료 감지: pagehide 이벤트 기반
         (function() {
-            function sendHeartbeat() {
-                fetch('/api/heartbeat', { method: 'POST' }).catch(function() {});
-            }
-            // 즉시 한 번 전송 후 5초마다 반복
-            sendHeartbeat();
-            setInterval(sendHeartbeat, 5000);
-
-            // 탭이 다시 활성화될 때 즉시 heartbeat 전송 (백그라운드 쓰로틀링 대응)
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    sendHeartbeat();
-                }
-            });
+            // 페이지 로드 시 1회 heartbeat (새로고침/페이지이동 시 종료 취소용)
+            fetch('/api/heartbeat', { method: 'POST' }).catch(function() {});
 
             // 페이지 종료 시 서버에 알림 (브라우저 닫기/새로고침/페이지이동)
-            // sendBeacon은 페이지 종료 중에도 안정적으로 전송됨
             window.addEventListener('pagehide', function() {
                 navigator.sendBeacon('/api/page-unload');
             });
