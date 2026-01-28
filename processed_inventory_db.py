@@ -82,6 +82,15 @@ def init_db():
             )
         ''')
 
+        # 데이터 파일 메타데이터 테이블 생성 (파일명-월 매핑)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS data_files (
+                filename TEXT PRIMARY KEY,
+                month TEXT NOT NULL,
+                uploaded_at TEXT
+            )
+        ''')
+
         # 기존 테이블에 약품유형 컬럼이 없으면 추가 (마이그레이션)
         cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
         columns = [col[1] for col in cursor.fetchall()]
@@ -437,6 +446,176 @@ def clear_db():
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
         print(f"🗑️  {DB_PATH} 삭제 완료")
+
+
+# ============================================================
+# 데이터 파일 메타데이터 관리 함수들
+# ============================================================
+
+def add_data_file(filename, month):
+    """
+    데이터 파일 메타데이터 추가/업데이트
+
+    Args:
+        filename (str): 파일명
+        month (str): 월 (예: '2025-01')
+
+    Returns:
+        bool: 성공 여부
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        uploaded_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+            INSERT OR REPLACE INTO data_files (filename, month, uploaded_at)
+            VALUES (?, ?, ?)
+        ''', (filename, month, uploaded_at))
+
+        conn.commit()
+        conn.close()
+        return True
+
+    except Exception as e:
+        print(f"❌ 데이터 파일 메타데이터 추가 실패: {e}")
+        return False
+
+
+def remove_data_file(filename):
+    """
+    데이터 파일 메타데이터 삭제
+
+    Args:
+        filename (str): 파일명
+
+    Returns:
+        bool: 성공 여부
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM data_files WHERE filename = ?', (filename,))
+
+        conn.commit()
+        conn.close()
+        return True
+
+    except Exception as e:
+        print(f"❌ 데이터 파일 메타데이터 삭제 실패: {e}")
+        return False
+
+
+def get_data_files_metadata():
+    """
+    모든 데이터 파일 메타데이터 조회
+
+    Returns:
+        dict: {filename: {'month': str, 'uploaded_at': str}} 형태
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # data_files 테이블이 존재하는지 확인
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='data_files'")
+        if not cursor.fetchone():
+            conn.close()
+            return {}
+
+        cursor.execute('SELECT filename, month, uploaded_at FROM data_files')
+        rows = cursor.fetchall()
+
+        conn.close()
+
+        result = {}
+        for filename, month, uploaded_at in rows:
+            result[filename] = {
+                'month': month,
+                'uploaded_at': uploaded_at
+            }
+
+        return result
+
+    except Exception as e:
+        print(f"❌ 데이터 파일 메타데이터 조회 실패: {e}")
+        return {}
+
+
+def sync_data_files(actual_files, extract_month_func=None):
+    """
+    실제 파일 목록과 DB 메타데이터 동기화 (self-healing)
+
+    - DB에만 있는 항목: 삭제 (파일이 수동으로 삭제된 경우)
+    - 파일에만 있는 항목: 파일명에서 월 추출 시도 후 추가
+
+    Args:
+        actual_files (list): 실제 존재하는 파일명 리스트
+        extract_month_func (callable, optional): 파일명에서 월을 추출하는 함수
+            함수 시그니처: func(filename) -> str or None
+
+    Returns:
+        dict: {'added': list, 'removed': list, 'unchanged': list}
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # data_files 테이블이 존재하는지 확인, 없으면 생성
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='data_files'")
+        if not cursor.fetchone():
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS data_files (
+                    filename TEXT PRIMARY KEY,
+                    month TEXT NOT NULL,
+                    uploaded_at TEXT
+                )
+            ''')
+            conn.commit()
+
+        # 현재 DB에 있는 파일 목록 조회
+        cursor.execute('SELECT filename FROM data_files')
+        db_files = set(row[0] for row in cursor.fetchall())
+
+        actual_files_set = set(actual_files)
+
+        # DB에만 있는 항목 삭제
+        removed = []
+        for filename in db_files - actual_files_set:
+            cursor.execute('DELETE FROM data_files WHERE filename = ?', (filename,))
+            removed.append(filename)
+
+        # 파일에만 있는 항목 추가 (월 추출 시도)
+        added = []
+        for filename in actual_files_set - db_files:
+            month = None
+            if extract_month_func:
+                month = extract_month_func(filename)
+
+            if month:
+                uploaded_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                cursor.execute('''
+                    INSERT INTO data_files (filename, month, uploaded_at)
+                    VALUES (?, ?, ?)
+                ''', (filename, month, uploaded_at))
+                added.append({'filename': filename, 'month': month})
+
+        # 변경되지 않은 항목
+        unchanged = list(db_files & actual_files_set)
+
+        conn.commit()
+        conn.close()
+
+        return {
+            'added': added,
+            'removed': removed,
+            'unchanged': unchanged
+        }
+
+    except Exception as e:
+        print(f"❌ 데이터 파일 동기화 실패: {e}")
+        return {'added': [], 'removed': [], 'unchanged': []}
 
 
 if __name__ == '__main__':

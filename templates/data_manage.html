@@ -1017,13 +1017,9 @@
         <!-- Card Footer - DB Details + Rebuild Button -->
         <div class="status-card-footer" id="db-details-footer">
             <div class="footer-stats">
-                <span>시계열 분석: <strong id="stat-timeseries">-</strong></span>
-                <span class="divider">|</span>
                 <span>일반약: <strong id="stat-general">-</strong></span>
                 <span class="divider">|</span>
                 <span>전문약: <strong id="stat-prescription">-</strong></span>
-                <span class="divider">|</span>
-                <span>신규: <strong id="stat-new">-</strong></span>
             </div>
             <button class="btn-rebuild-compact synced" id="btn-rebuild-main" onclick="rebuildDatabase()">
                 <svg class="icon"><use href="#icon-refresh-cw"></use></svg>
@@ -1338,10 +1334,8 @@
         // Footer DB 상세 정보 업데이트
         if (dbStats.period) {
             footerEl.style.display = 'flex';
-            document.getElementById('stat-timeseries').textContent = dbStats.processedStats.total;
             document.getElementById('stat-general').textContent = dbStats.processedStats.byType['일반약'] || 0;
             document.getElementById('stat-prescription').textContent = dbStats.processedStats.byType['전문약'] || 0;
-            document.getElementById('stat-new').textContent = dbStats.newDrugCount;
         } else {
             footerEl.style.display = 'none';
         }
@@ -1376,12 +1370,17 @@
     }
 
     // 월 선택 모달 열기
-    function openMonthPicker(file, callback, suggestedMonth) {
+    function openMonthPicker(file, callback, suggestedMonth, dateExtractionFailed) {
         monthPickerState.file = file;
         monthPickerState.callback = callback;
 
-        document.getElementById('month-picker-filename').innerHTML =
-            '파일: <strong>' + file.name + '</strong>';
+        var filenameEl = document.getElementById('month-picker-filename');
+        if (dateExtractionFailed) {
+            filenameEl.innerHTML = '파일: <strong>' + file.name + '</strong><br><br>' +
+                '<span style="color: var(--color-warning-dark);">⚠️ 파일명에서 날짜를 추출할 수 없었습니다. 데이터의 월을 직접 선택해주세요.</span>';
+        } else {
+            filenameEl.innerHTML = '파일: <strong>' + file.name + '</strong>';
+        }
 
         // 추출된 월이 있으면 기본값으로 설정
         if (suggestedMonth) {
@@ -1478,6 +1477,8 @@
 
             var monthDisplay = file.month ? formatMonthKorean(file.month) : '날짜 없음';
 
+            var uploadedAtDisplay = file.uploaded_at ? file.uploaded_at : '-';
+
             html += '<div class="file-card" data-filename="' + file.filename + '">' +
                 '<div class="file-icon">' +
                     '<svg class="icon"><use href="#icon-file-text"></use></svg>' +
@@ -1485,9 +1486,10 @@
                 '<div class="file-info">' +
                     '<div class="file-name">' + file.filename + '</div>' +
                     '<div class="file-meta">' +
-                        '<span>' + monthDisplay + '</span>' +
+                        '<span style="color: var(--color-success); font-weight: var(--font-semibold);">' + monthDisplay + '</span>' +
                         '<span>파일 크기: ' + file.size_display + '</span>' +
-                        '<span>수정일시: ' + file.modified_at + '</span>' +
+                        '<span>파일 수정: ' + file.file_modified_at + '</span>' +
+                        '<span>업로드: ' + uploadedAtDisplay + '</span>' +
                     '</div>' +
                 '</div>' +
                 '<span class="file-badge ' + badgeClass + '">' + badgeText + '</span>' +
@@ -1579,14 +1581,14 @@
 
             // 파일명에서 날짜 추출 불가한 경우 바로 월 선택 모달 열기
             if (!checkResult.valid) {
-                openMonthPicker(file, callback, null);
+                openMonthPicker(file, callback, null, true);
                 return;
             }
 
             // 1. 먼저 추출된 월이 맞는지 사용자에게 확인
             var monthDisplay = formatMonthKorean(checkResult.month);
             var confirmMonthMessage = '<strong>' + file.name + '</strong><br><br>' +
-                '이 파일은 <strong style="color: var(--brand-primary); font-size: 1.2em;">' + monthDisplay + '</strong> 사용량 데이터가 맞습니까?';
+                '이 파일은 <strong style="color: var(--color-success); font-size: 1.2em;">' + monthDisplay + '</strong> 사용량 데이터가 맞습니까?';
 
             // 중복 파일 정보도 함께 표시
             if (checkResult.exists) {

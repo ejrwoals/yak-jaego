@@ -2166,31 +2166,47 @@ def list_data_files():
             })
 
         # CSV, XLS, XLSX 파일 목록 수집
-        files = []
+        actual_files = []
         for filename in os.listdir(data_path):
             if filename.endswith(('.csv', '.xls', '.xlsx')):
-                file_path = os.path.join(data_path, filename)
-                stat = os.stat(file_path)
+                actual_files.append(filename)
 
-                # 파일명에서 월 정보 추출
+        # DB 메타데이터와 실제 파일 동기화 (self-healing)
+        processed_inventory_db.sync_data_files(actual_files, extract_month_from_file)
+
+        # DB에서 파일 메타데이터 조회
+        file_metadata = processed_inventory_db.get_data_files_metadata()
+
+        files = []
+        for filename in actual_files:
+            file_path = os.path.join(data_path, filename)
+            stat = os.stat(file_path)
+
+            # DB 메타데이터에서 월 정보 및 업로드 일시 조회
+            if filename in file_metadata:
+                month = file_metadata[filename]['month']
+                uploaded_at = file_metadata[filename].get('uploaded_at')
+            else:
                 month = extract_month_from_file(filename)
+                uploaded_at = None
 
-                # 파일 크기 포맷팅
-                size_bytes = stat.st_size
-                if size_bytes < 1024:
-                    size_display = f"{size_bytes} B"
-                elif size_bytes < 1024 * 1024:
-                    size_display = f"{size_bytes / 1024:.1f} KB"
-                else:
-                    size_display = f"{size_bytes / (1024 * 1024):.1f} MB"
+            # 파일 크기 포맷팅
+            size_bytes = stat.st_size
+            if size_bytes < 1024:
+                size_display = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_display = f"{size_bytes / 1024:.1f} KB"
+            else:
+                size_display = f"{size_bytes / (1024 * 1024):.1f} MB"
 
-                files.append({
-                    'filename': filename,
-                    'month': month,
-                    'size_bytes': size_bytes,
-                    'size_display': size_display,
-                    'modified_at': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                })
+            files.append({
+                'filename': filename,
+                'month': month,
+                'size_bytes': size_bytes,
+                'size_display': size_display,
+                'file_modified_at': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                'uploaded_at': uploaded_at
+            })
 
         # 월 기준 내림차순 정렬 (최신이 위로)
         files.sort(key=lambda x: x['month'] or '', reverse=True)
@@ -2242,10 +2258,10 @@ def check_data_file():
         # 파일명에서 월 정보 추출
         month = extract_month_from_file(filename)
         if not month:
+            # error 필드 없이 valid: false만 반환 → 프론트엔드에서 월 선택 모달 표시
             return jsonify({
                 'valid': False,
-                'error': '파일명에서 날짜를 추출할 수 없습니다.',
-                'hint': '파일명 형식: 2025-01.xls, 202501.csv, 2025_01.xlsx 등'
+                'filename': filename
             })
 
         # 동일 파일 존재 여부 확인
@@ -2275,7 +2291,7 @@ def check_data_file():
 
 @app.route('/api/upload-data-file', methods=['POST'])
 def upload_data_file():
-    """데이터 파일 업로드"""
+    """데이터 파일 업로드 - 원본 파일명 유지, 메타데이터 DB 저장"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': '파일이 없습니다.'}), 400
@@ -2291,45 +2307,62 @@ def upload_data_file():
         custom_month = request.form.get('month', '').strip()
 
         if custom_month:
-            # 사용자 지정 월 사용 - 파일명을 {월}.{확장자} 형식으로 변경
+            # 사용자 지정 월 사용
             import re
             if not re.match(r'^\d{4}-\d{2}$', custom_month):
                 return jsonify({'error': '월 형식이 올바르지 않습니다. (예: 2025-01)'}), 400
             month = custom_month
-            # 확장자 추출
-            ext = os.path.splitext(file.filename)[1]
-            save_filename = f"{month}{ext}"
         else:
             # 파일명에서 월 정보 추출
             month = extract_month_from_file(file.filename)
             if not month:
                 return jsonify({'error': '파일명에서 날짜를 추출할 수 없습니다. (예: 2025-01.xls, 202501.csv)'}), 400
-            save_filename = file.filename
 
         # data/ 폴더 생성 (없으면)
         data_path = paths.DATA_PATH
         if not os.path.exists(data_path):
             os.makedirs(data_path)
 
-        # 기존 파일 존재 여부 확인
+        # 원본 파일명 유지 - 중복 시 숫자 추가
+        original_filename = file.filename
+        save_filename = original_filename
         file_path = os.path.join(data_path, save_filename)
-        is_replacement = os.path.exists(file_path)
+
+        # 동일 파일명이 존재하는 경우 처리
+        is_replacement = False
+        if os.path.exists(file_path):
+            # 같은 월 데이터인지 확인
+            existing_metadata = processed_inventory_db.get_data_files_metadata()
+            if save_filename in existing_metadata and existing_metadata[save_filename]['month'] == month:
+                # 같은 월 데이터 교체
+                is_replacement = True
+            else:
+                # 다른 월 데이터 - 중복 파일명 처리
+                name_without_ext, ext = os.path.splitext(original_filename)
+                counter = 1
+                while os.path.exists(file_path):
+                    save_filename = f"{name_without_ext}_{counter}{ext}"
+                    file_path = os.path.join(data_path, save_filename)
+                    counter += 1
 
         # 파일 저장
         file.save(file_path)
 
-        action = '덮어쓰기' if is_replacement else '업로드'
+        # DB에 메타데이터 저장
+        processed_inventory_db.add_data_file(save_filename, month)
+
+        action = '교체' if is_replacement else '업로드'
         manual_note = ' (수동 지정)' if custom_month else ''
         print(f"📁 데이터 파일 {action} 완료: {save_filename}{manual_note}")
 
         return jsonify({
             'success': True,
             'filename': save_filename,
-            'original_filename': file.filename,
+            'original_filename': original_filename,
             'month': month,
             'is_replacement': is_replacement,
             'is_manual': bool(custom_month),
-            'message': f'{save_filename} 파일이 {"교체" if is_replacement else "업로드"}되었습니다.'
+            'message': f'{save_filename} 파일이 {action}되었습니다.'
         })
 
     except Exception as e:
@@ -2362,6 +2395,10 @@ def delete_data_file():
             return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
 
         os.remove(file_path)
+
+        # DB에서 메타데이터도 삭제
+        processed_inventory_db.remove_data_file(filename)
+
         print(f"🗑️  데이터 파일 삭제 완료: {filename}")
 
         return jsonify({
@@ -2453,8 +2490,12 @@ def validate_data_file(filename):
         if not os.path.exists(file_path):
             return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
 
-        # 월 정보 추출
-        month = extract_month_from_file(filename)
+        # 월 정보 확인: DB 메타데이터 우선, 없으면 파일명에서 추출
+        file_metadata = processed_inventory_db.get_data_files_metadata()
+        if filename in file_metadata:
+            month = file_metadata[filename]['month']
+        else:
+            month = extract_month_from_file(filename)
 
         # 파일 읽기 시도
         df = None
