@@ -15,7 +15,7 @@ import json
 import numpy as np
 
 import drug_periodicity_db
-import processed_inventory_db
+import drug_timeseries_db
 
 
 def autocorr(x, lag):
@@ -218,11 +218,11 @@ def calculate_all_periodicity(show_progress=True):
     Returns:
         dict: {'total': int, 'calculated': int, 'skipped': int}
     """
-    # processed_inventory에서 전체 약품 로드 (DataFrame 반환)
-    df = processed_inventory_db.get_processed_data()
+    # drug_timeseries에서 전체 약품 로드 (DataFrame 반환)
+    df = drug_timeseries_db.get_processed_data()
 
     if df.empty:
-        print("   ⚠️  processed_inventory에 데이터가 없습니다.")
+        print("   ⚠️  drug_timeseries에 데이터가 없습니다.")
         return {'total': 0, 'calculated': 0, 'skipped': 0}
 
     total = len(df)
@@ -278,8 +278,8 @@ def recalculate_for_drug(약품코드):
     Returns:
         dict 또는 None: 계산된 metrics
     """
-    # processed_inventory에서 약품 데이터 조회
-    drug_data = processed_inventory_db.get_drug_by_code(약품코드)
+    # drug_timeseries에서 약품 데이터 조회
+    drug_data = drug_timeseries_db.get_drug_by_code(약품코드)
 
     if not drug_data:
         print(f"   ⚠️  {약품코드} 데이터를 찾을 수 없습니다.")

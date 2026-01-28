@@ -160,12 +160,12 @@ def generate_sparkline_svg(usage_list, width=120, height=30):
 
 def load_data():
     """DB에서 데이터 로드"""
-    conn = sqlite3.connect('processed_inventory.sqlite3')
+    conn = sqlite3.connect('drug_timeseries.sqlite3')
     cursor = conn.cursor()
 
     cursor.execute('''
         SELECT 약품코드, 약품명, 제약회사, 약품유형, 월별_조제수량_리스트, 최종_재고수량
-        FROM processed_inventory
+        FROM drug_timeseries
     ''')
 
     rows = cursor.fetchall()

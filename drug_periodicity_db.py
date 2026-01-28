@@ -20,7 +20,7 @@ import json
 from datetime import datetime
 
 import paths
-import processed_inventory_db
+import drug_timeseries_db
 
 
 DB_PATH = paths.get_db_path('drug_periodicity.sqlite3')
@@ -318,7 +318,7 @@ def calculate_active_months_ratio(약품코드):
         float: 활성 월 비율 (0~1)
     """
     try:
-        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        processed = drug_timeseries_db.get_drug_by_code(약품코드)
         if not processed:
             return 0.5  # 기본값
 

@@ -3783,32 +3783,3 @@ def create_and_save_report(df, months, mode='dispense', ma_months=3, threshold_l
         webbrowser.open(f'file://{os.path.abspath(output_path)}')
 
     return output_path
-
-def main():
-    """메인 함수 - 직접 실행시에만 동작"""
-    # CSV 파일 읽기
-    csv_path = 'processed_inventory.csv'
-    if os.path.exists(csv_path):
-        df = pd.read_csv(csv_path)
-
-        # 사용자에게 이동평균 개월 수 물어보기
-        while True:
-            try:
-                ma = int(input("이동평균 개월 수 (1-12): "))
-                if 1 <= ma <= 12:
-                    break
-                else:
-                    print("1에서 12 사이의 숫자를 입력해주세요.")
-            except ValueError:
-                print("올바른 숫자를 입력해주세요.")
-
-        # 보고서 생성 및 저장
-        months = []  # 실제로는 DB에서 로드해야 함
-        create_and_save_report(df, months, ma_months=ma)
-
-    else:
-        print(f"❌ {csv_path} 파일을 찾을 수 없습니다.")
-        print("먼저 init_db.py를 실행하여 DB 파일을 생성해주세요.")
-
-if __name__ == "__main__":
-    main()

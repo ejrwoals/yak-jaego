@@ -1602,10 +1602,10 @@ def create_and_save_report(df, months, mode='dispense', threshold_high=0.5, thre
 
 if __name__ == '__main__':
     # 테스트용
-    import processed_inventory_db
+    import drug_timeseries_db
 
-    df = processed_inventory_db.get_processed_data(drug_type='전문약')
-    metadata = processed_inventory_db.get_metadata()
+    df = drug_timeseries_db.get_processed_data(drug_type='전문약')
+    metadata = drug_timeseries_db.get_metadata()
 
     # 월 리스트 생성
     from datetime import datetime

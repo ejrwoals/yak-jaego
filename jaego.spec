@@ -50,7 +50,7 @@ hidden_imports = [
     'paths',
     'read_csv',
     'inventory_db',
-    'processed_inventory_db',
+    'drug_timeseries_db',
     'checked_items_db',
     'drug_memos_db',
     'drug_patient_map_db',

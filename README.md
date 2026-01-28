@@ -12,7 +12,7 @@
 
 **SQLite 데이터베이스 기반 시스템**
 - `recent_inventory.sqlite3`: 각 약품의 최신 재고 수량 저장
-- `processed_inventory.sqlite3`: 시계열 통계 데이터 (1년 이동평균, 3개월 이동평균, 런웨이 등)
+- `drug_timeseries.sqlite3`: 시계열 통계 데이터 (1년 이동평균, 3개월 이동평균, 런웨이 등)
 - `checked_items.sqlite3`: 긴급 약품 확인 상태 저장
 - `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장
 - `drug_memos.sqlite3`: 통합 메모 저장 (모든 보고서에서 공유)
@@ -21,7 +21,7 @@
 - `drug_flags.sqlite3`: 특별관리 플래그 저장 (별표 토글)
 - `drug_periodicity.sqlite3`: 약품별 주기성 지표 저장 (avg_interval, interval_cv, height_cv, acf_max, peak_count, active_months_ratio)
 - `suggestion_skips.sqlite3`: 약품 추천 건너뛰기 기록 저장
-- ⚠️ **DB 재생성 시 보존되는 데이터**: "DB 재생성" 버튼은 `recent_inventory`와 `processed_inventory`만 재생성하며, 사용자 설정 DB(`checked_items`, `drug_thresholds`, `drug_memos`, `patients`, `drug_patient_map`, `drug_flags`, `suggestion_skips`)는 영향받지 않음. 단, `drug_periodicity`는 재계산됨
+- ⚠️ **DB 재생성 시 보존되는 데이터**: "DB 재생성" 버튼은 `recent_inventory`와 `drug_timeseries`만 재생성하며, 사용자 설정 DB(`checked_items`, `drug_thresholds`, `drug_memos`, `patients`, `drug_patient_map`, `drug_flags`, `suggestion_skips`)는 영향받지 않음. 단, `drug_periodicity`는 재계산됨
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
 - **음수 재고 지원**: 마이너스 재고도 정확히 반영
 - **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소
@@ -221,14 +221,14 @@ python init_db.py
 2. 전문약 데이터 처리 및 통계 계산
 3. 일반약 데이터 처리 및 통계 계산
 4. `recent_inventory.sqlite3` 생성 (각 약품의 최신 재고)
-5. `processed_inventory.sqlite3` 생성 (시계열 통계 데이터)
+5. `drug_timeseries.sqlite3` 생성 (시계열 통계 데이터)
 6. `drug_periodicity.sqlite3` 생성 (약품별 주기성 지표 계산)
 
 **생성되는 DB:**
 - `recent_inventory.sqlite3`: 현재 재고 데이터
   - 약품코드, 약품명, 제약회사, 약품유형(전문약/일반약), 현재_재고수량
   - 각 약품별로 가장 최근에 기록된 재고를 자동 채택
-- `processed_inventory.sqlite3`: 시계열 통계 데이터
+- `drug_timeseries.sqlite3`: 시계열 통계 데이터
   - 1년_이동평균, 월별_조제수량_리스트, 3개월_이동평균_리스트, 런웨이 등
 - `drug_periodicity.sqlite3`: 주기성 지표 데이터
   - avg_interval, interval_cv, height_cv, acf_max, peak_count, active_months_ratio, periodicity_score
@@ -261,7 +261,7 @@ python web_app.py
    - 전문약 보고서 (조제수량 기준)
    - 일반약 보고서 (판매수량 기준)
 2. **이동평균 기간 선택**: 1~12개월 중 선택 (기본 3개월)
-3. `processed_inventory.sqlite3`에서 데이터 로드
+3. `drug_timeseries.sqlite3`에서 데이터 로드
 4. 선택한 약품유형만 필터링
 5. HTML 보고서 생성 및 브라우저에서 자동 열기
 
@@ -279,14 +279,14 @@ python web_app.py
 
 **실행 전 요구사항:**
 - 오늘 나간 약품의 재고 현황 파일 (csv/xls/xlsx, 웹 UI에서 업로드)
-- `processed_inventory.sqlite3`: init_db.py로 생성된 DB
+- `drug_timeseries.sqlite3`: init_db.py로 생성된 DB
 - `recent_inventory.sqlite3`: init_db.py로 생성된 DB
 
 **실행 과정:**
 1. 웹 UI에서 재고 현황 파일 업로드 (파일명 자유)
 2. 업로드된 파일로 자동으로 `recent_inventory.sqlite3` 업데이트
 3. 업로드된 파일에서 오늘 나간 약품 코드 추출
-4. processed_inventory DB에서 시계열 통계 로드
+4. drug_timeseries DB에서 시계열 통계 로드
 5. recent_inventory DB에서 현재 재고 로드 → **업로드 파일 약품만 필터링**
 6. 데이터 병합 및 런웨이 계산
 7. HTML/CSV 보고서 생성 (런웨이 오름차순 정렬)
@@ -315,7 +315,7 @@ python web_app.py
 1. **약품 유형 선택**: 전문약 (조제수량 기준) 또는 일반약 (판매수량 기준)
 2. **분석 기간 선택**: 전체 기간, 최근 3/6/9/12/24개월 중 선택 (기본 12개월)
 3. **CV 임계값 설정**: 슬라이더로 고/중 경계, 중/저 경계 조절
-4. `processed_inventory.sqlite3`에서 시계열 데이터 로드 및 선택 기간으로 슬라이싱
+4. `drug_timeseries.sqlite3`에서 시계열 데이터 로드 및 선택 기간으로 슬라이싱
 5. 선택 기간 내 사용 이력이 없는 약품 자동 제외
 6. 각 약품별 CV 계산 및 변동성 그룹 분류
 7. HTML 보고서 생성 및 브라우저에서 자동 열기 (헤더에 분석 기간 표시)
@@ -382,7 +382,7 @@ yak-jaego/
 ├── generate_volatility_report.py  # 고변동성 약품 보고서 생성 모듈 (CV 분석)
 ├── drug_order_calculator.py       # 주문 수량 산출 모듈
 ├── inventory_db.py                # recent_inventory.sqlite3 관리 모듈
-├── processed_inventory_db.py      # processed_inventory.sqlite3 관리 모듈
+├── drug_timeseries_db.py      # drug_timeseries.sqlite3 관리 모듈
 ├── checked_items_db.py            # checked_items.sqlite3 관리 모듈 (체크 상태 저장)
 ├── drug_thresholds_db.py          # drug_thresholds.sqlite3 관리 모듈 (개별 임계값)
 ├── drug_memos_db.py               # drug_memos.sqlite3 관리 모듈 (통합 메모)
@@ -403,7 +403,7 @@ yak-jaego/
 │   └── pyinstaller-build-guide.md # PyInstaller 빌드 가이드
 ├── today.csv/xls/xlsx             # 오늘 나간 약품의 재고 현황 (사용자 제공)
 ├── recent_inventory.sqlite3       # 최신 재고 DB (자동 생성)
-├── processed_inventory.sqlite3    # 시계열 통계 DB (자동 생성)
+├── drug_timeseries.sqlite3    # 시계열 통계 DB (자동 생성)
 ├── checked_items.sqlite3          # 체크 상태 DB (자동 생성)
 ├── drug_thresholds.sqlite3        # 개별 임계값 DB (자동 생성)
 ├── drug_memos.sqlite3             # 통합 메모 DB (자동 생성)
@@ -425,11 +425,11 @@ yak-jaego/
 - **최신 재고 채택**: 각 약품별로 가장 최근 월의 재고를 자동 선택
 - **통계 계산**: 1년 이동평균 (12개월), 3개월 이동평균, 런웨이 자동 계산
 - **주기성 지표 계산**: 각 약품별 interval_cv, height_cv, acf_max, periodicity_score 계산
-- **DB 생성**: recent_inventory.sqlite3, processed_inventory.sqlite3, drug_periodicity.sqlite3 생성
+- **DB 생성**: recent_inventory.sqlite3, drug_timeseries.sqlite3, drug_periodicity.sqlite3 생성
 
 #### 실행 단계:
 1. Step 1~3: 월별 데이터 로드 및 전문약/일반약 처리
-2. Step 4: recent_inventory.sqlite3 및 processed_inventory.sqlite3 생성
+2. Step 4: recent_inventory.sqlite3 및 drug_timeseries.sqlite3 생성
 3. Step 4.5: drug_periodicity.sqlite3 주기성 지표 계산 (약품 추천 기능용)
 
 #### 실행 시점:
@@ -471,13 +471,13 @@ yak-jaego/
   ```
 - UPSERT 연산 지원 (INSERT OR REPLACE)
 
-### processed_inventory_db.py - 시계열 통계 DB 관리
+### drug_timeseries_db.py - 시계열 통계 DB 관리
 
 #### 주요 기능:
-- `processed_inventory.sqlite3` 관리
+- `drug_timeseries.sqlite3` 관리
 - 테이블 스키마:
   ```sql
-  CREATE TABLE processed_inventory (
+  CREATE TABLE drug_timeseries (
       약품코드 TEXT PRIMARY KEY,
       약품명 TEXT,
       제약회사 TEXT,

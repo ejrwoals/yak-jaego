@@ -1,7 +1,7 @@
 """
 시계열 통계 데이터베이스 관리 모듈
 
-processed_inventory.sqlite3 데이터베이스를 관리합니다.
+drug_timeseries.sqlite3 데이터베이스를 관리합니다.
 월평균, 3개월 이동평균, 런웨이 등 시계열 통계 데이터를 저장합니다.
 """
 
@@ -15,8 +15,8 @@ import numpy as np
 import paths
 
 
-DB_PATH = paths.get_db_path('processed_inventory.sqlite3')
-TABLE_NAME = 'processed_inventory'
+DB_PATH = paths.get_db_path('drug_timeseries.sqlite3')
+TABLE_NAME = 'drug_timeseries'
 
 
 def convert_to_python_types(data):
@@ -381,7 +381,7 @@ def update_drug_names(df, show_summary=True):
     """
     약품명과 제약회사만 업데이트 (시계열 통계는 유지)
 
-    recent_inventory 업데이트 시 processed_inventory의 약품명/제약회사도
+    recent_inventory 업데이트 시 drug_timeseries의 약품명/제약회사도
     동기화하기 위해 사용합니다.
 
     Args:
@@ -419,7 +419,7 @@ def update_drug_names(df, show_summary=True):
         conn.close()
 
         if show_summary and updated > 0:
-            print(f"📊 processed_inventory 약품명 동기화:")
+            print(f"📊 drug_timeseries 약품명 동기화:")
             print(f"   - 업데이트: {updated}건")
             if not_found > 0:
                 print(f"   - 미존재 (신규 약품): {not_found}건")
@@ -620,7 +620,7 @@ def sync_data_files(actual_files, extract_month_func=None):
 
 if __name__ == '__main__':
     # 테스트 코드
-    print("=== processed_inventory_db.py 테스트 ===\n")
+    print("=== drug_timeseries_db.py 테스트 ===\n")
 
     # 1. DB 초기화
     print("1. DB 초기화 테스트")

@@ -16,7 +16,7 @@ import drug_periodicity_db
 import suggestion_db
 import drug_patient_map_db
 import patients_db
-import processed_inventory_db
+import drug_timeseries_db
 import inventory_db
 
 
@@ -212,7 +212,7 @@ def get_nearest_k_drugs(candidate_code, k=DEFAULT_K):
             distance = np.linalg.norm(weighted_candidate - weighted_fv)
 
             # 약품 정보 조회
-            processed = processed_inventory_db.get_drug_by_code(code)
+            processed = drug_timeseries_db.get_drug_by_code(code)
             periodicity = drug_periodicity_db.get_periodicity(code)
 
             drug_name = processed.get('약품명', '') if processed else code
@@ -259,7 +259,7 @@ def get_suggestion_candidates():
 
     for 약품코드 in periodic_drugs:
         # 약품 정보 조회
-        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        processed = drug_timeseries_db.get_drug_by_code(약품코드)
         if not processed:
             continue
 
@@ -351,7 +351,7 @@ def _get_drug_suggestion_detail(약품코드):
     """
     # DB 조회
     periodicity = drug_periodicity_db.get_periodicity(약품코드)
-    processed = processed_inventory_db.get_drug_by_code(약품코드)
+    processed = drug_timeseries_db.get_drug_by_code(약품코드)
     inventory = inventory_db.get_inventory(약품코드)
 
     if not processed:
@@ -497,7 +497,7 @@ def get_new_drugs_list():
         약품코드 = drug['약품코드']
 
         # processed에서 약품명, 제약회사 조회
-        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        processed = drug_timeseries_db.get_drug_by_code(약품코드)
 
         if processed:
             result.append({
@@ -527,7 +527,7 @@ def get_skipped_drugs_list():
     result = []
     for 약품코드, skip_count in skip_counts.items():
         # processed에서 약품명, 제약회사 조회
-        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        processed = drug_timeseries_db.get_drug_by_code(약품코드)
 
         if processed:
             result.append({
@@ -599,7 +599,7 @@ def get_suggestion_stats():
     filtered_periodic_drugs = []
     skipped_count = 0
     for 약품코드 in periodic_drugs:
-        processed = processed_inventory_db.get_drug_by_code(약품코드)
+        processed = drug_timeseries_db.get_drug_by_code(약품코드)
         if not processed:
             continue
         # 전문약만

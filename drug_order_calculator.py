@@ -15,21 +15,21 @@ from datetime import datetime
 import webbrowser
 import paths
 import inventory_db
-import processed_inventory_db
+import drug_timeseries_db
 import drug_thresholds_db
 
 
 def check_required_files():
     """필수 파일 존재 여부 확인"""
-    # processed_inventory DB 체크
-    if not processed_inventory_db.db_exists():
-        print("❌ processed_inventory.sqlite3가 없습니다.")
+    # drug_timeseries DB 체크
+    if not drug_timeseries_db.db_exists():
+        print("❌ drug_timeseries.sqlite3가 없습니다.")
         print("💡 먼저 DB 초기화를 실행하세요: python init_db.py")
         return False
 
-    stats = processed_inventory_db.get_statistics()
+    stats = drug_timeseries_db.get_statistics()
     if stats['total'] == 0:
-        print("❌ processed_inventory.sqlite3에 데이터가 없습니다.")
+        print("❌ drug_timeseries.sqlite3에 데이터가 없습니다.")
         print("💡 먼저 DB 초기화를 실행하세요: python init_db.py")
         return False
 
@@ -49,15 +49,15 @@ def check_required_files():
 
 
 def load_processed_data():
-    """전문약 및 일반약 데이터 로드 (processed_inventory DB에서)"""
+    """전문약 및 일반약 데이터 로드 (drug_timeseries DB에서)"""
     print("🔍 Step 1: 시계열 분석 데이터 로드")
     print("-" * 30)
 
     # DB에서 전체 데이터 로드 (약품유형 포함)
-    df = processed_inventory_db.get_processed_data()  # 전체 조회
+    df = drug_timeseries_db.get_processed_data()  # 전체 조회
 
     if df.empty:
-        print("❌ processed_inventory DB에 데이터가 없습니다.")
+        print("❌ drug_timeseries DB에 데이터가 없습니다.")
         return None
 
     # 필요한 컬럼만 선택 (1년_이동평균 추가)
@@ -237,7 +237,7 @@ def merge_and_calculate(today_df, processed_df, today_qty_info=None):
             return []
 
     def is_new_drug(row):
-        # 1. 1년 이동평균이 NaN인 경우 = processed_inventory에 없는 약품
+        # 1. 1년 이동평균이 NaN인 경우 = drug_timeseries에 없는 약품
         if pd.isna(row['1년 이동평균']):
             return True
 
@@ -3881,7 +3881,7 @@ def run():
 
         # months 생성 (차트용)
         months = []
-        data_period = processed_inventory_db.get_metadata()
+        data_period = drug_timeseries_db.get_metadata()
         if data_period:
             from dateutil.relativedelta import relativedelta
             start_date = datetime.strptime(data_period['start_month'], '%Y-%m')

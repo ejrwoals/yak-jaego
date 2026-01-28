@@ -8,7 +8,7 @@ import pandas as pd
 import os
 import sys
 import inventory_db
-import processed_inventory_db
+import drug_timeseries_db
 from utils import normalize_drug_codes_in_df, validate_columns, read_today_file
 
 
@@ -83,9 +83,9 @@ def update_inventory_from_today_csv(today_csv_path='today.csv'):
     print("\n💾 데이터베이스 업데이트 중...")
     result = inventory_db.upsert_inventory(df_update, show_summary=True)
 
-    # 7. processed_inventory DB의 약품명/제약회사도 동기화
-    if processed_inventory_db.db_exists():
-        processed_inventory_db.update_drug_names(df_update, show_summary=True)
+    # 7. drug_timeseries DB의 약품명/제약회사도 동기화
+    if drug_timeseries_db.db_exists():
+        drug_timeseries_db.update_drug_names(df_update, show_summary=True)
 
     return result
 

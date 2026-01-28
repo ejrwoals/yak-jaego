@@ -6,7 +6,7 @@
 
 다음 두 개의 데이터베이스를 생성합니다:
 1. recent_inventory.sqlite3 - 최신 재고 현황
-2. processed_inventory.sqlite3 - 시계열 통계 데이터
+2. drug_timeseries.sqlite3 - 시계열 통계 데이터
 
 사용법: python init_db.py
 """
@@ -15,7 +15,7 @@ import os
 import sys
 from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
 import inventory_db
-import processed_inventory_db
+import drug_timeseries_db
 import periodicity_calculator
 import drug_periodicity_db
 import paths
@@ -29,7 +29,7 @@ def main():
 
     # 기존 DB 확인
     has_recent_db = inventory_db.db_exists()
-    has_processed_db = processed_inventory_db.db_exists()
+    has_processed_db = drug_timeseries_db.db_exists()
 
     if has_recent_db or has_processed_db:
         print("⚠️  기존 데이터베이스가 발견되었습니다:")
@@ -37,8 +37,8 @@ def main():
             count = inventory_db.get_inventory_count()
             print(f"   - recent_inventory.sqlite3 (재고: {count}개)")
         if has_processed_db:
-            stats = processed_inventory_db.get_statistics()
-            print(f"   - processed_inventory.sqlite3 (통계: {stats['total']}개)")
+            stats = drug_timeseries_db.get_statistics()
+            print(f"   - drug_timeseries.sqlite3 (통계: {stats['total']}개)")
 
         print()
         overwrite = input("❓ 기존 DB를 덮어쓰시겠습니까? (y/n): ").strip().lower()
@@ -52,8 +52,8 @@ def main():
             os.remove(paths.get_db_path('recent_inventory.sqlite3'))
             print("   ✅ recent_inventory.sqlite3 삭제 완료")
         if has_processed_db:
-            os.remove(paths.get_db_path('processed_inventory.sqlite3'))
-            print("   ✅ processed_inventory.sqlite3 삭제 완료")
+            os.remove(paths.get_db_path('drug_timeseries.sqlite3'))
+            print("   ✅ drug_timeseries.sqlite3 삭제 완료")
         print()
 
     # Step 1: 월별 CSV 로드
@@ -69,7 +69,7 @@ def main():
     print("\n💽 Step 2: 데이터베이스 초기화")
     print("-" * 60)
     inventory_db.init_db()
-    processed_inventory_db.init_db()
+    drug_timeseries_db.init_db()
 
     # Step 3: 전문약 처리
     print("\n🔄 Step 3: 전문약 데이터 처리")
@@ -80,11 +80,11 @@ def main():
     print(f"   ✅ 전문약 {len(df_dispense)}개 처리 완료")
 
     # 통계 DB에 저장
-    print("   💾 processed_inventory.sqlite3에 저장 중...")
-    processed_inventory_db.upsert_processed_data(df_dispense, drug_type='전문약')
+    print("   💾 drug_timeseries.sqlite3에 저장 중...")
+    drug_timeseries_db.upsert_processed_data(df_dispense, drug_type='전문약')
 
     # 메타데이터 저장 (첫 번째 처리 시에만)
-    processed_inventory_db.save_metadata(months)
+    drug_timeseries_db.save_metadata(months)
 
     # 재고 DB에 저장 (최종_재고수량만)
     print("   💾 recent_inventory.sqlite3에 저장 중...")
@@ -102,8 +102,8 @@ def main():
     print(f"   ✅ 일반약 {len(df_sale)}개 처리 완료")
 
     # 통계 DB에 저장
-    print("   💾 processed_inventory.sqlite3에 저장 중...")
-    processed_inventory_db.upsert_processed_data(df_sale, drug_type='일반약')
+    print("   💾 drug_timeseries.sqlite3에 저장 중...")
+    drug_timeseries_db.upsert_processed_data(df_sale, drug_type='일반약')
 
     # 재고 DB에 저장
     print("   💾 recent_inventory.sqlite3에 저장 중...")
@@ -133,8 +133,8 @@ def main():
         for drug_type, count in type_counts.items():
             print(f"   - {drug_type}: {count}개")
 
-    print("\n📊 processed_inventory.sqlite3 (시계열 통계):")
-    stats = processed_inventory_db.get_statistics()
+    print("\n📊 drug_timeseries.sqlite3 (시계열 통계):")
+    stats = drug_timeseries_db.get_statistics()
     print(f"   총 {stats['total']}개 약품")
     for drug_type, count in stats['by_type'].items():
         print(f"   - {drug_type}: {count}개")

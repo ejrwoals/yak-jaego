@@ -25,7 +25,7 @@ import paths
 from generate_single_ma_report import create_and_save_report as create_simple_report
 from drug_order_calculator import run as run_order_calculator, generate_order_report_html
 import inventory_db
-import processed_inventory_db
+import drug_timeseries_db
 import inventory_updater
 import checked_items_db
 import drug_thresholds_db
@@ -67,16 +67,16 @@ def check_database_ready():
     if recent_count == 0:
         return False, "recent_inventory.sqlite3에 데이터가 없습니다."
 
-    # processed_inventory.sqlite3 체크
-    if not processed_inventory_db.db_exists():
-        return False, "processed_inventory.sqlite3가 없습니다."
+    # drug_timeseries.sqlite3 체크
+    if not drug_timeseries_db.db_exists():
+        return False, "drug_timeseries.sqlite3가 없습니다."
 
-    processed_stats = processed_inventory_db.get_statistics()
+    processed_stats = drug_timeseries_db.get_statistics()
     if processed_stats['total'] == 0:
-        return False, "processed_inventory.sqlite3에 데이터가 없습니다."
+        return False, "drug_timeseries.sqlite3에 데이터가 없습니다."
 
     # DB에 저장된 데이터 기간 정보 조회
-    data_period = processed_inventory_db.get_metadata()
+    data_period = drug_timeseries_db.get_metadata()
 
     # 신규 약품 수 계산 (시계열 분석 불가능한 약품)
     new_drug_count = recent_count - processed_stats['total']
@@ -142,14 +142,14 @@ def generate_simple_report_route():
         # 약품 유형 결정
         drug_type = '전문약' if mode == 'dispense' else '일반약'
 
-        # processed_inventory DB에서 데이터 로드
-        df = processed_inventory_db.get_processed_data(drug_type=drug_type)
+        # drug_timeseries DB에서 데이터 로드
+        df = drug_timeseries_db.get_processed_data(drug_type=drug_type)
 
         if df.empty:
             return jsonify({'status': 'error', 'message': f'{drug_type} 데이터가 없습니다.'}), 404
 
         # DB 메타데이터에서 월 정보 추출
-        data_period = processed_inventory_db.get_metadata()
+        data_period = drug_timeseries_db.get_metadata()
 
         if data_period:
             # 메타데이터에서 정확한 월 범위 가져오기
@@ -211,14 +211,14 @@ def generate_volatility_report_route():
         # 약품 유형 결정
         drug_type = '전문약' if mode == 'dispense' else '일반약'
 
-        # processed_inventory DB에서 데이터 로드
-        df = processed_inventory_db.get_processed_data(drug_type=drug_type)
+        # drug_timeseries DB에서 데이터 로드
+        df = drug_timeseries_db.get_processed_data(drug_type=drug_type)
 
         if df.empty:
             return jsonify({'status': 'error', 'message': f'{drug_type} 데이터가 없습니다.'}), 404
 
         # DB 메타데이터에서 월 정보 추출
-        data_period = processed_inventory_db.get_metadata()
+        data_period = drug_timeseries_db.get_metadata()
 
         if data_period:
             start_month = data_period['start_month']
@@ -391,7 +391,7 @@ def calculate_order():
 
         # months 생성 (차트용)
         months = []
-        data_period = processed_inventory_db.get_metadata()
+        data_period = drug_timeseries_db.get_metadata()
         if data_period:
             from dateutil.relativedelta import relativedelta
             start_date = datetime.strptime(data_period['start_month'], '%Y-%m')
@@ -565,7 +565,9 @@ def serve_report(filename):
 @app.route('/api/rebuild-db', methods=['POST'])
 def rebuild_db():
     """DB 재생성 API (init_db.py 기능 실행)"""
+    global _long_operation_in_progress
     try:
+        _long_operation_in_progress = True  # auto-shutdown 방지
         print("\n🔄 DB 재생성 요청 받음...")
 
         from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
@@ -581,13 +583,13 @@ def rebuild_db():
         print("🗑️  기존 DB 삭제 중...")
         if inventory_db.db_exists():
             os.remove(paths.get_db_path('recent_inventory.sqlite3'))
-        if processed_inventory_db.db_exists():
-            os.remove(paths.get_db_path('processed_inventory.sqlite3'))
+        if drug_timeseries_db.db_exists():
+            os.remove(paths.get_db_path('drug_timeseries.sqlite3'))
 
         # Step 2: DB 초기화
         print("💽 데이터베이스 초기화 중...")
         inventory_db.init_db()
-        processed_inventory_db.init_db()
+        drug_timeseries_db.init_db()
 
         # Step 3: 전문약 처리
         print("🔄 전문약 데이터 처리 중...")
@@ -595,10 +597,10 @@ def rebuild_db():
         df_dispense = calculate_statistics(df_dispense, months)
 
         # 통계 DB에 저장
-        processed_inventory_db.upsert_processed_data(df_dispense, drug_type='전문약', show_summary=False)
+        drug_timeseries_db.upsert_processed_data(df_dispense, drug_type='전문약', show_summary=False)
 
         # 메타데이터 저장
-        processed_inventory_db.save_metadata(months)
+        drug_timeseries_db.save_metadata(months)
 
         # 재고 DB에 저장
         inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
@@ -612,7 +614,7 @@ def rebuild_db():
         df_sale = calculate_statistics(df_sale, months)
 
         # 통계 DB에 저장
-        processed_inventory_db.upsert_processed_data(df_sale, drug_type='일반약', show_summary=False)
+        drug_timeseries_db.upsert_processed_data(df_sale, drug_type='일반약', show_summary=False)
 
         # 재고 DB에 저장
         inventory_data = df_sale[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
@@ -624,8 +626,8 @@ def rebuild_db():
 
         # 최종 통계
         recent_count = inventory_db.get_inventory_count()
-        processed_stats = processed_inventory_db.get_statistics()
-        data_period = processed_inventory_db.get_metadata()
+        processed_stats = drug_timeseries_db.get_statistics()
+        data_period = drug_timeseries_db.get_metadata()
         new_drug_count = recent_count - processed_stats['total']
 
         return jsonify({
@@ -643,6 +645,8 @@ def rebuild_db():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'DB 재생성 실패: {str(e)}'}), 500
+    finally:
+        _long_operation_in_progress = False  # auto-shutdown 재활성화
 
 
 @app.route('/api/get_checked_items', methods=['GET'])
@@ -2132,6 +2136,7 @@ _last_heartbeat = time.time()
 _heartbeat_lock = threading.Lock()
 _shutdown_requested = False
 _unload_pending = False  # 브라우저 종료 예고 상태
+_long_operation_in_progress = False  # 오래 걸리는 작업 진행 중 (auto-shutdown 방지)
 
 # Heartbeat 설정
 HEARTBEAT_INTERVAL = 5  # 클라이언트가 5초마다 ping
@@ -2172,10 +2177,10 @@ def list_data_files():
                 actual_files.append(filename)
 
         # DB 메타데이터와 실제 파일 동기화 (self-healing)
-        processed_inventory_db.sync_data_files(actual_files, extract_month_from_file)
+        drug_timeseries_db.sync_data_files(actual_files, extract_month_from_file)
 
         # DB에서 파일 메타데이터 조회
-        file_metadata = processed_inventory_db.get_data_files_metadata()
+        file_metadata = drug_timeseries_db.get_data_files_metadata()
 
         files = []
         for filename in actual_files:
@@ -2224,7 +2229,7 @@ def list_data_files():
 
         # DB 월 목록 조회
         db_months = []
-        db_metadata = processed_inventory_db.get_metadata()
+        db_metadata = drug_timeseries_db.get_metadata()
         if db_metadata and 'month_list' in db_metadata:
             db_months = db_metadata['month_list']
 
@@ -2332,7 +2337,7 @@ def upload_data_file():
         is_replacement = False
         if os.path.exists(file_path):
             # 같은 월 데이터인지 확인
-            existing_metadata = processed_inventory_db.get_data_files_metadata()
+            existing_metadata = drug_timeseries_db.get_data_files_metadata()
             if save_filename in existing_metadata and existing_metadata[save_filename]['month'] == month:
                 # 같은 월 데이터 교체
                 is_replacement = True
@@ -2349,7 +2354,7 @@ def upload_data_file():
         file.save(file_path)
 
         # DB에 메타데이터 저장
-        processed_inventory_db.add_data_file(save_filename, month)
+        drug_timeseries_db.add_data_file(save_filename, month)
 
         action = '교체' if is_replacement else '업로드'
         manual_note = ' (수동 지정)' if custom_month else ''
@@ -2397,7 +2402,7 @@ def delete_data_file():
         os.remove(file_path)
 
         # DB에서 메타데이터도 삭제
-        processed_inventory_db.remove_data_file(filename)
+        drug_timeseries_db.remove_data_file(filename)
 
         print(f"🗑️  데이터 파일 삭제 완료: {filename}")
 
@@ -2491,7 +2496,7 @@ def validate_data_file(filename):
             return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
 
         # 월 정보 확인: DB 메타데이터 우선, 없으면 파일명에서 추출
-        file_metadata = processed_inventory_db.get_data_files_metadata()
+        file_metadata = drug_timeseries_db.get_data_files_metadata()
         if filename in file_metadata:
             month = file_metadata[filename]['month']
         else:
@@ -2629,6 +2634,11 @@ def check_heartbeat_timeout():
         with _heartbeat_lock:
             elapsed = time.time() - _last_heartbeat
             is_unloading = _unload_pending
+            is_long_op = _long_operation_in_progress
+
+        # 오래 걸리는 작업 중에는 auto-shutdown 방지
+        if is_long_op:
+            continue
 
         # 브라우저 종료 예고(pagehide) 후 5초 내 재연결 없으면 종료
         # 탭이 열려있는 동안은 타임아웃 없이 무한정 실행

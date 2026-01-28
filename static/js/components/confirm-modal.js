@@ -29,6 +29,10 @@
         'question': {
             svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-help-circle"></use></svg>',
             className: 'icon-info'
+        },
+        'database': {
+            svg: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-database"></use></svg>',
+            className: 'icon-info'
         }
     };
 

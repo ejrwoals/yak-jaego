@@ -7,12 +7,13 @@
 
 {% block component_styles %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/icons.css') }}?v={{ config.get('VERSION', '1') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/confirm-modal.css') }}?v={{ config.get('VERSION', '1') }}">
 {% endblock %}
 
 {% block page_styles %}
 <style>
     body {
-        background: linear-gradient(135deg, var(--danger) 0%, var(--danger-dark) 100%);
+        background: var(--color-background);
     }
 
     .container {
@@ -23,11 +24,16 @@
         width: 80px;
         height: 80px;
         margin: 0 auto var(--space-5);
-        color: var(--danger);
+        color: var(--color-danger);
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
     }
 
     h1 {
-        color: var(--danger-dark);
+        color: var(--color-danger-dark);
     }
 
     .suggestion-box h3 {
@@ -52,7 +58,7 @@
         font-size: var(--text-lg);
         font-weight: 600;
         color: white;
-        background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
+        background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
         border: none;
         border-radius: var(--radius-lg);
         cursor: pointer;
@@ -87,18 +93,18 @@
     }
 
     .init-status.loading {
-        background-color: var(--info-light);
-        color: var(--info-dark);
+        background-color: var(--color-info-light);
+        color: var(--color-info-dark);
     }
 
     .init-status.success {
-        background-color: var(--success-light);
-        color: var(--success-dark);
+        background-color: var(--color-success-light);
+        color: var(--color-success-dark);
     }
 
     .init-status.error {
-        background-color: var(--danger-light);
-        color: var(--danger-dark);
+        background-color: var(--color-danger-light);
+        color: var(--color-danger-dark);
     }
 
     /* 스피너 애니메이션 */
@@ -114,16 +120,16 @@
     /* 안내 박스 스타일 개선 */
     .guide-box {
         text-align: left;
-        color: var(--gray-600);
+        color: var(--color-text-secondary);
         margin: var(--space-5) 0;
         padding: var(--space-4);
-        background: var(--gray-50);
+        background: var(--color-background);
         border-radius: var(--radius-md);
-        border: 1px solid var(--gray-200);
+        border: 1px solid var(--color-border);
     }
 
     .guide-box h3 {
-        color: var(--gray-800);
+        color: var(--color-text-primary);
         margin-bottom: var(--space-3);
         display: flex;
         align-items: center;
@@ -142,7 +148,7 @@
     }
 
     .guide-box code {
-        background-color: var(--gray-100);
+        background-color: var(--color-surface-hover);
         padding: var(--space-1) var(--space-2);
         border-radius: var(--radius-sm);
         font-family: monospace;
@@ -198,14 +204,6 @@
         <div class="init-status" id="init-status"></div>
     </div>
 
-    <div class="divider"></div>
-
-    <div style="text-align: center;">
-        <a href="/" class="home-btn" style="display: inline-flex; align-items: center; gap: var(--space-2);">
-            <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-arrow-left"></use></svg>
-            홈으로 돌아가기
-        </a>
-    </div>
 </div>
 {% endblock %}
 
