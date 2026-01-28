@@ -365,6 +365,78 @@ app.config['VERSION'] = '1'  # 변경 시 증가
 
 ---
 
+## 툴팁 구현 가이드라인
+
+### 필수 CSS 패턴
+
+툴팁이 부모 컨테이너에 의해 잘리는 문제를 방지하기 위해 반드시 아래 패턴을 따를 것:
+
+```css
+/* 1. 부모 컨테이너: overflow: visible 필수 */
+.parent-container {
+    overflow: visible;  /* ❌ overflow: auto, hidden, scroll 사용 금지 */
+}
+
+/* 2. 툴팁 요소 */
+.tooltip-trigger {
+    position: relative;  /* 툴팁 위치 기준점 */
+}
+
+.tooltip-trigger .tooltip {
+    display: none;                    /* ❌ opacity: 0 사용 금지 */
+    position: absolute;
+    bottom: calc(100% + 8px);         /* 위로 표시 */
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-text-primary);
+    color: var(--color-surface);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-xs);
+    white-space: normal;              /* ❌ nowrap 사용 금지 */
+    width: max-content;
+    max-width: 200px;
+    line-height: 1.5;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-tooltip, 1000);
+}
+
+.tooltip-trigger:hover .tooltip {
+    display: block;                   /* ❌ opacity: 1 사용 금지 */
+}
+
+/* 3. 툴팁 화살표 (선택) */
+.tooltip-trigger .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--color-text-primary);
+}
+```
+
+### 체크리스트
+
+- [ ] 부모 컨테이너에 `overflow: visible` 적용
+- [ ] `display: none/block` 사용 (`opacity` 대신)
+- [ ] `white-space: normal` 사용 (`nowrap` 대신)
+- [ ] `max-width` 설정으로 너무 넓어지는 것 방지
+- [ ] `z-index` 충분히 높게 설정
+
+### 흔한 실수
+
+| 실수 | 문제 | 해결 |
+|------|------|------|
+| 부모에 `overflow: auto/hidden` | 툴팁이 잘림 | `overflow: visible` 사용 |
+| `opacity: 0/1`로 토글 | 보이지 않아도 공간 차지, 클릭 이벤트 발생 | `display: none/block` 사용 |
+| `white-space: nowrap` | 긴 텍스트가 한 줄로 표시되어 넘침 | `white-space: normal` + `max-width` |
+| `z-index` 미설정 | 다른 요소에 가려짐 | `z-index: 1000` 이상 설정 |
+
+---
+
 ## 참고
 
 - 상세 UI/UX 가이드라인: [CLAUDE.md](../CLAUDE.md)

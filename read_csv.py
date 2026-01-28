@@ -90,16 +90,35 @@ def read_csv_file(file_path):
     raise Exception("CSV 파일을 읽을 수 없습니다")
 
 def extract_month_from_file(filename):
-    """파일명에서 날짜 정보 추출 (예: 2025-01.csv, 202501.csv, 2025_01.csv 등)"""
-    patterns = [
+    """파일명에서 날짜 정보 추출 (예: 2025-01.csv, 202501.csv, 2025_01.csv, 25_01.csv 등)"""
+    # 4자리 연도 패턴 (우선 매칭)
+    patterns_4digit = [
         r'(\d{4})[-_]?(\d{2})',  # 2025-01, 202501, 2025_01
         r'(\d{4})년\s*(\d{1,2})월',  # 2025년 1월
     ]
 
-    for pattern in patterns:
+    for pattern in patterns_4digit:
         match = re.search(pattern, filename)
         if match:
             year, month = match.groups()
+            return f"{year}-{month.zfill(2)}"
+
+    # 2자리 연도 패턴 (4자리 매칭 실패 시)
+    patterns_2digit = [
+        r'(\d{2})[-_](\d{2})',  # 25-01, 25_01
+        r'(\d{2})년\s*(\d{1,2})월',  # 25년 1월
+    ]
+
+    for pattern in patterns_2digit:
+        match = re.search(pattern, filename)
+        if match:
+            year_2digit, month = match.groups()
+            year_int = int(year_2digit)
+            # 00-49 → 2000-2049, 50-99 → 1950-1999
+            if year_int < 50:
+                year = 2000 + year_int
+            else:
+                year = 1900 + year_int
             return f"{year}-{month.zfill(2)}"
 
     return None

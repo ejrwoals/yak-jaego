@@ -37,6 +37,7 @@ import buffer_calculator
 import suggestion_engine
 import suggestion_db
 from utils import read_today_file
+from read_csv import extract_month_from_file
 
 app = Flask(__name__,
             template_folder=paths.get_bundle_path('templates'),
@@ -2135,6 +2136,393 @@ _unload_pending = False  # 브라우저 종료 예고 상태
 # Heartbeat 설정
 HEARTBEAT_INTERVAL = 5  # 클라이언트가 5초마다 ping
 UNLOAD_TIMEOUT = 5  # 5초: 브라우저 종료 감지 후 빠른 종료 (pagehide 이벤트 기반)
+
+
+# ============================================================
+# 데이터 파일 관리 API
+# ============================================================
+
+@app.route('/data/manage')
+def data_manage():
+    """데이터 파일 관리 페이지"""
+    return render_template('data_manage.html')
+
+
+@app.route('/api/data-files')
+def list_data_files():
+    """data/ 폴더의 파일 목록 조회"""
+    try:
+        data_path = paths.DATA_PATH
+
+        # data/ 폴더가 없으면 빈 목록 반환
+        if not os.path.exists(data_path):
+            return jsonify({
+                'files': [],
+                'total_count': 0,
+                'period': None
+            })
+
+        # CSV, XLS, XLSX 파일 목록 수집
+        files = []
+        for filename in os.listdir(data_path):
+            if filename.endswith(('.csv', '.xls', '.xlsx')):
+                file_path = os.path.join(data_path, filename)
+                stat = os.stat(file_path)
+
+                # 파일명에서 월 정보 추출
+                month = extract_month_from_file(filename)
+
+                # 파일 크기 포맷팅
+                size_bytes = stat.st_size
+                if size_bytes < 1024:
+                    size_display = f"{size_bytes} B"
+                elif size_bytes < 1024 * 1024:
+                    size_display = f"{size_bytes / 1024:.1f} KB"
+                else:
+                    size_display = f"{size_bytes / (1024 * 1024):.1f} MB"
+
+                files.append({
+                    'filename': filename,
+                    'month': month,
+                    'size_bytes': size_bytes,
+                    'size_display': size_display,
+                    'modified_at': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                })
+
+        # 월 기준 내림차순 정렬 (최신이 위로)
+        files.sort(key=lambda x: x['month'] or '', reverse=True)
+
+        # 기간 정보 계산
+        months = [f['month'] for f in files if f['month']]
+        period = None
+        if months:
+            sorted_months = sorted(months)
+            period = {
+                'start': sorted_months[0],
+                'end': sorted_months[-1],
+                'months': len(months)
+            }
+
+        return jsonify({
+            'files': files,
+            'total_count': len(files),
+            'period': period
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/check-data-file', methods=['POST'])
+def check_data_file():
+    """데이터 파일 존재 여부 및 월 정보 확인 (업로드 전 사전 검사)"""
+    try:
+        data = request.get_json()
+        filename = data.get('filename', '')
+
+        if not filename:
+            return jsonify({'error': '파일명이 없습니다.'}), 400
+
+        if not allowed_file(filename):
+            return jsonify({'error': '허용되지 않는 파일 형식입니다. (CSV, XLS, XLSX만 가능)'}), 400
+
+        # 파일명에서 월 정보 추출
+        month = extract_month_from_file(filename)
+        if not month:
+            return jsonify({
+                'valid': False,
+                'error': '파일명에서 날짜를 추출할 수 없습니다.',
+                'hint': '파일명 형식: 2025-01.xls, 202501.csv, 2025_01.xlsx 등'
+            })
+
+        # 동일 파일 존재 여부 확인
+        file_path = os.path.join(paths.DATA_PATH, filename)
+        exists = os.path.exists(file_path)
+
+        # 동일 월 다른 파일 존재 여부 확인
+        same_month_files = []
+        if os.path.exists(paths.DATA_PATH):
+            for f in os.listdir(paths.DATA_PATH):
+                if f != filename and allowed_file(f):
+                    f_month = extract_month_from_file(f)
+                    if f_month == month:
+                        same_month_files.append(f)
+
+        return jsonify({
+            'valid': True,
+            'filename': filename,
+            'month': month,
+            'exists': exists,
+            'same_month_files': same_month_files
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/upload-data-file', methods=['POST'])
+def upload_data_file():
+    """데이터 파일 업로드"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': '파일이 없습니다.'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
+
+        if not allowed_file(file.filename):
+            return jsonify({'error': '허용되지 않는 파일 형식입니다. (CSV, XLS, XLSX만 가능)'}), 400
+
+        # 사용자가 직접 지정한 월이 있는지 확인
+        custom_month = request.form.get('month', '').strip()
+
+        if custom_month:
+            # 사용자 지정 월 사용 - 파일명을 {월}.{확장자} 형식으로 변경
+            import re
+            if not re.match(r'^\d{4}-\d{2}$', custom_month):
+                return jsonify({'error': '월 형식이 올바르지 않습니다. (예: 2025-01)'}), 400
+            month = custom_month
+            # 확장자 추출
+            ext = os.path.splitext(file.filename)[1]
+            save_filename = f"{month}{ext}"
+        else:
+            # 파일명에서 월 정보 추출
+            month = extract_month_from_file(file.filename)
+            if not month:
+                return jsonify({'error': '파일명에서 날짜를 추출할 수 없습니다. (예: 2025-01.xls, 202501.csv)'}), 400
+            save_filename = file.filename
+
+        # data/ 폴더 생성 (없으면)
+        data_path = paths.DATA_PATH
+        if not os.path.exists(data_path):
+            os.makedirs(data_path)
+
+        # 기존 파일 존재 여부 확인
+        file_path = os.path.join(data_path, save_filename)
+        is_replacement = os.path.exists(file_path)
+
+        # 파일 저장
+        file.save(file_path)
+
+        action = '덮어쓰기' if is_replacement else '업로드'
+        manual_note = ' (수동 지정)' if custom_month else ''
+        print(f"📁 데이터 파일 {action} 완료: {save_filename}{manual_note}")
+
+        return jsonify({
+            'success': True,
+            'filename': save_filename,
+            'original_filename': file.filename,
+            'month': month,
+            'is_replacement': is_replacement,
+            'is_manual': bool(custom_month),
+            'message': f'{save_filename} 파일이 {"교체" if is_replacement else "업로드"}되었습니다.'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/delete-data-file', methods=['POST'])
+def delete_data_file():
+    """데이터 파일 삭제"""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+
+        if not filename:
+            return jsonify({'error': '파일명이 없습니다.'}), 400
+
+        # 보안: 경로 탐색 방지
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({'error': '잘못된 파일명입니다.'}), 400
+
+        # 확장자 검증
+        if not allowed_file(filename):
+            return jsonify({'error': '허용되지 않는 파일 형식입니다.'}), 400
+
+        file_path = os.path.join(paths.DATA_PATH, filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
+
+        os.remove(file_path)
+        print(f"🗑️  데이터 파일 삭제 완료: {filename}")
+
+        return jsonify({
+            'success': True,
+            'message': f'{filename} 파일이 삭제되었습니다.'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/preview-data-file/<filename>')
+def preview_data_file(filename):
+    """데이터 파일 미리보기 (최대 10행)"""
+    try:
+        # 보안: 경로 탐색 방지
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({'error': '잘못된 파일명입니다.'}), 400
+
+        if not allowed_file(filename):
+            return jsonify({'error': '허용되지 않는 파일 형식입니다.'}), 400
+
+        file_path = os.path.join(paths.DATA_PATH, filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
+
+        # 파일 읽기
+        if filename.endswith('.csv'):
+            # CSV: 인코딩 시도
+            df = None
+            for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                try:
+                    df = pd.read_csv(file_path, encoding=encoding, dtype={'약품코드': str})
+                    break
+                except:
+                    continue
+            if df is None:
+                return jsonify({'error': '파일을 읽을 수 없습니다.'}), 400
+        else:
+            # Excel 파일
+            try:
+                if filename.endswith('.xls'):
+                    df = pd.read_excel(file_path, engine='calamine', dtype={'약품코드': str})
+                else:
+                    df = pd.read_excel(file_path, engine='openpyxl', dtype={'약품코드': str})
+            except:
+                df = pd.read_excel(file_path, dtype={'약품코드': str})
+
+        # 전체 행 수
+        total_rows = len(df)
+
+        # 미리보기 (최대 10행)
+        preview_df = df.head(10)
+
+        # 컬럼명과 데이터 추출
+        columns = preview_df.columns.tolist()
+        rows = preview_df.fillna('').values.tolist()
+
+        return jsonify({
+            'success': True,
+            'columns': columns,
+            'rows': rows,
+            'total_rows': total_rows,
+            'preview_rows': len(rows)
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/validate-data-file/<filename>')
+def validate_data_file(filename):
+    """데이터 파일 유효성 검증"""
+    try:
+        # 보안: 경로 탐색 방지
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return jsonify({'error': '잘못된 파일명입니다.'}), 400
+
+        if not allowed_file(filename):
+            return jsonify({'error': '허용되지 않는 파일 형식입니다.'}), 400
+
+        file_path = os.path.join(paths.DATA_PATH, filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
+
+        # 월 정보 추출
+        month = extract_month_from_file(filename)
+
+        # 파일 읽기 시도
+        df = None
+        read_error = None
+
+        if filename.endswith('.csv'):
+            for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                try:
+                    df = pd.read_csv(file_path, encoding=encoding, nrows=100, dtype={'약품코드': str})
+                    break
+                except Exception as e:
+                    read_error = str(e)
+        else:
+            try:
+                if filename.endswith('.xls'):
+                    df = pd.read_excel(file_path, engine='calamine', nrows=100, dtype={'약품코드': str})
+                else:
+                    df = pd.read_excel(file_path, engine='openpyxl', nrows=100, dtype={'약품코드': str})
+            except Exception as e:
+                read_error = str(e)
+
+        if df is None:
+            return jsonify({
+                'valid': False,
+                'month': month,
+                'error': f'파일을 읽을 수 없습니다: {read_error}',
+                'required_columns': [],
+                'present_columns': [],
+                'missing_columns': [],
+                'row_count': 0,
+                'warnings': ['파일 읽기 실패']
+            })
+
+        # 필수 컬럼 검증
+        required_columns = ['약품코드', '약품명', '재고수량']
+        present_columns = df.columns.tolist()
+        missing_columns = [col for col in required_columns if col not in present_columns]
+
+        # 경고 메시지 생성
+        warnings = []
+        if missing_columns:
+            warnings.append(f"필수 컬럼 누락: {', '.join(missing_columns)}")
+
+        if month is None:
+            warnings.append("파일명에서 날짜를 추출할 수 없습니다")
+
+        # 전체 행 수 (100행만 읽었으므로 실제 행 수 확인 필요)
+        if filename.endswith('.csv'):
+            for encoding in ['utf-8', 'cp949', 'euc-kr']:
+                try:
+                    full_df = pd.read_csv(file_path, encoding=encoding, dtype={'약품코드': str})
+                    row_count = len(full_df)
+                    break
+                except:
+                    row_count = len(df)
+        else:
+            try:
+                if filename.endswith('.xls'):
+                    full_df = pd.read_excel(file_path, engine='calamine', dtype={'약품코드': str})
+                else:
+                    full_df = pd.read_excel(file_path, engine='openpyxl', dtype={'약품코드': str})
+                row_count = len(full_df)
+            except:
+                row_count = len(df)
+
+        return jsonify({
+            'valid': len(missing_columns) == 0 and month is not None,
+            'month': month,
+            'required_columns': required_columns,
+            'present_columns': present_columns,
+            'missing_columns': missing_columns,
+            'row_count': row_count,
+            'warnings': warnings
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/heartbeat', methods=['POST'])

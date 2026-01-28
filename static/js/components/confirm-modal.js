@@ -40,6 +40,7 @@
          * @param {string} options.title - Modal title
          * @param {string} options.message - Modal message (supports HTML)
          * @param {string} options.confirmText - Confirm button text
+         * @param {string} options.cancelText - Cancel button text (optional)
          * @param {boolean} options.isDanger - Use danger styling for confirm button
          * @returns {Promise<boolean>} - Resolves to true if confirmed, false if cancelled
          */
@@ -48,6 +49,7 @@
             var title = options.title;
             var message = options.message;
             var confirmText = options.confirmText || '\uD655\uC778';
+            var cancelText = options.cancelText || '\uCDE8\uC18C';
             var isDanger = options.isDanger || false;
 
             var modal = document.getElementById('confirmModal');
@@ -60,6 +62,7 @@
             var titleEl = document.getElementById('confirmModalTitle');
             var messageEl = document.getElementById('confirmModalMessage');
             var confirmBtn = document.getElementById('confirmModalBtn');
+            var cancelBtn = document.getElementById('confirmModalCancelBtn');
 
             // Handle icon - either SVG type or emoji
             if (iconEl) {
@@ -81,6 +84,10 @@
             if (confirmBtn) {
                 confirmBtn.textContent = confirmText;
                 confirmBtn.className = isDanger ? 'btn-danger' : 'btn-confirm';
+            }
+
+            if (cancelBtn) {
+                cancelBtn.textContent = cancelText;
             }
 
             modal.classList.add('visible');
