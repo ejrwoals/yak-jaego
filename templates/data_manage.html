@@ -964,7 +964,7 @@
 <div class="container">
     <a href="/" class="back-link">
         <svg class="icon"><use href="#icon-arrow-left"></use></svg>
-        홈으로
+        홈으로 돌아가기
     </a>
 
     <div class="page-header">
@@ -1192,6 +1192,36 @@
         return Object.keys(monthSet).sort();
     }
 
+    // 다음 월 계산 (2025-12 → 2026-01)
+    function nextMonth(month) {
+        var parts = month.split('-');
+        var year = parseInt(parts[0]);
+        var m = parseInt(parts[1]);
+        m++;
+        if (m > 12) {
+            m = 1;
+            year++;
+        }
+        return year + '-' + (m < 10 ? '0' + m : m);
+    }
+
+    // 시작월~끝월 사이 모든 월 생성 (연속적인 타임라인)
+    function generateContinuousMonths(dbMonths, fileMonths) {
+        var allExisting = mergeAndSortMonths(dbMonths, fileMonths);
+        if (allExisting.length === 0) return [];
+
+        var startMonth = allExisting[0];
+        var endMonth = allExisting[allExisting.length - 1];
+
+        var result = [];
+        var current = startMonth;
+        while (current <= endMonth) {
+            result.push(current);
+            current = nextMonth(current);
+        }
+        return result;
+    }
+
     // 데이터 상태 카드 렌더링 (타일 기반)
     function renderDataStatusCard(dbMonths, fileMonths) {
         var card = document.getElementById('data-status-card');
@@ -1224,7 +1254,7 @@
         }
 
         // 전체 월 목록 (합집합)
-        var allMonths = mergeAndSortMonths(dbMonths, fileMonths);
+        var allMonths = generateContinuousMonths(dbMonths, fileMonths);
 
         // 최대 타일 수 제한 (컨테이너 너비 기준 약 35개)
         var MAX_TILES = 35;
@@ -1260,6 +1290,7 @@
             var hasDb = dbMonthSet[month] === true;
             var hasFile = fileMonthSet[month] === true;
             var isMismatch = hasDb !== hasFile;
+            var isBothMissing = !hasDb && !hasFile;
 
             if (isMismatch) {
                 mismatches.push({
@@ -1269,11 +1300,15 @@
             }
 
             var tooltipText = formatMonthKorean(month);
-            if (!hasDb) tooltipText += ' (DB 없음)';
+            if (isBothMissing) {
+                tooltipText += ' (데이터 없음)';
+            } else if (!hasDb) {
+                tooltipText += ' (DB 없음)';
+            }
 
             dbTilesHtml += '<div class="timeline-tile ' +
                 (hasDb ? 'db-present' : 'db-missing') +
-                (isMismatch ? ' mismatch' : '') + '">' +
+                (isMismatch || isBothMissing ? ' mismatch' : '') + '">' +
                 '<span class="tooltip">' + tooltipText + '</span></div>';
         });
         dbTilesEl.innerHTML = dbTilesHtml;
@@ -1284,13 +1319,18 @@
             var hasDb = dbMonthSet[month] === true;
             var hasFile = fileMonthSet[month] === true;
             var isMismatch = hasDb !== hasFile;
+            var isBothMissing = !hasDb && !hasFile;
 
             var tooltipText = formatMonthKorean(month);
-            if (!hasFile) tooltipText += ' (파일 없음)';
+            if (isBothMissing) {
+                tooltipText += ' (데이터 없음)';
+            } else if (!hasFile) {
+                tooltipText += ' (파일 없음)';
+            }
 
             fileTilesHtml += '<div class="timeline-tile ' +
                 (hasFile ? 'file-present' : 'file-missing') +
-                (isMismatch ? ' mismatch' : '') + '">' +
+                (isMismatch || isBothMissing ? ' mismatch' : '') + '">' +
                 '<span class="tooltip">' + tooltipText + '</span></div>';
         });
         fileTilesEl.innerHTML = fileTilesHtml;
@@ -1299,21 +1339,29 @@
         dbInfoEl.innerHTML = '<strong>' + dbMonths.length + '</strong>개월';
         fileInfoEl.innerHTML = '<strong>' + fileMonths.length + '</strong>개월';
 
+        // 누락 월 감지 (DB도 없고 파일도 없는 월)
+        var missingMonths = allMonths.filter(function(month) {
+            return !dbMonthSet[month] && !fileMonthSet[month];
+        });
+
         // 동기화 상태 판단
         var syncStatus = 'synced';
-        var isOutOfSync = mismatches.length > 0;
+        var hasIssues = mismatches.length > 0 || missingMonths.length > 0;
 
         if (dbMonths.length === 0 && fileMonths.length > 0) {
             syncStatus = 'no-db';
             syncMessage.textContent = 'DB 초기화가 필요합니다';
             rebuildText.textContent = 'DB 초기화';
-        } else if (isOutOfSync) {
+        } else if (hasIssues) {
             syncStatus = 'out-of-sync';
             // 불일치 메시지 생성
             var dbMissing = mismatches.filter(function(m) { return m.type === 'db-missing'; });
             var fileMissing = mismatches.filter(function(m) { return m.type === 'file-missing'; });
 
             var msgParts = [];
+            if (missingMonths.length > 0) {
+                msgParts.push('데이터 누락 ' + missingMonths.length + '개월');
+            }
             if (dbMissing.length > 0) {
                 msgParts.push('DB 미반영 ' + dbMissing.length + '개월');
             }
@@ -1329,7 +1377,7 @@
         // 상태에 따른 스타일 적용
         card.className = 'data-status-card ' + syncStatus;
         rebuildBtn.className = 'btn-rebuild-compact ' + syncStatus;
-        syncIndicator.style.display = isOutOfSync ? 'flex' : 'none';
+        syncIndicator.style.display = hasIssues ? 'flex' : 'none';
 
         // Footer DB 상세 정보 업데이트
         if (dbStats.period) {
