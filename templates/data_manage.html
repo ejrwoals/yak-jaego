@@ -88,35 +88,279 @@
         height: var(--icon-sm);
     }
 
-    /* Stats Bar */
-    .stats-bar {
-        display: flex;
-        gap: var(--space-4);
-        padding: var(--space-3) var(--space-4);
-        background: var(--color-surface-hover);
-        border-radius: var(--radius-lg);
-        flex-wrap: wrap;
-        border: 1px solid var(--color-border);
+    /* Data Status Card - Unified Timeline Comparison */
+    .data-status-card {
         margin-bottom: var(--space-6);
+        border: 2px solid var(--color-border);
+        border-radius: var(--radius-xl);
+        background: var(--color-surface);
+        overflow: visible; /* overflow: hidden 사용 금지 - 툴팁 잘림 방지 */
+        transition: border-color var(--transition-normal);
     }
 
-    .stat-item {
-        color: var(--color-text-secondary);
-        font-size: var(--text-sm);
+    .data-status-card.synced {
+        border-color: var(--color-success);
+    }
+
+    .data-status-card.out-of-sync {
+        border-color: var(--color-warning);
+    }
+
+    .data-status-card.no-db {
+        border-color: var(--color-danger);
+    }
+
+    .status-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-4) var(--space-5);
+        background: var(--color-surface-hover);
+        border-bottom: 1px solid var(--color-border);
+        border-radius: calc(var(--radius-xl) - 2px) calc(var(--radius-xl) - 2px) 0 0; /* 상단 모서리 */
+    }
+
+    .status-card-title {
         display: flex;
         align-items: center;
         gap: var(--space-2);
+        font-size: var(--text-base);
+        font-weight: var(--font-semibold);
+        color: var(--color-text-primary);
     }
 
-    .stat-item .icon {
+    .status-card-title .icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
+        color: var(--brand-primary);
+    }
+
+    .status-card-body {
+        padding: var(--space-5);
+    }
+
+    /* Tile Timeline Labels */
+    .tile-timeline-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: var(--space-3);
+        padding: 0 50px 0 50px; /* label width + tiles start */
+    }
+
+    .tile-timeline-labels span {
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        font-weight: var(--font-medium);
+    }
+
+    /* Tile Timeline Row */
+    .tile-timeline-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        margin-bottom: var(--space-2);
+    }
+
+    .tile-timeline-label {
+        width: 40px;
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+    }
+
+    .tile-timeline-tiles {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 2px;
+        flex: 1;
+        overflow: visible;
+        padding: 20px 4px 4px 4px; /* top padding for tooltip text */
+    }
+
+    .tile-timeline-info {
+        min-width: 60px;
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+        text-align: right;
+        flex-shrink: 0;
+    }
+
+    .tile-timeline-info strong {
+        color: var(--color-text-primary);
+        font-weight: var(--font-semibold);
+    }
+
+    /* Individual Tile */
+    .timeline-tile {
+        width: 20px;
+        height: 20px;
+        border-radius: var(--radius-sm);
+        flex-shrink: 0;
+        position: relative;
+        cursor: pointer;
+    }
+
+    .timeline-tile:hover {
+        outline: 2px solid var(--color-text-primary);
+        outline-offset: 1px;
+    }
+
+    /* DB Tile Colors */
+    .timeline-tile.db-present {
+        background: var(--brand-primary);
+    }
+
+    .timeline-tile.db-missing {
+        background: var(--color-border);
+        opacity: 0.5;
+    }
+
+    /* File Tile Colors */
+    .timeline-tile.file-present {
+        background: var(--color-success);
+    }
+
+    .timeline-tile.file-missing {
+        background: var(--color-border);
+        opacity: 0.5;
+    }
+
+    /* Mismatch Highlight */
+    .timeline-tile.mismatch {
+        box-shadow: 0 0 0 2px var(--color-warning);
+    }
+
+    /* Tile Tooltip - 단순 텍스트 */
+    .timeline-tile .tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 4px);
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: var(--text-xs);
+        font-weight: var(--font-medium);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        z-index: 10;
+        background: var(--color-surface);
+        padding: 2px 6px;
+        border-radius: var(--radius-sm);
+    }
+
+    .timeline-tile:hover .tooltip {
+        display: block;
+    }
+
+    /* Sync Indicator */
+    .sync-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-1);
+        margin-top: var(--space-2);
+        font-size: var(--text-xs);
+        color: var(--color-warning-dark);
+    }
+
+    .sync-indicator .icon {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* Rebuild Button (Compact - in footer) */
+    .btn-rebuild-compact {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .btn-rebuild-compact .icon {
         width: var(--icon-sm);
         height: var(--icon-sm);
     }
 
-    .stat-value {
-        font-weight: var(--font-bold);
-        font-size: var(--text-base);
+    .btn-rebuild-compact.synced {
+        background: var(--color-surface);
+        color: var(--color-text-secondary);
+        border: 1px solid var(--color-border);
+    }
+
+    .btn-rebuild-compact.synced:hover {
+        background: var(--color-border);
         color: var(--color-text-primary);
+    }
+
+    .btn-rebuild-compact.out-of-sync {
+        background: var(--color-warning);
+        color: white;
+    }
+
+    .btn-rebuild-compact.out-of-sync:hover {
+        background: var(--color-warning-dark);
+    }
+
+    .btn-rebuild-compact.no-db {
+        background: var(--color-danger);
+        color: white;
+    }
+
+    .btn-rebuild-compact.no-db:hover {
+        background: var(--color-danger-dark);
+    }
+
+    .btn-rebuild-compact:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-rebuild-compact .icon-spin {
+        animation: spin 1s linear infinite;
+    }
+
+    /* Status Card Footer */
+    .status-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) var(--space-5);
+        background: var(--color-surface-hover);
+        border-top: 1px solid var(--color-border);
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+        border-radius: 0 0 calc(var(--radius-xl) - 2px) calc(var(--radius-xl) - 2px); /* 하단 모서리 */
+    }
+
+    .footer-stats {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-3);
+    }
+
+    .footer-stats span {
+        display: flex;
+        align-items: center;
+        gap: var(--space-1);
+    }
+
+    .footer-stats strong {
+        color: var(--color-text-primary);
+        font-weight: var(--font-semibold);
+    }
+
+    .footer-stats .divider {
+        color: var(--color-border);
     }
 
     /* Upload Area */
@@ -167,11 +411,6 @@
         display: none;
     }
 
-    /* Timeline Section */
-    .timeline-section {
-        margin-bottom: var(--space-6);
-    }
-
     .section-title {
         font-size: var(--text-base);
         font-weight: var(--font-semibold);
@@ -186,87 +425,6 @@
         width: var(--icon-sm);
         height: var(--icon-sm);
         color: var(--brand-primary);
-    }
-
-    .timeline-container {
-        background: var(--color-surface-hover);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        padding: var(--space-4);
-        overflow: visible;
-    }
-
-    .timeline {
-        display: flex;
-        gap: 2px;
-        min-width: max-content;
-        align-items: center;
-    }
-
-    .timeline-month {
-        width: 24px;
-        height: 24px;
-        border-radius: var(--radius-sm);
-        background: var(--color-success);
-        cursor: pointer;
-        transition: transform var(--transition-fast);
-        position: relative;
-    }
-
-    .timeline-month:hover {
-        transform: scale(1.2);
-        z-index: 1;
-    }
-
-    .timeline-month.missing {
-        background: var(--color-border);
-        opacity: 0.5;
-    }
-
-    .timeline-month .tooltip {
-        display: none;
-        position: absolute;
-        bottom: calc(100% + 8px);
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--color-text-primary);
-        color: var(--color-surface);
-        padding: var(--space-3) var(--space-4);
-        border-radius: var(--radius-lg);
-        font-size: var(--text-xs);
-        font-weight: var(--font-normal);
-        white-space: normal;
-        width: max-content;
-        max-width: 200px;
-        line-height: 1.5;
-        text-align: center;
-        box-shadow: var(--shadow-lg);
-        z-index: var(--z-tooltip, 1000);
-        overflow: visible;
-        height: auto;
-        min-height: fit-content;
-    }
-
-    .timeline-month .tooltip::after {
-        content: '';
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 6px solid transparent;
-        border-top-color: var(--color-text-primary);
-    }
-
-    .timeline-month:hover .tooltip {
-        display: block;
-    }
-
-    .timeline-labels {
-        display: flex;
-        justify-content: space-between;
-        margin-top: var(--space-2);
-        font-size: var(--text-xs);
-        color: var(--color-text-muted);
     }
 
     /* File List Section */
@@ -817,15 +975,60 @@
         <p>월별 재고 데이터 파일을 관리합니다</p>
     </div>
 
-    <!-- Stats Bar -->
-    <div class="stats-bar" id="stats-bar">
-        <div class="stat-item">
-            <svg class="icon"><use href="#icon-file"></use></svg>
-            총 파일: <span class="stat-value" id="stat-total">-</span>개
+    <!-- Data Status Card - Unified Timeline Comparison -->
+    <div class="data-status-card" id="data-status-card">
+        <!-- Card Header -->
+        <div class="status-card-header">
+            <div class="status-card-title">
+                <svg class="icon"><use href="#icon-database"></use></svg>
+                데이터 상태
+            </div>
         </div>
-        <div class="stat-item">
-            <svg class="icon"><use href="#icon-calendar"></use></svg>
-            기간: <span class="stat-value" id="stat-period">-</span>
+
+        <!-- Card Body - Tile Timeline Comparison -->
+        <div class="status-card-body">
+            <!-- Timeline Period Labels -->
+            <div class="tile-timeline-labels">
+                <span id="timeline-start-label">-</span>
+                <span id="timeline-end-label">-</span>
+            </div>
+
+            <!-- DB Tile Timeline Row -->
+            <div class="tile-timeline-row">
+                <span class="tile-timeline-label">DB</span>
+                <div class="tile-timeline-tiles" id="db-tiles"></div>
+                <span class="tile-timeline-info" id="db-tile-info">-</span>
+            </div>
+
+            <!-- File Tile Timeline Row -->
+            <div class="tile-timeline-row">
+                <span class="tile-timeline-label">파일</span>
+                <div class="tile-timeline-tiles" id="file-tiles"></div>
+                <span class="tile-timeline-info" id="file-tile-info">-</span>
+            </div>
+
+            <!-- Sync Indicator (shown only when mismatch) -->
+            <div class="sync-indicator" id="sync-indicator" style="display: none;">
+                <svg class="icon"><use href="#icon-alert-triangle"></use></svg>
+                <span id="sync-indicator-message">불일치 발견</span>
+            </div>
+        </div>
+
+        <!-- Card Footer - DB Details + Rebuild Button -->
+        <div class="status-card-footer" id="db-details-footer">
+            <div class="footer-stats">
+                <span>시계열 분석: <strong id="stat-timeseries">-</strong></span>
+                <span class="divider">|</span>
+                <span>일반약: <strong id="stat-general">-</strong></span>
+                <span class="divider">|</span>
+                <span>전문약: <strong id="stat-prescription">-</strong></span>
+                <span class="divider">|</span>
+                <span>신규: <strong id="stat-new">-</strong></span>
+            </div>
+            <button class="btn-rebuild-compact synced" id="btn-rebuild-main" onclick="rebuildDatabase()">
+                <svg class="icon"><use href="#icon-refresh-cw"></use></svg>
+                <span id="btn-rebuild-text">DB 재생성</span>
+            </button>
         </div>
     </div>
 
@@ -839,18 +1042,6 @@
         <input type="file" class="upload-input" id="upload-input" accept=".csv,.xls,.xlsx" multiple>
     </div>
 
-    <!-- Timeline Section -->
-    <div class="timeline-section" id="timeline-section" style="display: none;">
-        <div class="section-title">
-            <svg class="icon"><use href="#icon-calendar"></use></svg>
-            데이터 기간 타임라인
-        </div>
-        <div class="timeline-container">
-            <div class="timeline" id="timeline"></div>
-            <div class="timeline-labels" id="timeline-labels"></div>
-        </div>
-    </div>
-
     <!-- File List Section -->
     <div class="file-list-section">
         <div class="file-list-header">
@@ -858,11 +1049,8 @@
                 <svg class="icon"><use href="#icon-list"></use></svg>
                 파일 목록
             </div>
-            <button class="btn-rebuild" id="btn-rebuild" onclick="rebuildDatabase()">
-                <svg class="icon"><use href="#icon-refresh-cw"></use></svg>
-                DB 재생성
-            </button>
         </div>
+
         <div class="file-list" id="file-list">
             <div class="empty-state">
                 <svg class="icon"><use href="#icon-folder"></use></svg>
@@ -872,11 +1060,6 @@
         </div>
     </div>
 
-    <!-- Notice -->
-    <div class="notice">
-        <svg class="icon"><use href="#icon-alert-triangle"></use></svg>
-        파일 변경 후 DB 재생성을 해야 분석에 반영됩니다.
-    </div>
 </div>
 
 <!-- Preview Modal -->
@@ -972,6 +1155,197 @@
         file: null,
         callback: null
     };
+
+    // DB 상태 정보 (서버에서 전달)
+    var dbStats = {
+        {% if db_stats %}
+        recentCount: {{ db_stats.recent_count }},
+        processedStats: {
+            total: {{ db_stats.processed_stats.total }},
+            byType: {
+                {% if db_stats.processed_stats.by_type %}
+                {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
+                '{{ drug_type }}': {{ count }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+                {% endif %}
+            }
+        },
+        newDrugCount: {{ db_stats.new_drug_count }},
+        {% if db_stats.data_period %}
+        period: {
+            start: '{{ db_stats.data_period.start_month }}',
+            end: '{{ db_stats.data_period.end_month }}',
+            months: {{ db_stats.data_period.total_months }}
+        }
+        {% else %}
+        period: null
+        {% endif %}
+        {% else %}
+        recentCount: 0,
+        processedStats: { total: 0, byType: {} },
+        newDrugCount: 0,
+        period: null
+        {% endif %}
+    };
+
+    // 두 월 배열의 합집합 생성 및 정렬
+    function mergeAndSortMonths(dbMonths, fileMonths) {
+        var monthSet = {};
+        dbMonths.forEach(function(m) { monthSet[m] = true; });
+        fileMonths.forEach(function(m) { monthSet[m] = true; });
+        return Object.keys(monthSet).sort();
+    }
+
+    // 데이터 상태 카드 렌더링 (타일 기반)
+    function renderDataStatusCard(dbMonths, fileMonths) {
+        var card = document.getElementById('data-status-card');
+        var dbTilesEl = document.getElementById('db-tiles');
+        var fileTilesEl = document.getElementById('file-tiles');
+        var dbInfoEl = document.getElementById('db-tile-info');
+        var fileInfoEl = document.getElementById('file-tile-info');
+        var startLabel = document.getElementById('timeline-start-label');
+        var endLabel = document.getElementById('timeline-end-label');
+        var syncIndicator = document.getElementById('sync-indicator');
+        var syncMessage = document.getElementById('sync-indicator-message');
+        var rebuildBtn = document.getElementById('btn-rebuild-main');
+        var rebuildText = document.getElementById('btn-rebuild-text');
+        var footerEl = document.getElementById('db-details-footer');
+
+        // DB와 파일 모두 없으면 초기 상태
+        if (dbMonths.length === 0 && fileMonths.length === 0) {
+            startLabel.textContent = '-';
+            endLabel.textContent = '-';
+            dbTilesEl.innerHTML = '<span style="color: var(--color-text-muted); font-size: var(--text-xs);">데이터 없음</span>';
+            fileTilesEl.innerHTML = '<span style="color: var(--color-text-muted); font-size: var(--text-xs);">파일 없음</span>';
+            dbInfoEl.textContent = '-';
+            fileInfoEl.textContent = '-';
+            card.className = 'data-status-card no-db';
+            rebuildBtn.className = 'btn-rebuild-compact no-db';
+            rebuildText.textContent = 'DB 초기화';
+            syncIndicator.style.display = 'none';
+            footerEl.style.display = 'none';
+            return;
+        }
+
+        // 전체 월 목록 (합집합)
+        var allMonths = mergeAndSortMonths(dbMonths, fileMonths);
+
+        // 최대 타일 수 제한 (컨테이너 너비 기준 약 35개)
+        var MAX_TILES = 35;
+        var omittedCount = 0;
+
+        if (allMonths.length > MAX_TILES) {
+            omittedCount = allMonths.length - MAX_TILES;
+            allMonths = allMonths.slice(-MAX_TILES); // 최근 N개월만 유지
+        }
+
+        // 기간 라벨 설정
+        if (omittedCount > 0) {
+            startLabel.innerHTML = '<span title="이전 ' + omittedCount + '개월 생략됨">... ' + formatMonthKorean(allMonths[0]) + '</span>';
+        } else {
+            startLabel.textContent = formatMonthKorean(allMonths[0]);
+        }
+        endLabel.textContent = formatMonthKorean(allMonths[allMonths.length - 1]);
+
+        // DB 월 목록을 Set으로 변환 (빠른 조회)
+        var dbMonthSet = {};
+        dbMonths.forEach(function(m) { dbMonthSet[m] = true; });
+
+        // 파일 월 목록을 Set으로 변환
+        var fileMonthSet = {};
+        fileMonths.forEach(function(m) { fileMonthSet[m] = true; });
+
+        // 불일치 목록
+        var mismatches = [];
+
+        // DB 타일 생성
+        var dbTilesHtml = '';
+        allMonths.forEach(function(month) {
+            var hasDb = dbMonthSet[month] === true;
+            var hasFile = fileMonthSet[month] === true;
+            var isMismatch = hasDb !== hasFile;
+
+            if (isMismatch) {
+                mismatches.push({
+                    month: month,
+                    type: hasDb ? 'file-missing' : 'db-missing'
+                });
+            }
+
+            var tooltipText = formatMonthKorean(month);
+            if (!hasDb) tooltipText += ' (DB 없음)';
+
+            dbTilesHtml += '<div class="timeline-tile ' +
+                (hasDb ? 'db-present' : 'db-missing') +
+                (isMismatch ? ' mismatch' : '') + '">' +
+                '<span class="tooltip">' + tooltipText + '</span></div>';
+        });
+        dbTilesEl.innerHTML = dbTilesHtml;
+
+        // 파일 타일 생성
+        var fileTilesHtml = '';
+        allMonths.forEach(function(month) {
+            var hasDb = dbMonthSet[month] === true;
+            var hasFile = fileMonthSet[month] === true;
+            var isMismatch = hasDb !== hasFile;
+
+            var tooltipText = formatMonthKorean(month);
+            if (!hasFile) tooltipText += ' (파일 없음)';
+
+            fileTilesHtml += '<div class="timeline-tile ' +
+                (hasFile ? 'file-present' : 'file-missing') +
+                (isMismatch ? ' mismatch' : '') + '">' +
+                '<span class="tooltip">' + tooltipText + '</span></div>';
+        });
+        fileTilesEl.innerHTML = fileTilesHtml;
+
+        // 정보 표시
+        dbInfoEl.innerHTML = '<strong>' + dbMonths.length + '</strong>개월';
+        fileInfoEl.innerHTML = '<strong>' + fileMonths.length + '</strong>개월';
+
+        // 동기화 상태 판단
+        var syncStatus = 'synced';
+        var isOutOfSync = mismatches.length > 0;
+
+        if (dbMonths.length === 0 && fileMonths.length > 0) {
+            syncStatus = 'no-db';
+            syncMessage.textContent = 'DB 초기화가 필요합니다';
+            rebuildText.textContent = 'DB 초기화';
+        } else if (isOutOfSync) {
+            syncStatus = 'out-of-sync';
+            // 불일치 메시지 생성
+            var dbMissing = mismatches.filter(function(m) { return m.type === 'db-missing'; });
+            var fileMissing = mismatches.filter(function(m) { return m.type === 'file-missing'; });
+
+            var msgParts = [];
+            if (dbMissing.length > 0) {
+                msgParts.push('DB 미반영 ' + dbMissing.length + '개월');
+            }
+            if (fileMissing.length > 0) {
+                msgParts.push('파일 누락 ' + fileMissing.length + '개월');
+            }
+            syncMessage.textContent = msgParts.join(', ');
+            rebuildText.textContent = 'DB 재생성';
+        } else {
+            rebuildText.textContent = 'DB 재생성';
+        }
+
+        // 상태에 따른 스타일 적용
+        card.className = 'data-status-card ' + syncStatus;
+        rebuildBtn.className = 'btn-rebuild-compact ' + syncStatus;
+        syncIndicator.style.display = isOutOfSync ? 'flex' : 'none';
+
+        // Footer DB 상세 정보 업데이트
+        if (dbStats.period) {
+            footerEl.style.display = 'flex';
+            document.getElementById('stat-timeseries').textContent = dbStats.processedStats.total;
+            document.getElementById('stat-general').textContent = dbStats.processedStats.byType['일반약'] || 0;
+            document.getElementById('stat-prescription').textContent = dbStats.processedStats.byType['전문약'] || 0;
+            document.getElementById('stat-new').textContent = dbStats.newDrugCount;
+        } else {
+            footerEl.style.display = 'none';
+        }
+    }
 
     // 월 포맷 변환 (2025-12 → 2025년 12월)
     function formatMonthKorean(month) {
@@ -1070,25 +1444,14 @@
                 }
 
                 currentFiles = data.files;
-                updateStats(data);
+                // 타일 기반 상태 카드 렌더링 (db_months, file_months 사용)
+                renderDataStatusCard(data.db_months || [], data.file_months || []);
                 renderFileList(data.files);
-                renderTimeline(data.files, data.period);
             })
             .catch(function(error) {
                 console.error('Error:', error);
                 showToast('파일 목록을 불러오는데 실패했습니다.', 'error');
             });
-    }
-
-    // 통계 업데이트
-    function updateStats(data) {
-        document.getElementById('stat-total').textContent = data.total_count;
-        if (data.period) {
-            document.getElementById('stat-period').textContent =
-                formatMonthKorean(data.period.start) + ' ~ ' + formatMonthKorean(data.period.end) + ' (' + data.period.months + '개월)';
-        } else {
-            document.getElementById('stat-period').textContent = '-';
-        }
     }
 
     // 파일 목록 렌더링
@@ -1147,78 +1510,6 @@
                 validateFile(file.filename, true);
             }
         });
-    }
-
-    // 타임라인 렌더링
-    function renderTimeline(files, period) {
-        var section = document.getElementById('timeline-section');
-        var container = document.getElementById('timeline');
-        var labels = document.getElementById('timeline-labels');
-
-        if (!period || files.length === 0) {
-            section.style.display = 'none';
-            return;
-        }
-
-        section.style.display = 'block';
-
-        // 파일 월 목록 생성
-        var fileMonths = {};
-        files.forEach(function(file) {
-            if (file.month) {
-                fileMonths[file.month] = file.filename;
-            }
-        });
-
-        // 시작월부터 종료월까지 모든 월 생성
-        var startParts = period.start.split('-');
-        var endParts = period.end.split('-');
-        var startYear = parseInt(startParts[0]);
-        var startMonth = parseInt(startParts[1]);
-        var endYear = parseInt(endParts[0]);
-        var endMonth = parseInt(endParts[1]);
-
-        var allMonths = [];
-        var y = startYear;
-        var m = startMonth;
-        while (y < endYear || (y === endYear && m <= endMonth)) {
-            var monthStr = y + '-' + (m < 10 ? '0' + m : m);
-            allMonths.push(monthStr);
-            m++;
-            if (m > 12) {
-                m = 1;
-                y++;
-            }
-        }
-
-        // 타임라인 HTML 생성
-        var html = '';
-        allMonths.forEach(function(month) {
-            var hasFile = fileMonths[month] !== undefined;
-            var filename = fileMonths[month] || '';
-            var tooltipText = formatMonthKorean(month) + (hasFile ? '' : '<br>(파일 없음)');
-            html += '<div class="timeline-month ' + (hasFile ? '' : 'missing') + '" ' +
-                'data-month="' + month + '" ' +
-                'data-filename="' + filename + '" ' +
-                'onclick="' + (hasFile ? 'scrollToFile(\'' + filename + '\')' : '') + '">' +
-                '<span class="tooltip">' + tooltipText + '</span>' +
-            '</div>';
-        });
-        container.innerHTML = html;
-
-        // 라벨 표시
-        labels.innerHTML = '<span>' + formatMonthKorean(period.start) + '</span><span>' + formatMonthKorean(period.end) + '</span>';
-    }
-
-    // 파일로 스크롤
-    function scrollToFile(filename) {
-        var card = document.querySelector('.file-card[data-filename="' + filename + '"]');
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            card.style.animation = 'none';
-            card.offsetHeight; // reflow
-            card.style.animation = 'highlight 1s ease';
-        }
     }
 
     // 드래그앤드롭 초기화
@@ -1542,21 +1833,30 @@
 
     // DB 재생성
     async function rebuildDatabase() {
+        var isInitialize = !dbStats.period;
+        var title = isInitialize ? 'DB 초기화' : 'DB 재생성';
+        var message = isInitialize
+            ? 'data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?'
+            : '기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?';
+
         var confirmed = await showConfirmModal({
             icon: 'warning',
-            title: 'DB 재생성',
-            message: '기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?',
-            confirmText: '재생성',
+            title: title,
+            message: message,
+            confirmText: isInitialize ? '초기화' : '재생성',
             isDanger: true
         });
 
         if (!confirmed) return;
 
-        var btn = document.getElementById('btn-rebuild');
+        var btn = document.getElementById('btn-rebuild-main');
+        var btnText = document.getElementById('btn-rebuild-text');
         btn.disabled = true;
-        btn.innerHTML = '<svg class="icon icon-spin"><use href="#icon-loader"></use></svg> DB 재생성 중...';
+        btnText.textContent = isInitialize ? 'DB 초기화 중...' : 'DB 재생성 중...';
+        btn.querySelector('.icon').innerHTML = '<use href="#icon-loader"></use>';
+        btn.querySelector('.icon').classList.add('icon-spin');
 
-        showLoading('DB 재생성 중... (시간이 걸릴 수 있습니다)');
+        showLoading('DB 처리 중... (시간이 걸릴 수 있습니다)');
 
         fetch('/api/rebuild-db', {
             method: 'POST',
@@ -1566,12 +1866,33 @@
         .then(function(data) {
             hideLoading();
             btn.disabled = false;
-            btn.innerHTML = '<svg class="icon"><use href="#icon-refresh-cw"></use></svg> DB 재생성';
+            btn.querySelector('.icon').innerHTML = '<use href="#icon-refresh-cw"></use>';
+            btn.querySelector('.icon').classList.remove('icon-spin');
 
             if (data.error) {
                 showToast(data.error, 'error');
+                btnText.textContent = 'DB 재생성';
             } else if (data.success) {
-                showToast('DB 재생성이 완료되었습니다.', 'success');
+                showToast('DB 처리가 완료되었습니다.', 'success');
+
+                // dbStats 전체 업데이트
+                if (data.stats) {
+                    dbStats.recentCount = data.stats.recent_count;
+                    dbStats.processedStats = {
+                        total: data.stats.processed_stats.total,
+                        byType: data.stats.processed_stats.by_type || {}
+                    };
+                    dbStats.newDrugCount = data.stats.new_drug_count;
+
+                    if (data.stats.data_period) {
+                        dbStats.period = {
+                            start: data.stats.data_period.start_month,
+                            end: data.stats.data_period.end_month,
+                            months: data.stats.data_period.total_months
+                        };
+                    }
+                }
+
                 // 검증 캐시 초기화 및 새로고침
                 validationCache = {};
                 loadDataFiles();
@@ -1580,9 +1901,11 @@
         .catch(function(error) {
             hideLoading();
             btn.disabled = false;
-            btn.innerHTML = '<svg class="icon"><use href="#icon-refresh-cw"></use></svg> DB 재생성';
+            btn.querySelector('.icon').innerHTML = '<use href="#icon-refresh-cw"></use>';
+            btn.querySelector('.icon').classList.remove('icon-spin');
+            btnText.textContent = 'DB 재생성';
             console.error('Error:', error);
-            showToast('DB 재생성에 실패했습니다.', 'error');
+            showToast('DB 처리에 실패했습니다.', 'error');
         });
     }
 

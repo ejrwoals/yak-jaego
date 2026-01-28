@@ -103,158 +103,6 @@
         border-color: var(--color-border-hover);
     }
 
-    .toolbar-arrow {
-        transition: transform var(--transition-normal);
-    }
-
-    .toolbar-arrow.open {
-        transform: rotate(180deg);
-    }
-
-    .db-info-panel {
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-xl);
-        margin-top: var(--space-4);
-        max-height: 0;
-        overflow: hidden;
-        transition: all var(--transition-normal);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .db-info-panel.open {
-        max-height: 400px;
-        margin-top: var(--space-4);
-    }
-
-    .db-info-panel-body {
-        padding: var(--space-6);
-    }
-
-    .db-stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: var(--space-3);
-        margin-bottom: var(--space-4);
-    }
-
-    .db-stat-card {
-        background: var(--color-surface-hover);
-        border-radius: var(--radius-lg);
-        padding: var(--space-4);
-        text-align: center;
-        border: 1px solid var(--color-border);
-    }
-
-    .db-stat-card .stat-value {
-        font-size: var(--text-lg);
-        font-weight: var(--font-bold);
-        color: var(--color-text-primary);
-        margin-bottom: var(--space-1);
-    }
-
-    .db-stat-card .stat-label {
-        font-size: var(--text-xs);
-        color: var(--color-text-muted);
-        font-weight: var(--font-medium);
-    }
-
-    .db-bottom-row {
-        display: flex;
-        gap: var(--space-3);
-        align-items: stretch;
-    }
-
-    .db-stat-card.period {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: var(--space-2);
-        padding: var(--space-3) var(--space-4);
-        margin: 0;
-    }
-
-    .db-stat-card.period .icon {
-        width: var(--icon-sm);
-        height: var(--icon-sm);
-        color: var(--color-text-muted);
-    }
-
-    .db-stat-card.period .stat-label {
-        margin: 0;
-        font-size: var(--text-xs);
-    }
-
-    .db-stat-card.period .stat-value {
-        font-size: var(--text-sm);
-        font-weight: var(--font-semibold);
-        margin: 0;
-    }
-
-    .btn-rebuild-db {
-        background: var(--color-surface-hover);
-        color: var(--color-text-secondary);
-        border: 1px solid var(--color-border);
-        padding: var(--space-3) var(--space-5);
-        border-radius: var(--radius-lg);
-        font-size: var(--text-sm);
-        font-weight: var(--font-medium);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        justify-content: center;
-        transition: all var(--transition-fast);
-        white-space: nowrap;
-    }
-
-    .btn-rebuild-db .icon {
-        width: var(--icon-sm);
-        height: var(--icon-sm);
-    }
-
-    .btn-rebuild-db:hover {
-        background: var(--color-surface-active);
-        border-color: var(--color-border-hover);
-        color: var(--color-text-primary);
-    }
-
-    .btn-rebuild-db:disabled {
-        background: var(--color-surface-hover);
-        color: var(--color-text-disabled);
-        cursor: not-allowed;
-    }
-
-    .rebuild-status {
-        margin-top: var(--space-3);
-        padding: var(--space-3);
-        border-radius: var(--radius-md);
-        font-size: var(--text-sm);
-        display: none;
-    }
-
-    .rebuild-status.success {
-        background-color: var(--color-success-light);
-        color: var(--color-success-dark);
-        border: 1px solid var(--color-success);
-        display: block;
-    }
-
-    .rebuild-status.error {
-        background-color: var(--color-danger-light);
-        color: var(--color-danger-dark);
-        border: 1px solid var(--color-danger);
-        display: block;
-    }
-
-    .rebuild-status.loading {
-        background-color: var(--color-info-light);
-        color: var(--color-info-dark);
-        border: 1px solid var(--color-info);
-        display: block;
-    }
-
     .tabs-container {
         margin-bottom: var(--space-6);
     }
@@ -612,12 +460,10 @@
 <div class="container">
     <div class="header">
         <div class="header-toolbar">
-            <button class="toolbar-item db-status" onclick="toggleDbInfo()">
-                <svg class="icon"><use href="#icon-check-circle"></use></svg>
-                <span>DB 준비 완료</span>
-                <span style="opacity: 0.8;">({{ db_stats.recent_count }}개)</span>
-                <svg class="icon toolbar-arrow" id="db-info-arrow"><use href="#icon-chevron-down"></use></svg>
-            </button>
+            <a href="/data/manage" class="toolbar-item db-status">
+                <svg class="icon"><use href="#icon-folder"></use></svg>
+                <span>데이터 파일 관리</span>
+            </a>
             <a href="/drug/manage" class="toolbar-item util-link">
                 <svg class="icon"><use href="#icon-settings"></use></svg>
                 <span>약품 개별 관리</span>
@@ -626,49 +472,6 @@
                 <svg class="icon"><use href="#icon-user"></use></svg>
                 <span>환자 관리</span>
             </a>
-            <a href="/data/manage" class="toolbar-item util-link">
-                <svg class="icon"><use href="#icon-folder"></use></svg>
-                <span>데이터 파일 관리</span>
-            </a>
-        </div>
-
-        <div class="db-info-panel" id="db-info-content">
-            <div class="db-info-panel-body">
-                <div class="db-stats-grid">
-                    <div class="db-stat-card">
-                        <div class="stat-value" id="processed-total">{{ db_stats.processed_stats.total }}</div>
-                        <div class="stat-label">시계열 분석 가능 약품</div>
-                    </div>
-                    {% if db_stats.processed_stats.by_type %}
-                    {% for drug_type, count in db_stats.processed_stats.by_type.items() %}
-                    <div class="db-stat-card">
-                        <div class="stat-value" id="drug-type-{{ drug_type }}">{{ count }}</div>
-                        <div class="stat-label">{{ drug_type }}</div>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-                    <div class="db-stat-card">
-                        <div class="stat-value" id="new-drug-count">{{ db_stats.new_drug_count }}</div>
-                        <div class="stat-label">신규약품</div>
-                    </div>
-                </div>
-
-                <div class="db-bottom-row">
-                    {% if db_stats.data_period %}
-                    <div class="db-stat-card period">
-                        <svg class="icon"><use href="#icon-calendar"></use></svg>
-                        <div class="stat-label">데이터 기간</div>
-                        <div class="stat-value" id="data-period">{{ db_stats.data_period.start_month }} ~ {{ db_stats.data_period.end_month }} ({{ db_stats.data_period.total_months }}개월)</div>
-                    </div>
-                    {% endif %}
-                    <button class="btn-rebuild-db" id="btn-rebuild-db" onclick="rebuildDatabase()">
-                        <svg class="icon"><use href="#icon-refresh-cw"></use></svg>
-                        <span>DB 재생성</span>
-                    </button>
-                </div>
-
-                <div class="rebuild-status" id="rebuild-status"></div>
-            </div>
         </div>
     </div>
 
@@ -766,13 +569,6 @@
 
 {% block page_scripts %}
 <script>
-    function toggleDbInfo() {
-        var content = document.getElementById('db-info-content');
-        var arrow = document.getElementById('db-info-arrow');
-        content.classList.toggle('open');
-        arrow.classList.toggle('open');
-    }
-
     function switchTab(tabName) {
         document.querySelectorAll('.tab-button').forEach(function(btn) {
             btn.classList.remove('active');
@@ -876,76 +672,6 @@
         loadReports('timeseries');
         reportsLoaded.timeseries = true;
     });
-
-    async function rebuildDatabase() {
-        var confirmed = await showConfirmModal({
-            icon: 'warning',
-            title: 'DB \uC7AC\uC0DD\uC131',
-            message: '\uAE30\uC874 DB\uAC00 \uC0AD\uC81C\uB418\uACE0 data/ \uD3F4\uB354\uC758 \uBAA8\uB4E0 \uD30C\uC77C\uC744 \uAE30\uBC18\uC73C\uB85C \uC0C8\uB85C\uC6B4 DB\uAC00 \uC0DD\uC131\uB429\uB2C8\uB2E4.<br><br>\uC774 \uC791\uC5C5\uC740 \uC218 \uBD84\uC774 \uC18C\uC694\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
-            confirmText: '\uC7AC\uC0DD\uC131',
-            isDanger: true
-        });
-        if (!confirmed) return;
-
-        var button = document.getElementById('btn-rebuild-db');
-        var statusDiv = document.getElementById('rebuild-status');
-
-        button.disabled = true;
-        button.innerHTML = '<svg class="icon icon-spin"><use href="#icon-loader"></use></svg><span>DB \uC7AC\uC0DD\uC131 \uC911...</span>';
-
-        statusDiv.className = 'rebuild-status loading';
-        statusDiv.innerHTML = 'DB \uC7AC\uC0DD\uC131 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC\uB9CC \uAE30\uB2E4\uB824\uC8FC\uC138\uC694...';
-
-        try {
-            var response = await fetch('/api/rebuild-db', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            var data = await response.json();
-
-            if (response.ok && data.success) {
-                statusDiv.className = 'rebuild-status success';
-                statusDiv.innerHTML = data.message;
-
-                if (data.stats) {
-                    document.getElementById('processed-total').textContent = data.stats.processed_stats.total;
-                    document.getElementById('new-drug-count').textContent = data.stats.new_drug_count;
-
-                    if (data.stats.processed_stats.by_type) {
-                        for (var drugType in data.stats.processed_stats.by_type) {
-                            var typeElement = document.getElementById('drug-type-' + drugType);
-                            if (typeElement) {
-                                typeElement.textContent = data.stats.processed_stats.by_type[drugType];
-                            }
-                        }
-                    }
-
-                    if (data.stats.data_period) {
-                        var dataPeriod = document.getElementById('data-period');
-                        if (dataPeriod) {
-                            dataPeriod.textContent = data.stats.data_period.start_month + ' ~ ' + data.stats.data_period.end_month + ' (' + data.stats.data_period.total_months + '\uAC1C\uC6D4)';
-                        }
-                    }
-                }
-
-                setTimeout(function() {
-                    statusDiv.className = 'rebuild-status';
-                    statusDiv.innerHTML = '';
-                }, 5000);
-            } else {
-                statusDiv.className = 'rebuild-status error';
-                statusDiv.innerHTML = (data.error || '\uC54C \uC218 \uC5C6\uB294 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.');
-            }
-        } catch (error) {
-            console.error('DB \uC7AC\uC0DD\uC131 \uC2E4\uD328:', error);
-            statusDiv.className = 'rebuild-status error';
-            statusDiv.innerHTML = 'DB \uC7AC\uC0DD\uC131 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: ' + error.message;
-        } finally {
-            button.disabled = false;
-            button.innerHTML = '<svg class="icon"><use href="#icon-refresh-cw"></use></svg><span>DB \uC7AC\uC0DD\uC131</span>';
-        }
-    }
 
     async function deleteAllReports(reportType) {
         var container = document.getElementById(reportType + '-reports');

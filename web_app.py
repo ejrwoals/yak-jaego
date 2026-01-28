@@ -2145,7 +2145,10 @@ UNLOAD_TIMEOUT = 5  # 5초: 브라우저 종료 감지 후 빠른 종료 (pagehi
 @app.route('/data/manage')
 def data_manage():
     """데이터 파일 관리 페이지"""
-    return render_template('data_manage.html')
+    # DB 상태 확인
+    is_ready, result = check_database_ready()
+    db_stats = result if is_ready else None
+    return render_template('data_manage.html', db_stats=db_stats)
 
 
 @app.route('/api/data-files')
@@ -2192,21 +2195,29 @@ def list_data_files():
         # 월 기준 내림차순 정렬 (최신이 위로)
         files.sort(key=lambda x: x['month'] or '', reverse=True)
 
-        # 기간 정보 계산
-        months = [f['month'] for f in files if f['month']]
+        # 파일 기간 정보 계산
+        file_months = [f['month'] for f in files if f['month']]
         period = None
-        if months:
-            sorted_months = sorted(months)
+        if file_months:
+            sorted_months = sorted(file_months)
             period = {
                 'start': sorted_months[0],
                 'end': sorted_months[-1],
-                'months': len(months)
+                'months': len(file_months)
             }
+
+        # DB 월 목록 조회
+        db_months = []
+        db_metadata = processed_inventory_db.get_metadata()
+        if db_metadata and 'month_list' in db_metadata:
+            db_months = db_metadata['month_list']
 
         return jsonify({
             'files': files,
             'total_count': len(files),
-            'period': period
+            'period': period,
+            'file_months': sorted(file_months) if file_months else [],
+            'db_months': db_months
         })
 
     except Exception as e:

@@ -310,6 +310,9 @@ def save_metadata(months):
                          ("end_month", end_month))
             cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
                          ("total_months", str(total_months)))
+            # 월 목록 전체 저장 (불일치 감지용)
+            cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+                         ("month_list", json.dumps(months)))
 
             conn.commit()
             print(f"   📅 데이터 기간 메타데이터 저장: {start_month} ~ {end_month} ({total_months}개월)")
@@ -325,7 +328,7 @@ def get_metadata():
     데이터 기간 메타데이터 조회
 
     Returns:
-        dict: {'start_month': str, 'end_month': str, 'total_months': int} 또는 None
+        dict: {'start_month': str, 'end_month': str, 'total_months': int, 'month_list': list} 또는 None
     """
     try:
         conn = get_connection()
@@ -337,7 +340,7 @@ def get_metadata():
             conn.close()
             return None
 
-        cursor.execute("SELECT key, value FROM metadata WHERE key IN ('start_month', 'end_month', 'total_months')")
+        cursor.execute("SELECT key, value FROM metadata WHERE key IN ('start_month', 'end_month', 'total_months', 'month_list')")
         rows = cursor.fetchall()
 
         conn.close()
@@ -348,11 +351,15 @@ def get_metadata():
         metadata = dict(rows)
 
         if 'start_month' in metadata and 'end_month' in metadata and 'total_months' in metadata:
-            return {
+            result = {
                 'start_month': metadata['start_month'],
                 'end_month': metadata['end_month'],
                 'total_months': int(metadata['total_months'])
             }
+            # month_list가 있으면 포함 (없으면 start_month~end_month로 생성)
+            if 'month_list' in metadata:
+                result['month_list'] = json.loads(metadata['month_list'])
+            return result
 
         return None
 
