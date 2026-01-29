@@ -1886,8 +1886,8 @@
         var isInitialize = !dbStats.period;
         var title = isInitialize ? 'DB 초기화' : 'DB 재생성';
         var message = isInitialize
-            ? 'data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?'
-            : '기존 DB가 삭제되고 data/ 폴더의 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?';
+            ? '업로드된 모든 파일을 기반으로 새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?'
+            : '기존 DB가 삭제되고 업로드된 모든 파일을 기반으로<br>새로운 DB가 생성됩니다.<br><br>계속하시겠습니까?';
 
         var confirmed = await showConfirmModal({
             icon: 'warning',
