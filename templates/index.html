@@ -500,10 +500,12 @@
                                 <svg class="icon"><use href="#icon-bar-chart-2"></use></svg>
                                 재고 관리 보고서
                             </a>
+                            {% if dev_mode %}
                             <a href="/workflow/volatility" class="btn-new">
                                 <svg class="icon"><use href="#icon-trending-up"></use></svg>
-                                고변동성 약품 보고서
+                                고변동성 약품 보고서 <span style="font-size: 0.75em; opacity: 0.7;">(개발중)</span>
                             </a>
+                            {% endif %}
                         </div>
                     </div>
 

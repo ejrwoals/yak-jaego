@@ -46,6 +46,7 @@ app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
 app.config['UPLOAD_FOLDER'] = paths.UPLOADS_PATH  # 임시 업로드 폴더
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 제한
 app.config['VERSION'] = os.getenv('APP_VERSION', str(int(datetime.now().timestamp())))  # 캐시 버스팅용 버전
+app.config['DEV_MODE'] = not paths.is_frozen()  # 개발 모드 플래그 (PyInstaller 빌드가 아닌 경우)
 
 # 허용된 파일 확장자
 ALLOWED_EXTENSIONS = {'csv', 'xls', 'xlsx'}
@@ -100,7 +101,7 @@ def index():
                              error_message=result,
                              suggestion="먼저 DB를 초기화해주세요: python init_db.py")
 
-    return render_template('index.html', db_stats=result)
+    return render_template('index.html', db_stats=result, dev_mode=app.config['DEV_MODE'])
 
 
 @app.route('/workflow/simple')
