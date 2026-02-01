@@ -378,6 +378,9 @@
 
 {% block page_scripts %}
 <script>
+    // 사용자 설정값 로드
+    var userSettings = {{ user_settings | tojson }};
+
     // Toggle info box
     function toggleInfoBox() {
         var content = document.getElementById('info-box-content');
@@ -391,7 +394,7 @@
         var MIN_VALUE = 0.5;
         var MAX_VALUE = 6;
         var STEP = 0.5;
-        var currentValue = 1;
+        var currentValue = userSettings.runway_threshold || 1;
 
         var track = document.getElementById('sliderTrack');
         var handle = document.getElementById('sliderHandle');

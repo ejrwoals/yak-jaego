@@ -1,7 +1,14 @@
-{# Shutdown Button Partial #}
-<button class="exit-btn" onclick="exitApp()">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <use href="#icon-power"></use>
-    </svg>
-    <span>종료</span>
-</button>
+{# Shutdown Button + Settings Button Partial #}
+<div class="header-controls">
+    <button class="exit-btn" onclick="exitApp()">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <use href="#icon-power"></use>
+        </svg>
+        <span>종료</span>
+    </button>
+    <button class="settings-btn" onclick="openSettingsModal()">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <use href="#icon-settings"></use>
+        </svg>
+    </button>
+</div>

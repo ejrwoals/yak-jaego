@@ -1,0 +1,130 @@
+{# Settings Modal Partial #}
+<div id="settingsModal" class="settings-modal-overlay">
+    <div class="settings-modal-box">
+        <div class="settings-modal-header">
+            <h2>
+                <svg class="icon" style="width: var(--icon-lg); height: var(--icon-lg);"><use href="#icon-settings"></use></svg>
+                사용자 설정
+            </h2>
+            <button class="settings-modal-close" onclick="closeSettingsModal()">
+                <svg class="icon"><use href="#icon-x"></use></svg>
+            </button>
+        </div>
+
+        <div class="settings-modal-content">
+            <!-- 재고 분석 보고서 섹션 -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <svg class="icon"><use href="#icon-bar-chart-2"></use></svg>
+                    재고 분석 보고서
+                </div>
+            </div>
+
+            <!-- 이동평균 개월 수 -->
+            <div class="settings-group">
+                <label>
+                    이동평균 개월 수
+                    <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.">ⓘ</span>
+                </label>
+                <div class="custom-dropdown settings-dropdown" id="settingsMaMonthsDropdown">
+                    <div class="custom-dropdown-selected" onclick="toggleSettingsDropdown('settingsMaMonthsDropdown')">
+                        3개월 (권장 - 단기 트렌드)
+                    </div>
+                    <div class="custom-dropdown-options">
+                        <div class="custom-dropdown-option" data-value="1">1개월 (매우 단기)</div>
+                        <div class="custom-dropdown-option" data-value="2">2개월 (단기)</div>
+                        <div class="custom-dropdown-option selected" data-value="3">3개월 (권장 - 단기 트렌드)</div>
+                        <div class="custom-dropdown-option" data-value="4">4개월</div>
+                        <div class="custom-dropdown-option" data-value="5">5개월</div>
+                        <div class="custom-dropdown-option" data-value="6">6개월 (중기 트렌드)</div>
+                        <div class="custom-dropdown-option" data-value="9">9개월</div>
+                        <div class="custom-dropdown-option" data-value="12">12개월 (장기 트렌드)</div>
+                    </div>
+                </div>
+                <input type="hidden" id="settings_ma_months" value="3">
+            </div>
+
+            <!-- 런웨이 구간 설정 -->
+            <div class="settings-group">
+                <label>
+                    런웨이 구간 설정
+                    <span class="tooltip" title="런웨이 기준으로 약품을 부족/충분/과다로 분류합니다.">ⓘ</span>
+                </label>
+                <div class="settings-runway-slider-container">
+                    <div class="settings-runway-labels">
+                        <span class="settings-runway-label shortage">부족</span>
+                        <span class="settings-runway-label sufficient">충분</span>
+                        <span class="settings-runway-label excess">과다</span>
+                    </div>
+                    <div class="settings-runway-bar">
+                        <div class="settings-runway-segment shortage" id="settings-segment-shortage"></div>
+                        <div class="settings-runway-segment sufficient" id="settings-segment-sufficient"></div>
+                        <div class="settings-runway-segment excess" id="settings-segment-excess"></div>
+                        <div class="settings-runway-handle" id="settings-handle-low" title="부족/충분 경계"></div>
+                        <div class="settings-runway-handle" id="settings-handle-high" title="충분/과다 경계"></div>
+                    </div>
+                    <div class="settings-runway-scale">
+                        <span>0</span>
+                        <span id="settings-scale-low">1</span>
+                        <span id="settings-scale-high">3</span>
+                        <span>7+</span>
+                    </div>
+                    <div class="settings-runway-values">
+                        <div class="settings-runway-value-box">
+                            <span class="settings-runway-value-label">부족/충분 경계</span>
+                            <span class="settings-runway-value" id="settings-value-low">1</span>
+                            <span class="settings-runway-value-unit">개월</span>
+                        </div>
+                        <div class="settings-runway-value-box">
+                            <span class="settings-runway-value-label">충분/과다 경계</span>
+                            <span class="settings-runway-value" id="settings-value-high">3</span>
+                            <span class="settings-runway-value-unit">개월</span>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="settings_threshold_low" value="1">
+                <input type="hidden" id="settings_threshold_high" value="3">
+            </div>
+
+            <!-- 약 주문 수량 산출 섹션 -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <svg class="icon"><use href="#icon-package"></use></svg>
+                    약 주문 수량 산출
+                </div>
+            </div>
+
+            <!-- 강조 표시 기준 런웨이 -->
+            <div class="settings-group">
+                <label>
+                    강조 표시 기준 런웨이
+                    <span class="tooltip" title="이 기준 미만의 런웨이를 가진 약품이 강조됩니다.">ⓘ</span>
+                </label>
+                <div class="settings-highlight-slider-container">
+                    <div class="settings-highlight-track" id="settingsHighlightTrack">
+                        <div class="settings-highlight-handle" id="settingsHighlightHandle"></div>
+                    </div>
+                    <div class="settings-highlight-labels">
+                        <span style="left: 0%;">0.5</span>
+                        <span style="left: 9.09%;">1</span>
+                        <span style="left: 27.27%;">2</span>
+                        <span style="left: 45.45%;">3</span>
+                        <span style="left: 63.64%;">4</span>
+                        <span style="left: 81.82%;">5</span>
+                        <span style="left: 100%;">6</span>
+                    </div>
+                </div>
+                <div class="settings-highlight-value-display">
+                    <span class="value" id="settingsHighlightValue">1</span>
+                    <span class="unit">개월 미만</span>
+                </div>
+                <input type="hidden" id="settings_runway_threshold" value="1">
+            </div>
+        </div>
+
+        <div class="settings-modal-footer">
+            <button class="btn-secondary" onclick="resetSettingsToDefault()">기본값 복원</button>
+            <button class="btn-primary" onclick="saveSettings()">저장</button>
+        </div>
+    </div>
+</div>

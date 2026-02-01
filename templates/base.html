@@ -8,6 +8,10 @@
     {# Base CSS #}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}?v={{ config.get('VERSION', '1') }}">
 
+    {# Core Component CSS - always included #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/shutdown-button.css') }}?v={{ config.get('VERSION', '1') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/settings-modal.css') }}?v={{ config.get('VERSION', '1') }}">
+
     {# Component CSS - Override these blocks to include specific components #}
     {% block component_styles %}{% endblock %}
 
@@ -34,10 +38,16 @@
         {% include 'partials/_confirm_modal.html' %}
     {% endblock %}
 
-    {# Base scripts - core and confirm modal #}
+    {# Settings modal - included by default for most pages #}
+    {% block settings_modal %}
+        {% include 'partials/_settings_modal.html' %}
+    {% endblock %}
+
+    {# Base scripts - core, confirm modal, and settings #}
     {% block base_scripts %}
     <script src="{{ url_for('static', filename='js/components/jaego-core.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script src="{{ url_for('static', filename='js/components/confirm-modal.js') }}?v={{ config.get('VERSION', '1') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/settings.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script>
         // 브라우저 종료 감지: pagehide 이벤트 기반
         (function() {

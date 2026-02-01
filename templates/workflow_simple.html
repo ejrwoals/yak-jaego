@@ -332,12 +332,35 @@
 
 {% block page_scripts %}
 <script>
+    // 사용자 설정값 로드
+    var userSettings = {{ user_settings | tojson }};
+
     function toggleInfoBox() {
         var content = document.getElementById('info-box-content');
         var arrow = document.getElementById('info-box-arrow');
         content.classList.toggle('open');
         arrow.classList.toggle('open');
     }
+
+    // 드롭다운 초기값 설정 (사용자 설정 기반)
+    (function() {
+        var maMonths = userSettings.ma_months || 3;
+        var dropdown = document.getElementById('maMonthsDropdown');
+        if (dropdown) {
+            var options = dropdown.querySelectorAll('.custom-dropdown-option');
+            var selected = dropdown.querySelector('.custom-dropdown-selected');
+            options.forEach(function(opt) {
+                opt.classList.remove('selected');
+                if (parseInt(opt.dataset.value) === maMonths) {
+                    opt.classList.add('selected');
+                    if (selected) {
+                        selected.textContent = opt.textContent;
+                    }
+                }
+            });
+            document.getElementById('ma_months').value = maMonths;
+        }
+    })();
 
     document.getElementById('reportForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -382,8 +405,8 @@
     // Runway Slider Logic
     (function() {
         var MAX_VALUE = 7;
-        var lowValue = 1;
-        var highValue = 3;
+        var lowValue = userSettings.threshold_low || 1;
+        var highValue = userSettings.threshold_high || 3;
 
         var bar = document.querySelector('.runway-bar');
         var handleLow = document.getElementById('handle-low');
