@@ -435,6 +435,36 @@ app.config['VERSION'] = '1'  # 변경 시 증가
 | `white-space: nowrap` | 긴 텍스트가 한 줄로 표시되어 넘침 | `white-space: normal` + `max-width` |
 | `z-index` 미설정 | 다른 요소에 가려짐 | `z-index: 1000` 이상 설정 |
 
+### Collapse/Accordion 내부 툴팁
+
+`max-height` 애니메이션을 사용하는 collapse 컴포넌트는 `overflow: hidden`이 필수입니다.
+이 경우 내부에 툴팁이 있으면 잘리는 문제가 발생합니다.
+
+**해결책: 열린 상태에서만 `overflow: visible` 적용**
+
+```css
+/* 닫힌 상태: overflow: hidden 유지 (애니메이션용) */
+.collapse-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--transition-normal);
+}
+
+/* 열린 상태: overflow: visible로 전환 (툴팁이 잘리지 않도록) */
+.collapse-content.open {
+    max-height: 600px;
+    overflow: visible;  /* ⭐ 핵심: 열린 상태에서는 visible */
+}
+
+/* 부모 컨테이너도 overflow: visible 필수 */
+.collapse-box {
+    overflow: visible;  /* ❌ overflow: hidden 사용 금지 */
+}
+```
+
+**주의:** 부모 컨테이너(`.collapse-box`)에도 `overflow: visible`을 적용해야 합니다.
+부모가 `overflow: hidden`이면 자식의 `overflow: visible`이 무시됩니다.
+
 ---
 
 ## 참고

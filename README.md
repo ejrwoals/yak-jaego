@@ -718,7 +718,7 @@ for month in months_reversed:
 - 약품코드 정규화 및 데이터 검증
 - 다중 인코딩 지원 (UTF-8, CP949, EUC-KR)
 
-## 🛠️ 고급 설정
+## 🛠️ 세부 설정
 
 ### 독립 실행형 빌드 (PyInstaller)
 

@@ -12,6 +12,81 @@
 
 {% block page_styles %}
 <style>
+    /* Advanced Settings Toggle */
+    .advanced-settings-box {
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-5);
+        overflow: visible;  /* 툴팁이 잘리지 않도록 visible 유지 */
+    }
+
+    .advanced-settings-header {
+        display: flex;
+        align-items: center;
+        padding: var(--space-4);
+        cursor: pointer;
+        transition: background var(--transition-fast);
+        gap: var(--space-3);
+    }
+
+    .advanced-settings-header:hover {
+        background: var(--color-surface-hover);
+    }
+
+    .advanced-settings-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-weight: var(--font-semibold);
+        color: var(--color-text-primary);
+        font-size: var(--text-sm);
+    }
+
+    .advanced-settings-title .icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        color: var(--brand-primary);
+    }
+
+    .advanced-settings-summary {
+        flex: 1;
+        text-align: right;
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+    }
+
+    .advanced-settings-summary strong {
+        color: var(--brand-primary);
+        font-weight: var(--font-semibold);
+    }
+
+    .advanced-settings-arrow {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        color: var(--color-text-muted);
+        transition: transform var(--transition-fast);
+    }
+
+    .advanced-settings-arrow.open {
+        transform: rotate(180deg);
+    }
+
+    .advanced-settings-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height var(--transition-normal);
+        border-top: 1px solid var(--color-border);
+        opacity: 0;
+    }
+
+    .advanced-settings-content.open {
+        max-height: 600px;
+        padding: var(--space-4);
+        opacity: 1;
+        overflow: visible;  /* 툴팁이 잘리지 않도록 */
+    }
+
     /* Runway Slider Styles */
     .runway-slider-container {
         background: #f7fafc;
@@ -247,68 +322,83 @@
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="ma_months">
-                이동평균 개월 수
-                <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.&#10;• 3개월: 단기 트렌드 (권장)&#10;• 6개월: 중기 트렌드&#10;• 12개월: 장기 트렌드">ⓘ</span>
-            </label>
-            <div class="custom-dropdown" id="maMonthsDropdown">
-                <div class="custom-dropdown-selected" onclick="toggleDropdown('maMonthsDropdown')">
-                    3개월 (권장 - 단기 트렌드)
+        <!-- 세부 설정 토글 -->
+        <div class="advanced-settings-box">
+            <div class="advanced-settings-header" onclick="toggleAdvancedSettings()">
+                <div class="advanced-settings-title">
+                    <svg class="icon"><use href="#icon-sliders"></use></svg>
+                    <span>세부 설정</span>
                 </div>
-                <div class="custom-dropdown-options">
-                    <div class="custom-dropdown-option" data-value="1">1개월 (매우 단기)</div>
-                    <div class="custom-dropdown-option" data-value="2">2개월 (단기)</div>
-                    <div class="custom-dropdown-option selected" data-value="3">3개월 (권장 - 단기 트렌드)</div>
-                    <div class="custom-dropdown-option" data-value="4">4개월</div>
-                    <div class="custom-dropdown-option" data-value="5">5개월</div>
-                    <div class="custom-dropdown-option" data-value="6">6개월 (중기 트렌드)</div>
-                    <div class="custom-dropdown-option" data-value="9">9개월</div>
-                    <div class="custom-dropdown-option" data-value="12">12개월 (장기 트렌드)</div>
+                <div class="advanced-settings-summary" id="advancedSettingsSummary">
+                    기본 설정 : 이동평균 <strong id="summaryMaMonths">3</strong>개월 · 런웨이 <strong id="summaryThresholdLow">1</strong>/<strong id="summaryThresholdHigh">3</strong>개월
                 </div>
+                <svg class="icon advanced-settings-arrow" id="advanced-settings-arrow"><use href="#icon-chevron-down"></use></svg>
             </div>
-            <input type="hidden" name="ma_months" id="ma_months" value="3">
-        </div>
+            <div class="advanced-settings-content" id="advanced-settings-content">
+                <div class="form-group">
+                    <label for="ma_months">
+                        이동평균 개월 수
+                        <span class="tooltip" title="최근 N개월의 평균 소비량을 계산합니다.&#10;• 3개월: 단기 트렌드 (권장)&#10;• 6개월: 중기 트렌드&#10;• 12개월: 장기 트렌드">ⓘ</span>
+                    </label>
+                    <div class="custom-dropdown" id="maMonthsDropdown">
+                        <div class="custom-dropdown-selected" onclick="toggleDropdown('maMonthsDropdown')">
+                            3개월 (권장 - 단기 트렌드)
+                        </div>
+                        <div class="custom-dropdown-options">
+                            <div class="custom-dropdown-option" data-value="1">1개월 (매우 단기)</div>
+                            <div class="custom-dropdown-option" data-value="2">2개월 (단기)</div>
+                            <div class="custom-dropdown-option selected" data-value="3">3개월 (권장 - 단기 트렌드)</div>
+                            <div class="custom-dropdown-option" data-value="4">4개월</div>
+                            <div class="custom-dropdown-option" data-value="5">5개월</div>
+                            <div class="custom-dropdown-option" data-value="6">6개월 (중기 트렌드)</div>
+                            <div class="custom-dropdown-option" data-value="9">9개월</div>
+                            <div class="custom-dropdown-option" data-value="12">12개월 (장기 트렌드)</div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="ma_months" id="ma_months" value="3">
+                </div>
 
-        <div class="form-group">
-            <label>
-                런웨이 구간 설정
-                <span class="tooltip" title="런웨이(재고 소진 예상 기간) 기준으로&#10;약품을 부족/충분/과다로 분류합니다.&#10;핸들을 드래그하여 경계값을 조정하세요.">ⓘ</span>
-            </label>
-            <div class="runway-slider-container">
-                <div class="runway-labels">
-                    <span class="runway-label shortage">부족</span>
-                    <span class="runway-label sufficient">충분</span>
-                    <span class="runway-label excess">과다</span>
-                </div>
-                <div class="runway-bar">
-                    <div class="runway-segment shortage" id="segment-shortage"></div>
-                    <div class="runway-segment sufficient" id="segment-sufficient"></div>
-                    <div class="runway-segment excess" id="segment-excess"></div>
-                    <div class="runway-handle" id="handle-low" title="부족/충분 경계"></div>
-                    <div class="runway-handle" id="handle-high" title="충분/과다 경계"></div>
-                </div>
-                <div class="runway-scale">
-                    <span>0</span>
-                    <span id="scale-low">1</span>
-                    <span id="scale-high">3</span>
-                    <span>7+</span>
-                </div>
-                <div class="runway-values">
-                    <div class="runway-value-box">
-                        <span class="runway-value-label">부족/충분 경계</span>
-                        <span class="runway-value" id="value-low">1</span>
-                        <span class="runway-value-unit">개월</span>
+                <div class="form-group">
+                    <label>
+                        런웨이 구간 설정
+                        <span class="tooltip" title="런웨이(재고 소진 예상 기간) 기준으로&#10;약품을 부족/충분/과다로 분류합니다.&#10;핸들을 드래그하여 경계값을 조정하세요.">ⓘ</span>
+                    </label>
+                    <div class="runway-slider-container">
+                        <div class="runway-labels">
+                            <span class="runway-label shortage">부족</span>
+                            <span class="runway-label sufficient">충분</span>
+                            <span class="runway-label excess">과다</span>
+                        </div>
+                        <div class="runway-bar">
+                            <div class="runway-segment shortage" id="segment-shortage"></div>
+                            <div class="runway-segment sufficient" id="segment-sufficient"></div>
+                            <div class="runway-segment excess" id="segment-excess"></div>
+                            <div class="runway-handle" id="handle-low" title="부족/충분 경계"></div>
+                            <div class="runway-handle" id="handle-high" title="충분/과다 경계"></div>
+                        </div>
+                        <div class="runway-scale">
+                            <span>0</span>
+                            <span id="scale-low">1</span>
+                            <span id="scale-high">3</span>
+                            <span>7+</span>
+                        </div>
+                        <div class="runway-values">
+                            <div class="runway-value-box">
+                                <span class="runway-value-label">부족/충분 경계</span>
+                                <span class="runway-value" id="value-low">1</span>
+                                <span class="runway-value-unit">개월</span>
+                            </div>
+                            <div class="runway-value-box">
+                                <span class="runway-value-label">충분/과다 경계</span>
+                                <span class="runway-value" id="value-high">3</span>
+                                <span class="runway-value-unit">개월</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="runway-value-box">
-                        <span class="runway-value-label">충분/과다 경계</span>
-                        <span class="runway-value" id="value-high">3</span>
-                        <span class="runway-value-unit">개월</span>
-                    </div>
+                    <input type="hidden" name="threshold_low" id="threshold_low" value="1">
+                    <input type="hidden" name="threshold_high" id="threshold_high" value="3">
                 </div>
             </div>
-            <input type="hidden" name="threshold_low" id="threshold_low" value="1">
-            <input type="hidden" name="threshold_high" id="threshold_high" value="3">
         </div>
 
         <button type="submit" class="submit-btn" id="submitBtn">
@@ -342,6 +432,25 @@
         arrow.classList.toggle('open');
     }
 
+    // 세부 설정 토글
+    function toggleAdvancedSettings() {
+        var content = document.getElementById('advanced-settings-content');
+        var arrow = document.getElementById('advanced-settings-arrow');
+        content.classList.toggle('open');
+        arrow.classList.toggle('open');
+    }
+
+    // 세부 설정 요약 업데이트
+    function updateAdvancedSettingsSummary() {
+        var maMonths = document.getElementById('ma_months').value;
+        var thresholdLow = document.getElementById('threshold_low').value;
+        var thresholdHigh = document.getElementById('threshold_high').value;
+
+        document.getElementById('summaryMaMonths').textContent = maMonths;
+        document.getElementById('summaryThresholdLow').textContent = thresholdLow;
+        document.getElementById('summaryThresholdHigh').textContent = thresholdHigh;
+    }
+
     // 드롭다운 초기값 설정 (사용자 설정 기반)
     (function() {
         var maMonths = userSettings.ma_months || 3;
@@ -360,6 +469,8 @@
             });
             document.getElementById('ma_months').value = maMonths;
         }
+        // 요약 업데이트
+        updateAdvancedSettingsSummary();
     })();
 
     document.getElementById('reportForm').addEventListener('submit', function(e) {
@@ -442,6 +553,9 @@
 
             inputLow.value = lowValue;
             inputHigh.value = highValue;
+
+            // 세부 설정 요약 업데이트
+            updateAdvancedSettingsSummary();
         }
 
         function getValueFromPosition(clientX) {

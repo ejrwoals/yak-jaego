@@ -179,6 +179,10 @@
     box-sizing: border-box;
 }
 
+html {
+    scrollbar-gutter: stable;
+}
+
 body {
     font-family: var(--font-family);
     background: var(--color-background);
