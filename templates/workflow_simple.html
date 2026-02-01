@@ -166,6 +166,20 @@
         color: #718096;
         margin-left: 2px;
     }
+
+    /* Disabled radio option */
+    .radio-option.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .radio-option.disabled label {
+        cursor: not-allowed;
+    }
+
+    .radio-option.disabled input[type="radio"] {
+        cursor: not-allowed;
+    }
 </style>
 {% endblock %}
 
@@ -216,12 +230,16 @@
                         </span>
                     </label>
                 </div>
-                <div class="radio-option">
-                    <input type="radio" id="sale" name="mode" value="sale">
+                <div class="radio-option{% if not dev_mode %} disabled{% endif %}">
+                    <input type="radio" id="sale" name="mode" value="sale"{% if not dev_mode %} disabled{% endif %}>
                     <label for="sale">
                         <span class="radio-icon"><svg class="icon"><use href="#icon-building-2"></use></svg></span>
                         <span class="radio-text">
-                            <div class="radio-title">일반약</div>
+                            {% if dev_mode %}
+                            <div class="radio-title">일반약 <span style="font-size: 0.75em; opacity: 0.7;">(개발중)</span></div>
+                            {% else %}
+                            <div class="radio-title">일반약 <span style="font-size: 0.75em; opacity: 0.7;">(출시 예정)</span></div>
+                            {% endif %}
                             <div class="radio-desc">판매수량 기준</div>
                         </span>
                     </label>

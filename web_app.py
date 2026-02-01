@@ -107,7 +107,7 @@ def index():
 @app.route('/workflow/simple')
 def workflow_simple():
     """단순 재고 관리 보고서 워크플로우 페이지"""
-    return render_template('workflow_simple.html')
+    return render_template('workflow_simple.html', dev_mode=app.config['DEV_MODE'])
 
 
 @app.route('/workflow/order')
