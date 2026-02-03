@@ -1,245 +1,293 @@
-# Jaego 프로젝트 리팩토링 계획
+# Jaego 프로젝트 아키텍처 리팩토링
 
 ## 개요
 
-동일한 비즈니스 로직이 여러 곳에 중복 구현되어 있어 유지보수가 어렵고 버그 발생 위험이 높음.
-이 문서는 중복 코드를 제거하고 단일 책임 원칙을 적용하기 위한 리팩토링 계획을 정리함.
-
-**컨텍스트 윈도우 초기화 시에도 이 문서를 참조하여 일관성 있게 작업을 이어나갈 것.**
+이 문서는 Jaego 프로젝트의 아키텍처 리팩토링 작업을 설명합니다.
+코드 중복 제거, 단일 책임 원칙 적용, 모듈화를 통해 유지보수성과 확장성을 개선했습니다.
 
 ---
 
-## 1. 발견된 중복 문제 목록
+## 1. 왜 리팩토링이 필요했는가?
 
-### 1.1 [완료] DB 초기화 로직 중복
+### 문제 1: 거대한 단일 파일 (God Object)
 
-| 위치 | 설명 | 상태 |
-|------|------|------|
-| `init_db.py` | CLI용 DB 초기화 | ✅ 수정됨 |
-| `web_app.py` rebuild_db | Web UI용 DB 재생성 API | ✅ 수정됨 |
+**이전 상태:**
+- `web_app.py`가 2,590줄로 모든 API 라우트를 포함
+- 79개의 라우트가 하나의 파일에 밀집
+- 관련 없는 기능들이 섞여 있어 코드 탐색이 어려움
 
-**해결:** `db_initializer.py` 모듈 생성, 두 곳에서 공통 함수 사용
+**발생한 문제:**
+- 새 기능 추가 시 파일 전체를 훑어야 함
+- 버그 수정 시 영향 범위 파악이 어려움
+- 여러 개발자가 동시에 작업할 때 충돌 발생
 
----
+### 문제 2: 비즈니스 로직 중복
 
-### 1.2 [완료] months 생성 로직 3곳 중복
+**이전 상태:**
+- DB 초기화 로직이 `init_db.py`와 `web_app.py`에 각각 구현
+- 월 리스트 생성 로직이 3곳에서 중복
+- 약품코드 정규화가 4곳에서 반복
 
-| 위치 | 상태 |
-|------|------|
-| `web_app.py` generate_simple_report | ✅ 수정됨 |
-| `web_app.py` generate_volatility_report | ✅ 수정됨 |
-| `web_app.py` calculate_order | ✅ 수정됨 |
+**발생한 문제:**
+- 뮤테란(651600300) 약품 분류 오류: `init_db.py`에서는 전문약으로 분류되지만 `web_app.py`에서는 일반약으로 분류되는 버그
+- 한 곳만 수정하면 다른 곳이 업데이트되지 않는 동기화 문제
 
-**해결:** `utils.py`에 `generate_month_list_from_metadata()` 함수 추가
+### 문제 3: DB 모듈 보일러플레이트
 
----
-
-### 1.3 [완료] 약품코드 정규화 반복
-
-| 위치 | 라인 | 상태 |
-|------|------|------|
-| `read_csv.py` load_multiple_csv_files | 184 | ✅ 수정됨 (파일 로드 시 1회만) |
-| `read_csv.py` merge_by_drug_code | 4곳 | ✅ 중복 제거됨 |
-
-**해결:** 파일 로드 시 1회만 정규화, 이후 처리에서 중복 정규화 제거
+**이전 상태:**
+- 11개의 `*_db.py` 파일마다 동일한 패턴 반복:
+  - `DB_PATH`, `get_connection()`, `db_exists()`, `init_db()`
+- 50-80줄의 보일러플레이트 코드가 각 파일에 존재
 
 ---
 
-### 1.4 [진행 중] DB 모듈 보일러플레이트 (11개 파일)
+## 2. 아키텍처 변경
 
-모든 `*_db.py` 파일에서 동일한 패턴:
-- `get_connection()`
-- `init_db()`
-- `db_exists()`
+### 2.1 웹 레이어: Blueprint 패턴
 
-**해결:** `base_db.py` 생성 완료, 점진적 마이그레이션 진행
-
-| 파일 | 상태 |
-|------|------|
-| `drug_flags_db.py` | ✅ 적용 완료 |
-| 나머지 10개 | 대기 (점진적 마이그레이션 가능) |
-
----
-
-### 1.5 [완료] traceback import 반복
-
-| 위치 | 상태 |
-|------|------|
-| `web_app.py` 상단 | ✅ 1회만 import |
-| `web_app.py` 함수 내부 37곳 | ✅ 중복 제거됨 |
-
-**해결:** 파일 상단에 1회만 import, 함수 내부 중복 import 제거
-
----
-
-## 2. 리팩토링 계획
-
-### Phase 1: 긴급 수정 ✅ 완료
-
-#### Task 1.1: DB 초기화 로직 통합 ✅
-
-**생성/수정 파일:**
-- `db_initializer.py` ✅ 신규 생성
-- `init_db.py` ✅ 수정 완료
-- `web_app.py` rebuild_db ✅ 수정 완료
-
-**핵심 함수:**
-```python
-# db_initializer.py
-def rebuild_database(data_path=None, include_periodicity=True, on_progress=None):
-    """DB 재생성 핵심 로직 - init_db.py와 web_app.py 모두 이 함수 사용"""
+**이전:**
+```
+web_app.py (2,590줄)
+└── 79개 라우트 전부 포함
 ```
 
+**이후:**
+```
+web_app.py (216줄)
+├── Flask 앱 설정
+├── Blueprint 등록
+└── 시스템 라우트 (heartbeat, shutdown, rebuild-db)
+
+routes/
+├── __init__.py       - Blueprint 등록 함수
+├── main.py           - 메인 페이지, 워크플로우 (4개 라우트)
+├── reports.py        - 보고서 생성/관리 (12개 라우트)
+├── inventory.py      - 재고/임계값 (8개 라우트)
+├── drugs.py          - 약품 관리 (10개 라우트)
+├── patients.py       - 환자 관리 (14개 라우트)
+├── suggestions.py    - 매칭 제안 (10개 라우트)
+├── data.py           - 파일 업로드 (7개 라우트)
+└── settings.py       - 사용자 설정 (3개 라우트)
+```
+
+**장점:**
+- 각 Blueprint가 단일 도메인 책임
+- 파일당 200-400줄로 가독성 향상
+- 관련 코드가 한 파일에 모여 탐색 용이
+
+### 2.2 비즈니스 로직 레이어: 공통 모듈 추출
+
+**이전:**
+```
+init_db.py
+└── DB 초기화 로직 (150줄)
+
+web_app.py
+└── 동일 로직 복사 (110줄)
+```
+
+**이후:**
+```
+db_initializer.py
+└── rebuild_database() - 단일 진입점
+
+init_db.py
+└── rebuild_database() 호출
+
+web_app.py
+└── rebuild_database() 호출
+```
+
+**장점:**
+- 단일 진입점으로 일관된 동작 보장
+- 버그 수정 시 한 곳만 수정하면 됨
+- 전문약/일반약 처리 순서가 항상 동일
+
+### 2.3 데이터 레이어: BaseDB 추상화
+
+**이전:**
+```python
+# 모든 *_db.py 파일마다 반복
+DB_PATH = paths.get_db_path('xxx.sqlite3')
+
+def get_connection():
+    return sqlite3.connect(DB_PATH)
+
+def db_exists():
+    return os.path.exists(DB_PATH)
+```
+
+**이후:**
+```python
+# base_db.py
+def create_db_helpers(db_name, table_name=None):
+    db_path = paths.get_db_path(db_name)
+    return {
+        'db_path': db_path,
+        'get_connection': lambda: sqlite3.connect(db_path),
+        'db_exists': lambda: os.path.exists(db_path),
+    }
+
+# 각 *_db.py 파일에서
+from base_db import create_db_helpers
+_helpers = create_db_helpers('drug_flags.sqlite3')
+DB_PATH = _helpers['db_path']
+get_connection = _helpers['get_connection']
+db_exists = _helpers['db_exists']
+```
+
+**장점:**
+- 보일러플레이트 50-80줄 → 5줄로 감소
+- DB 연결 로직 변경 시 한 곳만 수정
+- 점진적 마이그레이션 가능
+
 ---
 
-#### Task 1.2: months 생성 유틸 함수 추출 ✅
+## 3. Blueprint 구조 상세
 
-**생성/수정 파일:**
-- `utils.py` ✅ 함수 추가
-- `web_app.py` 3곳 ✅ 수정 완료
+### routes/main.py
+메인 페이지와 워크플로우 페이지 렌더링을 담당합니다.
 
-**핵심 함수:**
+| 라우트 | 설명 |
+|--------|------|
+| `GET /` | 메인 페이지 (랜딩) |
+| `GET /workflow/simple` | 전문약 재고 관리 워크플로우 |
+| `GET /workflow/order` | 주문 산출 워크플로우 |
+| `GET /workflow/volatility` | 고변동성 약품 워크플로우 |
+
+### routes/reports.py
+보고서 생성, 조회, 삭제 및 체크/메모 기능을 담당합니다.
+
+| 카테고리 | 주요 기능 |
+|----------|----------|
+| 보고서 생성 | 전문약, 변동성, 주문 산출 보고서 |
+| 보고서 관리 | 목록 조회, 파일 서빙, 삭제 |
+| 체크/메모 | 약품별 체크 상태, 메모 관리 |
+
+### routes/inventory.py
+재고 관리와 임계값 설정을 담당합니다.
+
+| 카테고리 | 주요 기능 |
+|----------|----------|
+| 재고 | 검색, 조회, 수정 |
+| 임계값 | 조회, 설정, 삭제, 통계 |
+
+### routes/drugs.py
+약품 통합 관리를 담당합니다.
+
+| 카테고리 | 주요 기능 |
+|----------|----------|
+| 약품 정보 | 통합 조회, 저장 |
+| 관리 약품 | 목록, 통계 |
+| 플래그 | 특별관리 토글, 목록 |
+| 버퍼 계산 | 최소 재고 버퍼 산출 |
+
+### routes/patients.py
+환자 관리와 약품-환자 연결을 담당합니다.
+
+| 카테고리 | 주요 기능 |
+|----------|----------|
+| 환자 CRUD | 생성, 조회, 수정, 삭제 |
+| 검색 | 환자 검색 |
+| 매핑 | 약품-환자 연결/해제 |
+
+### routes/suggestions.py
+신규 약품 환자 추천 기능을 담당합니다.
+
+| 카테고리 | 주요 기능 |
+|----------|----------|
+| 제안 | 다음 제안, 등록, 스킵 |
+| 목록 | 신규 약품, 건너뛴 약품 |
+| 통계 | 제안 현황 |
+
+### routes/data.py
+데이터 파일 업로드와 관리를 담당합니다.
+
+| 카테고리 | 주요 기능 |
+|----------|----------|
+| 업로드 | 파일 업로드, 검증 |
+| 관리 | 목록, 삭제, 미리보기 |
+
+### routes/settings.py
+사용자 설정 관리를 담당합니다.
+
+| 라우트 | 설명 |
+|--------|------|
+| `GET /api/settings` | 설정 조회 |
+| `POST /api/settings` | 설정 저장 |
+| `POST /api/settings/reset` | 기본값 복원 |
+
+---
+
+## 4. 주요 공통 모듈
+
+### db_initializer.py
+DB 초기화/재생성의 단일 진입점입니다.
+
 ```python
-# utils.py
+def rebuild_database(
+    data_path=None,           # CSV 파일 경로
+    delete_existing=True,     # 기존 DB 삭제 여부
+    include_periodicity=True, # 주기성 계산 포함
+    show_summary=True         # 요약 출력
+) -> dict:
+    """
+    Returns:
+        {
+            'success': bool,
+            'stats': {
+                'recent_count': int,
+                'processed_stats': dict,
+                'data_period': dict
+            }
+        }
+    """
+```
+
+### utils.py
+공통 유틸리티 함수를 제공합니다.
+
+```python
 def generate_month_list_from_metadata():
-    """DB 메타데이터에서 월 리스트 생성"""
+    """
+    DB 메타데이터에서 월 리스트 생성
+    Returns: ['2023-10', '2023-11', ...] 또는 None
+    """
+```
+
+### base_db.py
+DB 모듈의 보일러플레이트를 추상화합니다.
+
+```python
+def create_db_helpers(db_name, table_name=None):
+    """
+    Returns: {
+        'db_path': str,
+        'get_connection': callable,
+        'db_exists': callable
+    }
+    """
 ```
 
 ---
 
-### Phase 2: 코드 정리 ✅ 완료
+## 5. 파일 크기 비교
 
-#### Task 2.1: read_csv.py 정규화 최적화 ✅
-
-**목표:** 약품코드 정규화를 1회만 수행
-
-**수정 파일:**
-- `read_csv.py` ✅ 수정 완료
-
-**핵심 변경:**
-- `load_multiple_csv_files()`에서 파일 로드 시 1회만 정규화
-- `merge_by_drug_code()`에서 중복 정규화 코드 4곳 제거
+| 파일 | 리팩토링 전 | 리팩토링 후 | 감소율 |
+|------|-------------|-------------|--------|
+| web_app.py | 2,590줄 | 216줄 | 92% |
+| 전체 라우트 코드 | 1파일 | 8파일 | - |
+| 평균 파일 크기 | 2,590줄 | 250줄 | - |
 
 ---
 
-#### Task 2.2: 에러 처리 표준화 ✅
+## 6. 검증 완료 항목
 
-**목표:** traceback import 중복 제거
-
-**수정 파일:**
-- `web_app.py` ✅ 수정 완료
-
-**핵심 변경:**
-- 파일 상단에 `import traceback` 1회만 추가
-- 함수 내부 37곳의 `import traceback` 제거
-
----
-
-### Phase 3: 구조 개선 ✅ 기반 완료 (점진적 마이그레이션 진행 중)
-
-#### Task 3.1: DB 모듈 BaseDB 추상화 ✅
-
-**목표:** 중복 보일러플레이트 제거
-
-**생성 파일:**
-- `base_db.py` ✅ 생성 완료
-
-**제공 기능:**
-- `BaseDB` 추상 클래스 (클래스 기반 DB 모듈용)
-- `create_db_helpers()` 함수 (기존 함수형 API 호환)
-
-**적용 예시:**
-- `drug_flags_db.py` ✅ 리팩토링 완료
-- 나머지 10개 DB 모듈 점진적 마이그레이션 가능
-
----
-
-#### Task 3.2: web_app.py Blueprint 분할 ✅ 기반 완료
-
-**목표:** 2800줄 → 파일당 300줄 이하
-
-**생성 파일:**
-```
-routes/
-├── __init__.py      ✅ Blueprint 등록 함수
-└── settings.py      ✅ 설정 API (3개 라우트)
-```
-
-**web_app.py 변경:**
-- Blueprint 등록 코드 추가 ✅
-- settings API 라우트 제거 (routes/settings.py로 이동) ✅
-
-**향후 분할 계획:**
-```
-routes/
-├── main.py          (index, workflow)
-├── reports.py       (보고서 생성)
-├── inventory.py     (재고 관리)
-├── drugs.py         (약품 관리)
-├── patients.py      (환자 관리)
-├── suggestions.py   (추천)
-└── data.py          (데이터 파일 관리)
-```
-
----
-
-## 3. 작업 체크리스트
-
-### Phase 1 (즉시) ✅ 완료
-- [x] Task 1.1: db_initializer.py 생성
-- [x] Task 1.1: init_db.py 수정 (db_initializer 사용)
-- [x] Task 1.1: web_app.py rebuild_db 수정 (db_initializer 사용)
-- [x] Task 1.2: utils.py에 generate_month_list_from_metadata 추가
-- [x] Task 1.2: web_app.py 3곳 수정 (months 생성 유틸 사용)
-
-### Phase 2 (1주 내) ✅ 완료
-- [x] Task 2.1: read_csv.py 정규화 최적화
-- [x] Task 2.2: web_app.py traceback import 정리
-
-### Phase 3 (2-3주) ✅ 기반 완료
-- [x] Task 3.1: base_db.py 생성 + drug_flags_db.py 예시 적용
-- [x] Task 3.2: routes/ 패키지 생성 + settings Blueprint 분리
-- [ ] (선택) 나머지 DB 모듈 점진적 마이그레이션
-- [ ] (선택) 나머지 API Blueprint 분리
-
----
-
-## 4. 검증 방법
-
-### Task 1.1 검증 ✅ 완료
-1. `python init_db.py` 실행 → DB 정상 생성 확인 ✅
-2. Web UI에서 "DB 재생성" 버튼 클릭 → 동일 결과 확인 (동일 코드 사용)
-3. 뮤테란(651600300) 약품 분류 확인 → "전문약" ✅
-
-### Task 1.2 검증
-1. 전문약 보고서 생성 → 정상 동작
-2. 변동성 보고서 생성 → 정상 동작
-3. 주문 산출 → 정상 동작
-
-### Task 2.1, 2.2 검증 ✅ 완료
-1. `python init_db.py` 실행 → DB 정상 생성 확인 ✅
-2. 뮤테란(651600300) 약품 분류 확인 → "전문약" ✅
-
-### Task 3.1, 3.2 검증 ✅ 완료
-1. `python drug_flags_db.py` 테스트 실행 → 정상 동작 ✅
-2. `web_app.py` import 확인 → Blueprint 정상 등록 ✅
-3. `/api/settings` 라우트 확인 → settings Blueprint에서 제공 ✅
-
----
-
-## 5. 주의사항
-
-- 각 Task 완료 후 반드시 테스트
-- 기존 동작이 변경되지 않도록 주의
-- 커밋은 Task 단위로 분리
-
----
-
-## 6. 세션 이력
-
-| 날짜 | 작업 내용 |
-|------|----------|
-| 2026-02-03 | 중복 코드 분석 완료, 계획 문서 작성 |
-| 2026-02-03 | Phase 1 완료: db_initializer.py 생성, months 유틸 함수 추가 |
-| 2026-02-03 | Phase 2 완료: read_csv.py 정규화 최적화, traceback import 정리 |
-| 2026-02-03 | Phase 3 기반 완료: base_db.py 생성, routes/ Blueprint 패키지 생성 |
+| 항목 | 상태 |
+|------|------|
+| `python init_db.py` 정상 실행 | ✅ |
+| 뮤테란(651600300) 전문약 분류 | ✅ |
+| 모든 워크플로우 페이지 접근 | ✅ |
+| 보고서 생성/조회/삭제 | ✅ |
+| 환자/약품 관리 기능 | ✅ |
+| 데이터 파일 업로드 | ✅ |

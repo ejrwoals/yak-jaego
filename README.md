@@ -373,6 +373,16 @@ yak-jaego/
 │   ├── workflow_volatility.html   # 고변동성 약품 보고서 워크플로우 페이지
 │   ├── data_manage.html           # 데이터 파일 관리 페이지 (업로드/삭제/미리보기/검증)
 │   └── error.html                 # 에러 페이지
+├── routes/                        # Flask Blueprint 라우트 모듈 폴더
+│   ├── __init__.py                # Blueprint 등록 함수 (register_blueprints)
+│   ├── main.py                    # 메인 페이지, 워크플로우 페이지 (4개 라우트)
+│   ├── reports.py                 # 보고서 생성/관리, 체크/메모 (12개 라우트)
+│   ├── inventory.py               # 재고 관리, 임계값 설정 (8개 라우트)
+│   ├── drugs.py                   # 약품 관리, 플래그, 버퍼 계산 (10개 라우트)
+│   ├── patients.py                # 환자 관리, 약품-환자 연결 (14개 라우트)
+│   ├── suggestions.py             # 환자-약품 매칭 제안 (10개 라우트)
+│   ├── data.py                    # 데이터 파일 업로드/관리 (7개 라우트)
+│   └── settings.py                # 사용자 설정 API (3개 라우트)
 ├── inventory_reports/             # 재고 관리 보고서 폴더 (자동 생성)
 │   └── simple_report_YYYYMMDD_HHMMSS.html      # 재고 관리 보고서 (N-MA)
 ├── order_calc_reports/            # 주문 수량 산출 보고서 폴더 (자동 생성)
@@ -445,6 +455,19 @@ yak-jaego/
 - DB 재구축이 필요할 때
 
 ### web_app.py - 웹 UI 메인 애플리케이션 (사용자용)
+
+#### 아키텍처:
+- **Blueprint 패턴**: 79개의 라우트를 8개의 Blueprint 모듈로 분리하여 유지보수성 향상
+- **web_app.py**: Flask 앱 설정, 시스템 라우트 (heartbeat, shutdown, rebuild-db)만 포함
+- **routes/ 폴더**: 비즈니스 로직 라우트를 도메인별로 분리
+  - `main.py`: 메인 페이지, 워크플로우 페이지
+  - `reports.py`: 보고서 생성/관리, 체크/메모
+  - `inventory.py`: 재고 관리, 임계값 설정
+  - `drugs.py`: 약품 관리, 플래그, 버퍼 계산
+  - `patients.py`: 환자 관리, 약품-환자 연결
+  - `suggestions.py`: 환자-약품 매칭 제안
+  - `data.py`: 데이터 파일 업로드/관리
+  - `settings.py`: 사용자 설정 API
 
 #### 주요 특징:
 - **Flask 기반 웹 인터페이스**: 브라우저에서 직관적으로 사용
