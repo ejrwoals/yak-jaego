@@ -6,6 +6,7 @@
 
 import pandas as pd
 import os
+from datetime import datetime
 
 
 def normalize_drug_code(code):
@@ -95,6 +96,49 @@ def safe_float_conversion(value, default=0.0):
         return float(value)
     except (ValueError, TypeError):
         return default
+
+
+def generate_month_list_from_metadata():
+    """
+    drug_timeseries_db의 메타데이터에서 월 리스트 생성
+
+    DB에 저장된 month_list가 있으면 그대로 반환하고,
+    없으면 start_month와 total_months로 생성합니다.
+
+    Returns:
+        list: ['2023-10', '2023-11', ...] 형태의 월 리스트
+              메타데이터가 없으면 None 반환
+
+    Examples:
+        >>> months = generate_month_list_from_metadata()
+        >>> if months:
+        >>>     print(f"분석 기간: {months[0]} ~ {months[-1]}")
+    """
+    import drug_timeseries_db
+    from dateutil.relativedelta import relativedelta
+
+    data_period = drug_timeseries_db.get_metadata()
+    if not data_period:
+        return None
+
+    # DB에 month_list가 저장되어 있으면 그대로 사용
+    if 'month_list' in data_period and data_period['month_list']:
+        return data_period['month_list']
+
+    # 없으면 start_month와 total_months로 생성
+    start_month = data_period.get('start_month')
+    total_months = data_period.get('total_months')
+
+    if not start_month or not total_months:
+        return None
+
+    start_date = datetime.strptime(start_month, '%Y-%m')
+    months = []
+    for i in range(total_months):
+        month_date = start_date + relativedelta(months=i)
+        months.append(month_date.strftime('%Y-%m'))
+
+    return months
 
 
 def read_today_file(base_name_or_path='today'):

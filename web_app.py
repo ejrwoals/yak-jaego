@@ -11,6 +11,7 @@ Flask 기반 웹 애플리케이션
 import os
 import sys
 import json
+import traceback
 import webbrowser
 from datetime import datetime
 from threading import Timer
@@ -43,6 +44,10 @@ from read_csv import extract_month_from_file
 app = Flask(__name__,
             template_folder=paths.get_bundle_path('templates'),
             static_folder=paths.get_bundle_path('static'))
+
+# Blueprint 등록
+from routes import register_blueprints
+register_blueprints(app)
 app.config['JSON_AS_ASCII'] = False  # 한글 JSON 출력 지원
 app.config['UPLOAD_FOLDER'] = paths.UPLOADS_PATH  # 임시 업로드 폴더
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 제한
@@ -152,23 +157,11 @@ def generate_simple_report_route():
         if df.empty:
             return jsonify({'status': 'error', 'message': f'{drug_type} 데이터가 없습니다.'}), 404
 
-        # DB 메타데이터에서 월 정보 추출
-        data_period = drug_timeseries_db.get_metadata()
+        # DB 메타데이터에서 월 정보 추출 (공통 유틸 함수 사용)
+        from utils import generate_month_list_from_metadata
+        months = generate_month_list_from_metadata()
 
-        if data_period:
-            # 메타데이터에서 정확한 월 범위 가져오기
-            start_month = data_period['start_month']
-            end_month = data_period['end_month']
-            total_months = data_period['total_months']
-
-            # 시작 월부터 종료 월까지 연속된 월 생성
-            from dateutil.relativedelta import relativedelta
-            start_date = datetime.strptime(start_month, '%Y-%m')
-            months = []
-            for i in range(total_months):
-                month_date = start_date + relativedelta(months=i)
-                months.append(month_date.strftime('%Y-%m'))
-        else:
+        if not months:
             # 메타데이터가 없는 경우 (fallback)
             first_record = df.iloc[0]
             num_months = len(first_record['월별_조제수량_리스트'])
@@ -192,7 +185,6 @@ def generate_simple_report_route():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -221,20 +213,11 @@ def generate_volatility_report_route():
         if df.empty:
             return jsonify({'status': 'error', 'message': f'{drug_type} 데이터가 없습니다.'}), 404
 
-        # DB 메타데이터에서 월 정보 추출
-        data_period = drug_timeseries_db.get_metadata()
+        # DB 메타데이터에서 월 정보 추출 (공통 유틸 함수 사용)
+        from utils import generate_month_list_from_metadata
+        months = generate_month_list_from_metadata()
 
-        if data_period:
-            start_month = data_period['start_month']
-            total_months = data_period['total_months']
-
-            from dateutil.relativedelta import relativedelta
-            start_date = datetime.strptime(start_month, '%Y-%m')
-            months = []
-            for i in range(total_months):
-                month_date = start_date + relativedelta(months=i)
-                months.append(month_date.strftime('%Y-%m'))
-        else:
+        if not months:
             first_record = df.iloc[0]
             num_months = len(first_record['월별_조제수량_리스트'])
             months = [f"Month {i+1}" for i in range(num_months)]
@@ -261,7 +244,6 @@ def generate_volatility_report_route():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -393,15 +375,9 @@ def calculate_order():
             'today_usage': '당일_소모수량'
         }
 
-        # months 생성 (차트용)
-        months = []
-        data_period = drug_timeseries_db.get_metadata()
-        if data_period:
-            from dateutil.relativedelta import relativedelta
-            start_date = datetime.strptime(data_period['start_month'], '%Y-%m')
-            for i in range(data_period['total_months']):
-                month_date = start_date + relativedelta(months=i)
-                months.append(month_date.strftime('%Y-%m'))
+        # months 생성 (차트용) - 공통 유틸 함수 사용
+        from utils import generate_month_list_from_metadata
+        months = generate_month_list_from_metadata() or []
 
         # 오늘의 매출 합계 계산 (조제금액, 총 판매금액)
         # 마지막 행은 합계 행이므로 제외
@@ -453,7 +429,6 @@ def calculate_order():
             os.remove(temp_filepath)
             print(f"🗑️  임시 파일 삭제 (에러): {temp_filepath}")
 
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -537,7 +512,6 @@ def list_reports(report_type):
         return jsonify({'reports': reports})
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -568,88 +542,39 @@ def serve_report(filename):
 
 @app.route('/api/rebuild-db', methods=['POST'])
 def rebuild_db():
-    """DB 재생성 API (init_db.py 기능 실행)"""
+    """DB 재생성 API (db_initializer 모듈 사용)"""
     global _long_operation_in_progress
     try:
         _long_operation_in_progress = True  # auto-shutdown 방지
         print("\n🔄 DB 재생성 요청 받음...")
 
-        from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
+        from db_initializer import rebuild_database
 
-        # Step 1: 월별 CSV 로드
-        print("🔍 월별 CSV 파일 로드 중...")
-        monthly_data = load_multiple_csv_files()  # paths.DATA_PATH 사용
+        # db_initializer의 공통 로직 사용
+        result = rebuild_database(
+            delete_existing=True,
+            include_periodicity=True,
+            show_summary=False
+        )
 
-        if not monthly_data:
-            return jsonify({'error': 'CSV 파일을 로드할 수 없습니다.'}), 400
+        if not result['success']:
+            return jsonify({'error': result.get('error', 'DB 재생성 실패')}), 500
 
-        # 기존 DB 삭제
-        print("🗑️  기존 DB 삭제 중...")
-        if inventory_db.db_exists():
-            os.remove(paths.get_db_path('recent_inventory.sqlite3'))
-        if drug_timeseries_db.db_exists():
-            os.remove(paths.get_db_path('drug_timeseries.sqlite3'))
-
-        # Step 2: DB 초기화
-        print("💽 데이터베이스 초기화 중...")
-        inventory_db.init_db()
-        drug_timeseries_db.init_db()
-
-        # Step 3: 일반약 처리 (먼저 처리)
-        # 전문약 중 일부가 일반약으로도 판매되는 경우가 있음 (예: 뮤테란)
-        # 이 경우 전문약으로 분류하는 것이 맞으므로, 일반약을 먼저 처리하고 전문약이 덮어쓰도록 함
-        print("🔄 일반약 데이터 처리 중...")
-        df_sale, months = merge_by_drug_code(monthly_data, mode='sale')
-        df_sale = calculate_statistics(df_sale, months)
-
-        # 통계 DB에 저장
-        drug_timeseries_db.upsert_processed_data(df_sale, drug_type='일반약', show_summary=False)
-
-        # 메타데이터 저장
-        drug_timeseries_db.save_metadata(months)
-
-        # 재고 DB에 저장
-        inventory_data = df_sale[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
-        inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
-        inventory_data['약품유형'] = '일반약'
-        inventory_db.upsert_inventory(inventory_data, show_summary=False)
-
-        # Step 4: 전문약 처리 (나중에 처리하여 덮어씀)
-        # 조제수량과 판매수량이 모두 있는 약품은 전문약으로 최종 분류됨
-        print("🔄 전문약 데이터 처리 중...")
-        df_dispense, months = merge_by_drug_code(monthly_data, mode='dispense')
-        df_dispense = calculate_statistics(df_dispense, months)
-
-        # 통계 DB에 저장
-        drug_timeseries_db.upsert_processed_data(df_dispense, drug_type='전문약', show_summary=False)
-
-        # 재고 DB에 저장
-        inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
-        inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
-        inventory_data['약품유형'] = '전문약'
-        inventory_db.upsert_inventory(inventory_data, show_summary=False)
-
-        print("✅ DB 재생성 완료!")
-
-        # 최종 통계
-        recent_count = inventory_db.get_inventory_count()
-        processed_stats = drug_timeseries_db.get_statistics()
-        data_period = drug_timeseries_db.get_metadata()
-        new_drug_count = recent_count - processed_stats['total']
+        stats = result['stats']
+        new_drug_count = stats['recent_count'] - stats['processed_stats']['total']
 
         return jsonify({
             'success': True,
             'message': 'DB 재생성이 완료되었습니다.',
             'stats': {
-                'recent_count': recent_count,
-                'processed_stats': processed_stats,
-                'data_period': data_period,
+                'recent_count': stats['recent_count'],
+                'processed_stats': stats['processed_stats'],
+                'data_period': stats['data_period'],
                 'new_drug_count': new_drug_count
             }
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': f'DB 재생성 실패: {str(e)}'}), 500
     finally:
@@ -663,7 +588,6 @@ def get_checked_items_api():
         checked_items = checked_items_db.get_checked_items()
         return jsonify({'status': 'success', 'checked_items': list(checked_items)})
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -688,7 +612,6 @@ def toggle_checked_item():
         return jsonify({'status': 'success', 'message': '체크 상태가 업데이트되었습니다.'})
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -713,7 +636,6 @@ def update_memo():
         return jsonify({'status': 'success', 'message': '메모가 저장되었습니다.'})
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -733,7 +655,6 @@ def get_memo():
         return jsonify({'status': 'success', 'memo': memo})
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -808,7 +729,6 @@ def delete_report():
             return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -835,7 +755,6 @@ def search_inventory_api():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -855,7 +774,6 @@ def get_inventory_api(drug_code):
             return jsonify({'status': 'error', 'message': '해당 약품을 찾을 수 없습니다.'}), 404
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -896,7 +814,6 @@ def update_inventory_api():
             return jsonify({'status': 'error', 'message': result['message']}), 404
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -966,7 +883,6 @@ def set_drug_threshold(drug_code):
             }), 500
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1086,7 +1002,6 @@ def get_all_memos_api():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1164,7 +1079,6 @@ def get_drug_management(drug_code):
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1277,7 +1191,6 @@ def save_drug_management(drug_code):
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1380,7 +1293,6 @@ def get_managed_drugs():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1674,7 +1586,6 @@ def get_patients_with_drugs():
             'data': result
         })
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1740,7 +1651,6 @@ def get_patient_drugs_with_stock(patient_id):
             'drugs': result
         })
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1798,7 +1708,6 @@ def link_drug_to_patient(patient_id):
         else:
             return jsonify({'status': 'error', 'message': result['message']}), 400
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1817,7 +1726,6 @@ def unlink_drug_from_patient(patient_id, drug_code):
         else:
             return jsonify({'status': 'error', 'message': result['message']}), 404
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1910,7 +1818,6 @@ def calculate_drug_buffer(drug_code):
             'data': result
         })
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1975,7 +1882,6 @@ def get_suggestion_status():
         result = suggestion_engine.get_activation_status()
         return jsonify({'status': 'success', 'data': result})
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1994,7 +1900,6 @@ def get_next_suggestion():
                 'message': '제안할 약품이 없습니다.'
             })
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2021,7 +1926,6 @@ def register_suggestion():
             return jsonify({'status': 'error', 'message': result['message']}), 400
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2048,7 +1952,6 @@ def skip_suggestion():
             return jsonify({'status': 'error', 'message': result['message']}), 500
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2064,7 +1967,6 @@ def get_new_drugs():
             'data': drugs
         })
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2076,7 +1978,6 @@ def get_suggestion_stats():
         stats = suggestion_engine.get_suggestion_stats()
         return jsonify({'status': 'success', 'data': stats})
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2092,7 +1993,6 @@ def get_skipped_drugs():
             'count': len(drugs)
         })
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2111,7 +2011,6 @@ def clear_skipped_drugs():
         else:
             return jsonify({'status': 'error', 'message': result['message']}), 500
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2126,7 +2025,6 @@ def get_drug_suggestion(drug_code):
         else:
             return jsonify({'status': 'error', 'message': '약품을 찾을 수 없습니다.'}), 404
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -2249,7 +2147,6 @@ def list_data_files():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2335,9 +2232,17 @@ def upload_data_file():
         if not os.path.exists(data_path):
             os.makedirs(data_path)
 
-        # 원본 파일명 유지 - 중복 시 숫자 추가
+        # 파일명 결정
         original_filename = file.filename
-        save_filename = original_filename
+        _, ext = os.path.splitext(original_filename)
+
+        # 사용자가 월을 직접 지정한 경우: 파일명을 YYYY-MM.확장자로 표준화
+        # (이후 로직에서 파일명으로 날짜 추출 가능하도록)
+        if custom_month:
+            save_filename = f"{month}{ext}"
+        else:
+            save_filename = original_filename
+
         file_path = os.path.join(data_path, save_filename)
 
         # 동일 파일명이 존재하는 경우 처리
@@ -2378,7 +2283,6 @@ def upload_data_file():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2419,7 +2323,6 @@ def delete_data_file():
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2481,7 +2384,6 @@ def preview_data_file(filename):
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2584,7 +2486,6 @@ def validate_data_file(filename):
         })
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2633,73 +2534,8 @@ def shutdown():
 
 
 # =============================================================================
-# 사용자 설정 API
+# 사용자 설정 API - routes/settings.py로 이동됨
 # =============================================================================
-
-@app.route('/api/settings', methods=['GET'])
-def get_settings():
-    """사용자 설정 조회 API"""
-    try:
-        settings = user_settings_db.get_all_settings()
-        return jsonify({
-            'success': True,
-            'settings': settings
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/settings', methods=['POST'])
-def save_settings():
-    """사용자 설정 저장 API"""
-    try:
-        data = request.get_json()
-
-        # 유효성 검사
-        ma_months = int(data.get('ma_months', 3))
-        threshold_low = int(data.get('threshold_low', 1))
-        threshold_high = int(data.get('threshold_high', 3))
-        runway_threshold = float(data.get('runway_threshold', 1.0))
-
-        # 범위 검사
-        if not (1 <= ma_months <= 12):
-            return jsonify({'success': False, 'message': '이동평균 개월 수는 1~12 사이여야 합니다.'}), 400
-        if not (1 <= threshold_low < threshold_high <= 24):
-            return jsonify({'success': False, 'message': '런웨이 경계값 설정이 올바르지 않습니다.'}), 400
-        if not (0.5 <= runway_threshold <= 6):
-            return jsonify({'success': False, 'message': '강조 표시 기준은 0.5~6 사이여야 합니다.'}), 400
-
-        # 저장
-        result = user_settings_db.set_all_settings({
-            'ma_months': ma_months,
-            'threshold_low': threshold_low,
-            'threshold_high': threshold_high,
-            'runway_threshold': runway_threshold
-        })
-
-        if result['success']:
-            return jsonify({'success': True, 'message': '설정이 저장되었습니다.'})
-        else:
-            return jsonify({'success': False, 'message': result['message']}), 500
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/settings/reset', methods=['POST'])
-def reset_settings():
-    """설정을 기본값으로 복원하는 API"""
-    try:
-        result = user_settings_db.reset_to_defaults()
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'settings': result['settings'],
-                'message': '기본값으로 복원되었습니다.'
-            })
-        else:
-            return jsonify({'success': False, 'message': result['message']}), 500
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 def check_heartbeat_timeout():

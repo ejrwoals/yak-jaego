@@ -11,14 +11,10 @@
 사용법: python init_db.py
 """
 
-import os
 import sys
-from read_csv import load_multiple_csv_files, merge_by_drug_code, calculate_statistics
+from db_initializer import rebuild_database, get_existing_db_info
 import inventory_db
 import drug_timeseries_db
-import periodicity_calculator
-import drug_periodicity_db
-import paths
 
 
 def main():
@@ -28,16 +24,14 @@ def main():
     print()
 
     # 기존 DB 확인
-    has_recent_db = inventory_db.db_exists()
-    has_processed_db = drug_timeseries_db.db_exists()
+    db_info = get_existing_db_info()
 
-    if has_recent_db or has_processed_db:
+    if db_info['has_recent_db'] or db_info['has_processed_db']:
         print("⚠️  기존 데이터베이스가 발견되었습니다:")
-        if has_recent_db:
-            count = inventory_db.get_inventory_count()
-            print(f"   - recent_inventory.sqlite3 (재고: {count}개)")
-        if has_processed_db:
-            stats = drug_timeseries_db.get_statistics()
+        if db_info['has_recent_db']:
+            print(f"   - recent_inventory.sqlite3 (재고: {db_info['recent_count']}개)")
+        if db_info['has_processed_db']:
+            stats = db_info['processed_stats']
             print(f"   - drug_timeseries.sqlite3 (통계: {stats['total']}개)")
 
         print()
@@ -47,89 +41,30 @@ def main():
             print("\n❌ 초기화를 취소했습니다.")
             sys.exit(0)
 
-        print("\n🗑️  기존 DB 삭제 중...")
-        if has_recent_db:
-            os.remove(paths.get_db_path('recent_inventory.sqlite3'))
-            print("   ✅ recent_inventory.sqlite3 삭제 완료")
-        if has_processed_db:
-            os.remove(paths.get_db_path('drug_timeseries.sqlite3'))
-            print("   ✅ drug_timeseries.sqlite3 삭제 완료")
-        print()
-
-    # Step 1: 월별 CSV 로드
-    print("🔍 Step 1: 월별 CSV 파일 로드")
+    # DB 재생성 실행
+    print("\n🔄 DB 재생성을 시작합니다...")
     print("-" * 60)
-    monthly_data = load_multiple_csv_files()  # paths.DATA_PATH 사용
 
-    if not monthly_data:
-        print("❌ CSV 파일을 로드할 수 없습니다.")
+    result = rebuild_database(
+        delete_existing=True,
+        include_periodicity=True,
+        show_summary=True
+    )
+
+    if not result['success']:
+        print(f"\n❌ DB 재생성 실패: {result.get('error', '알 수 없는 오류')}")
         sys.exit(1)
 
-    # Step 2: DB 초기화
-    print("\n💽 Step 2: 데이터베이스 초기화")
-    print("-" * 60)
-    inventory_db.init_db()
-    drug_timeseries_db.init_db()
-
-    # Step 3: 일반약 처리 (먼저 처리)
-    # 전문약 중 일부가 일반약으로도 판매되는 경우가 있음 (예: 뮤테란)
-    # 이 경우 전문약으로 분류하는 것이 맞으므로, 일반약을 먼저 처리하고 전문약이 덮어쓰도록 함
-    print("\n🔄 Step 3: 일반약 데이터 처리")
-    print("-" * 60)
-    print("   데이터 통합 및 통계 계산 중...")
-    df_sale, months = merge_by_drug_code(monthly_data, mode='sale')
-    df_sale = calculate_statistics(df_sale, months)
-    print(f"   ✅ 일반약 {len(df_sale)}개 처리 완료")
-
-    # 통계 DB에 저장
-    print("   💾 drug_timeseries.sqlite3에 저장 중...")
-    drug_timeseries_db.upsert_processed_data(df_sale, drug_type='일반약')
-
-    # 메타데이터 저장 (첫 번째 처리 시에만)
-    drug_timeseries_db.save_metadata(months)
-
-    # 재고 DB에 저장
-    print("   💾 recent_inventory.sqlite3에 저장 중...")
-    inventory_data = df_sale[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
-    inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
-    inventory_data['약품유형'] = '일반약'
-    inventory_db.upsert_inventory(inventory_data, show_summary=True)
-
-    # Step 4: 전문약 처리 (나중에 처리하여 덮어씀)
-    # 조제수량과 판매수량이 모두 있는 약품은 전문약으로 최종 분류됨
-    print("\n🔄 Step 4: 전문약 데이터 처리")
-    print("-" * 60)
-    print("   데이터 통합 및 통계 계산 중...")
-    df_dispense, months = merge_by_drug_code(monthly_data, mode='dispense')
-    df_dispense = calculate_statistics(df_dispense, months)
-    print(f"   ✅ 전문약 {len(df_dispense)}개 처리 완료")
-
-    # 통계 DB에 저장
-    print("   💾 drug_timeseries.sqlite3에 저장 중...")
-    drug_timeseries_db.upsert_processed_data(df_dispense, drug_type='전문약')
-
-    # 재고 DB에 저장 (최종_재고수량만)
-    print("   💾 recent_inventory.sqlite3에 저장 중...")
-    inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
-    inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
-    inventory_data['약품유형'] = '전문약'
-    inventory_db.upsert_inventory(inventory_data, show_summary=True)
-
-    # Step 4.5: 주기성 지표 계산
-    print("\n🔄 Step 4.5: 주기성 지표 계산")
-    print("-" * 60)
-    print("   기존 주기성 데이터 초기화 중...")
-    drug_periodicity_db.clear_all()
-    result = periodicity_calculator.calculate_all_periodicity(show_progress=True)
-    print(f"   ✅ 주기성 계산 완료: {result['calculated']}/{result['total']}개")
-
-    # Step 5: 최종 통계 출력
+    # 최종 통계 출력
     print("\n" + "=" * 60)
     print("✅ 데이터베이스 초기화 완료!")
     print("=" * 60)
 
+    stats = result['stats']
+    months = result['months']
+
     print("\n📊 recent_inventory.sqlite3 (최신 재고):")
-    print(f"   총 {inventory_db.get_inventory_count()}개 약품")
+    print(f"   총 {stats['recent_count']}개 약품")
     df_recent = inventory_db.get_all_inventory_as_df()
     if '약품유형' in df_recent.columns:
         type_counts = df_recent['약품유형'].value_counts()
@@ -137,9 +72,9 @@ def main():
             print(f"   - {drug_type}: {count}개")
 
     print("\n📊 drug_timeseries.sqlite3 (시계열 통계):")
-    stats = drug_timeseries_db.get_statistics()
-    print(f"   총 {stats['total']}개 약품")
-    for drug_type, count in stats['by_type'].items():
+    processed_stats = stats['processed_stats']
+    print(f"   총 {processed_stats['total']}개 약품")
+    for drug_type, count in processed_stats['by_type'].items():
         print(f"   - {drug_type}: {count}개")
 
     print(f"\n📅 분석 기간: {months[0]} ~ {months[-1]} ({len(months)}개월)")

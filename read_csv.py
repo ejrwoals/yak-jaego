@@ -179,6 +179,9 @@ def load_multiple_csv_files(directory=None):
                         pass
 
             if df is not None:
+                # 파일 로드 시 약품코드 정규화 (1회만 수행)
+                if '약품코드' in df.columns:
+                    df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
                 monthly_data[month] = df
                 print(f"  ✅ 성공: {len(df)}개 행")
             else:
@@ -207,11 +210,10 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
     print(f"\n약품코드 기준으로 데이터 통합 중... (모드: {mode_name})")
 
     # 모든 약품코드 수집 (NaN 제외)
+    # 참고: 약품코드는 load_multiple_csv_files()에서 이미 정규화됨
     all_drug_codes = set()
     for month, df in monthly_data.items():
         if '약품코드' in df.columns:
-            # 약품코드 정규화 (utils.normalize_drug_code 사용)
-            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
             # 'nan' 제외하고 수집
             codes = df['약품코드'].unique()
             all_drug_codes.update([code for code in codes if code != 'nan'])
@@ -243,8 +245,7 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
             if '약품코드' not in df.columns:
                 continue
 
-            # 해당 약품코드 찾기 (정규화)
-            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
+            # 해당 약품코드 찾기
             drug_row = df[df['약품코드'] == drug_code]
 
             if not drug_row.empty:
@@ -262,8 +263,7 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
             if '약품코드' not in df.columns:
                 continue
 
-            # 해당 약품코드 찾기 (정규화)
-            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
+            # 해당 약품코드 찾기
             drug_row = df[df['약품코드'] == drug_code]
 
             if not drug_row.empty:
@@ -300,7 +300,6 @@ def merge_by_drug_code(monthly_data, mode='dispense'):
             if '약품코드' not in df.columns:
                 continue
 
-            df['약품코드'] = df['약품코드'].apply(normalize_drug_code)
             drug_row = df[df['약품코드'] == drug_code]
 
             if not drug_row.empty and '재고수량' in drug_row.columns:

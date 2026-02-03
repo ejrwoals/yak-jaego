@@ -7,21 +7,19 @@ drug_flags_db.py
 약품별 특별관리 표시 (별표) 저장소
 """
 
-import os
 import sqlite3
 from datetime import datetime
 
-import paths
+from base_db import create_db_helpers
 
 
-DB_PATH = paths.get_db_path('drug_flags.sqlite3')
+# base_db 헬퍼 사용 (보일러플레이트 제거)
+_helpers = create_db_helpers('drug_flags.sqlite3', 'drug_flags')
+DB_PATH = _helpers['db_path']
+get_connection = _helpers['get_connection']
+db_exists = _helpers['db_exists']
+
 TABLE_NAME = 'drug_flags'
-
-
-def get_connection():
-    """데이터베이스 연결 반환"""
-    conn = sqlite3.connect(DB_PATH)
-    return conn
 
 
 def init_db():
@@ -47,11 +45,6 @@ def init_db():
     except Exception as e:
         print(f"drug_flags DB 초기화 실패: {e}")
         return False
-
-
-def db_exists():
-    """DB 파일 존재 여부 확인"""
-    return os.path.exists(DB_PATH)
 
 
 def get_flag(약품코드):
