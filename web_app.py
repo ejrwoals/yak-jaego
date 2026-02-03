@@ -595,24 +595,9 @@ def rebuild_db():
         inventory_db.init_db()
         drug_timeseries_db.init_db()
 
-        # Step 3: 전문약 처리
-        print("🔄 전문약 데이터 처리 중...")
-        df_dispense, months = merge_by_drug_code(monthly_data, mode='dispense')
-        df_dispense = calculate_statistics(df_dispense, months)
-
-        # 통계 DB에 저장
-        drug_timeseries_db.upsert_processed_data(df_dispense, drug_type='전문약', show_summary=False)
-
-        # 메타데이터 저장
-        drug_timeseries_db.save_metadata(months)
-
-        # 재고 DB에 저장
-        inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
-        inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
-        inventory_data['약품유형'] = '전문약'
-        inventory_db.upsert_inventory(inventory_data, show_summary=False)
-
-        # Step 4: 일반약 처리
+        # Step 3: 일반약 처리 (먼저 처리)
+        # 전문약 중 일부가 일반약으로도 판매되는 경우가 있음 (예: 뮤테란)
+        # 이 경우 전문약으로 분류하는 것이 맞으므로, 일반약을 먼저 처리하고 전문약이 덮어쓰도록 함
         print("🔄 일반약 데이터 처리 중...")
         df_sale, months = merge_by_drug_code(monthly_data, mode='sale')
         df_sale = calculate_statistics(df_sale, months)
@@ -620,10 +605,28 @@ def rebuild_db():
         # 통계 DB에 저장
         drug_timeseries_db.upsert_processed_data(df_sale, drug_type='일반약', show_summary=False)
 
+        # 메타데이터 저장
+        drug_timeseries_db.save_metadata(months)
+
         # 재고 DB에 저장
         inventory_data = df_sale[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
         inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
         inventory_data['약품유형'] = '일반약'
+        inventory_db.upsert_inventory(inventory_data, show_summary=False)
+
+        # Step 4: 전문약 처리 (나중에 처리하여 덮어씀)
+        # 조제수량과 판매수량이 모두 있는 약품은 전문약으로 최종 분류됨
+        print("🔄 전문약 데이터 처리 중...")
+        df_dispense, months = merge_by_drug_code(monthly_data, mode='dispense')
+        df_dispense = calculate_statistics(df_dispense, months)
+
+        # 통계 DB에 저장
+        drug_timeseries_db.upsert_processed_data(df_dispense, drug_type='전문약', show_summary=False)
+
+        # 재고 DB에 저장
+        inventory_data = df_dispense[['약품코드', '약품명', '제약회사', '최종_재고수량']].copy()
+        inventory_data.rename(columns={'최종_재고수량': '현재_재고수량'}, inplace=True)
+        inventory_data['약품유형'] = '전문약'
         inventory_db.upsert_inventory(inventory_data, show_summary=False)
 
         print("✅ DB 재생성 완료!")
