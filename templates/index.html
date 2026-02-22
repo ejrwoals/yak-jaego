@@ -485,6 +485,12 @@
                 <svg class="icon"><use href="#icon-bar-chart-2"></use></svg>
                 <span>분석 보고서</span>
             </button>
+            <button class="tab-button" onclick="switchTab('trash')">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                <span>약 휴지통</span>
+            </button>
         </div>
 
         <div id="tab-timeseries" class="tab-content">
@@ -556,6 +562,39 @@
                 </div>
             </div>
         </div>
+        <div id="tab-trash" class="tab-content">
+            <div class="workflow-content">
+                <div class="workflow-grid">
+                    <div class="workflow-section section-new">
+                        <h3>
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                            </svg>
+                            약 휴지통 관리
+                        </h3>
+                        <div class="action-buttons">
+                            <a href="/workflow/trash" class="btn-new">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                </svg>
+                                휴지통 관리 페이지
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="workflow-section section-history">
+                        <h3>
+                            <svg class="icon"><use href="#icon-info"></use></svg>
+                            현황 요약
+                        </h3>
+                        <div id="trash-summary" class="report-list">
+                            <div class="loading-state">로딩 중...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div class="footer">
@@ -598,7 +637,8 @@
 
     var reportsLoaded = {
         timeseries: false,
-        order: false
+        order: false,
+        trash: false
     };
 
     function getReportIcon(typeClass) {
@@ -611,7 +651,49 @@
         }
     }
 
+    async function loadTrashSummary() {
+        var container = document.getElementById('trash-summary');
+        try {
+            var response = await fetch('/api/trash/items');
+            var data = await response.json();
+            if (data.status !== 'success') {
+                container.innerHTML = '<div class="empty-state"><div>오류가 발생했습니다.</div></div>';
+                return;
+            }
+            var items = data.items || [];
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></div><div>휴지통이 비어있습니다</div></div>';
+                return;
+            }
+            var counts = { '대기중': 0, '처리중': 0, '완료': 0, '보류': 0 };
+            items.forEach(function(item) { counts[item['처리상태']] = (counts[item['처리상태']] || 0) + 1; });
+            var html = '<div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">';
+            html += '<div style="font-size: 0.9rem; color: var(--text-secondary);">총 <strong>' + items.length + '</strong>개 약품</div>';
+            var badges = [
+                { key: '대기중', color: 'var(--color-warning)', label: '대기중' },
+                { key: '처리중', color: 'var(--color-info)', label: '처리 중' },
+                { key: '완료', color: 'var(--color-success)', label: '완료' },
+                { key: '보류', color: 'var(--text-muted)', label: '보류' }
+            ];
+            html += '<div style="display: flex; gap: 8px; flex-wrap: wrap;">';
+            badges.forEach(function(b) {
+                if (counts[b.key] > 0) {
+                    html += '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; background: ' + b.color + '22; color: ' + b.color + '; border: 1px solid ' + b.color + '44;">' + b.label + ' ' + counts[b.key] + '</span>';
+                }
+            });
+            html += '</div></div>';
+            container.innerHTML = html;
+        } catch (e) {
+            container.innerHTML = '<div class="empty-state"><div>로딩 실패</div></div>';
+        }
+    }
+
     async function loadReports(type) {
+        if (type === 'trash') {
+            loadTrashSummary();
+            return;
+        }
+
         var container = document.getElementById(type + '-reports');
 
         try {

@@ -762,6 +762,39 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 background: var(--bg-subtle);
             }}
 
+            .visibility-btn.hidden:hover {{
+                color: var(--color-success-dark, #276749);
+                border-color: var(--color-success, #48bb78);
+                background: var(--color-success-subtle, #f0fff4);
+            }}
+
+            /* ===== Process Status Badge ===== */
+            .process-status-badge {{
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: var(--radius-sm);
+                font-size: 0.75rem;
+                font-weight: 600;
+                background: var(--color-warning-subtle, #fffbeb);
+                color: var(--color-warning-dark, #92400e);
+                border: 1px solid var(--color-warning, #f59e0b);
+            }}
+            .process-status-badge.status-처리중 {{
+                background: var(--color-info-subtle, #eff6ff);
+                color: var(--color-info-dark, #1e40af);
+                border-color: var(--color-info, #3b82f6);
+            }}
+            .process-status-badge.status-완료 {{
+                background: var(--color-success-subtle, #f0fdf4);
+                color: var(--color-success-dark, #166534);
+                border-color: var(--color-success, #22c55e);
+            }}
+            .process-status-badge.status-보류 {{
+                background: var(--bg-surface, #f9fafb);
+                color: var(--text-muted, #6b7280);
+                border-color: var(--border-default, #e5e7eb);
+            }}
+
             /* ===== Hidden Row ===== */
             .hidden-row {{
                 background: var(--bg-subtle) !important;
@@ -982,6 +1015,37 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 margin: 0 0 var(--space-4) 0;
             }}
 
+            .status-distribution-header {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: var(--space-4);
+            }}
+
+            .status-distribution-header h2 {{
+                margin: 0;
+            }}
+
+            .trash-shortcut-btn {{
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: var(--space-1) var(--space-3);
+                border: 1px solid var(--border-default);
+                border-radius: var(--radius-sm);
+                background: var(--bg-surface);
+                color: var(--text-muted);
+                font-size: 0.8rem;
+                cursor: pointer;
+                transition: all var(--duration-fast) var(--ease-out);
+            }}
+
+            .trash-shortcut-btn:hover {{
+                border-color: var(--text-muted);
+                background: var(--bg-subtle);
+                color: var(--text-secondary);
+            }}
+
             .distribution-bar {{
                 display: flex;
                 height: 40px;
@@ -1074,7 +1138,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
     # 숨김 처리된 약품 수 (체크된 항목)
     checked_items = checked_items_db.get_checked_items()
+    checked_items_status = checked_items_db.get_checked_items_with_status()
     hidden_count = len(checked_items)
+    pending_count = sum(1 for s in checked_items_status.values() if s == '대기중')
 
     # 음수 재고 경고 배너 (음수 재고가 있을 때만 표시)
     if negative_count > 0:
@@ -1100,12 +1166,20 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
     html_content += f"""
         <!-- 통합 재고 현황 인디케이터 -->
         <div class="status-distribution">
-            <h2>
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
-                </svg>
-                재고 현황 분포
-            </h2>
+            <div class="status-distribution-header">
+                <h2>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+                    </svg>
+                    재고 현황 분포
+                </h2>
+                <button class="trash-shortcut-btn" onclick="openCategoryModal('hidden-modal')" title="휴지통 열기">
+                    <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    </svg>
+                    휴지통 <span id="trash-shortcut-count">{pending_count}</span>
+                </button>
+            </div>
             <div id="proportion-graph" class="distribution-bar" data-total="{total_count}">
                 <div id="proportion-bar-urgent" style="background: var(--color-danger); flex: {urgent_count};" title="긴급: {urgent_count}개 ({urgent_count/total_count*100:.1f}%)" onclick="openCategoryModal('urgent-modal')">
                     {urgent_count if urgent_count > 0 else ''}
@@ -1174,9 +1248,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 <div class="bookmark-title">악성재고</div>
                 <div class="bookmark-count">{dead_count}</div>
             </div>
-            <div class="bookmark-item" onclick="openCategoryModal('hidden-modal')" style="background: var(--bg-surface); border: 1px solid var(--border-default); color: var(--text-muted);">
+            <div class="bookmark-item bookmark-hidden" onclick="openCategoryModal('hidden-modal')" style="background: var(--bg-surface); border: 1px solid var(--border-default); color: var(--text-muted);">
                 <div class="bookmark-icon" style="background: var(--border-default);"></div>
-                <div class="bookmark-title">숨김 약품</div>
+                <div class="bookmark-title">휴지통</div>
                 <div class="bookmark-count">{hidden_count}</div>
             </div>
         </div>
@@ -1325,9 +1399,9 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 <div class="category-modal-header">
                     <h2 style="color: var(--text-secondary);">
                         <svg class="icon icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/>
+                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
                         </svg>
-                        숨김 처리된 약품
+                        휴지통
                     </h2>
                     <span class="category-modal-close" onclick="closeCategoryModal('hidden-modal')">&times;</span>
                 </div>
@@ -1373,7 +1447,7 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 <table id="dataTable">
                     <thead>
                         <tr>
-                            <th style="width: 80px;">숨김</th>
+                            <th style="width: 80px;">휴지통</th>
                             <th>약품명</th>
                             <th>제약회사</th>
                             <th>약품코드</th>
@@ -1464,8 +1538,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
         # 숨김 상태 확인
         is_hidden = drug_code in main_checked_codes
         hidden_class = "hidden" if is_hidden else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_hidden else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_hidden else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_hidden else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_hidden else "휴지통에 넣기"
 
         # 메모 확인
         memo = main_memos.get(drug_code, "")
@@ -1697,11 +1771,11 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
 
                     if (isHidden) {
                         btn.classList.add('hidden');
-                        btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
-                        btn.title = '숨김 해제';
+                        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+                        btn.title = '복원하기';
                         if (row) {
                             if (isInHiddenTable) {
-                                // 숨김 탭: 보이게
+                                // 휴지통 탭: 보이게
                                 row.style.display = '';
                             } else {
                                 // 다른 탭: 회색 스타일 + 하단 정렬
@@ -1710,8 +1784,8 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                         }
                     } else {
                         btn.classList.remove('hidden');
-                        btn.innerHTML = '<i class="bi bi-eye"></i>';
-                        btn.title = '숨김 처리';
+                        btn.innerHTML = '<i class="bi bi-trash"></i>';
+                        btn.title = '휴지통에 넣기';
                         if (row) {
                             if (isInHiddenTable) {
                                 // 숨김 탭: 숨기기
@@ -1871,6 +1945,23 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                 if (countEl) {
                     countEl.textContent = hiddenDrugCodes.size;
                 }
+                const shortcutCountEl = document.getElementById('trash-shortcut-count');
+                if (shortcutCountEl) {
+                    // 대기중 상태인 항목만 카운트
+                    let pendingCount = 0;
+                    const hiddenTable = document.getElementById('hidden-drugs-table');
+                    if (hiddenTable) {
+                        hiddenTable.querySelectorAll('tbody tr').forEach(row => {
+                            if (row.style.display !== 'none') {
+                                const badge = row.querySelector('.process-status-badge');
+                                if (badge && badge.textContent.trim() === '대기중') {
+                                    pendingCount++;
+                                }
+                            }
+                        });
+                    }
+                    shortcutCountEl.textContent = pendingCount;
+                }
                 // 빈 메시지 표시/숨김 업데이트
                 updateHiddenEmptyMessage(hiddenDrugCodes.size);
             }
@@ -1916,10 +2007,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                                 const isInHiddenTable = row && row.closest('#hidden-drugs-table');
 
                                 if (checkedItems.has(drugCode)) {
-                                    // 숨김 처리된 상태
+                                    // 휴지통에 넣은 상태
                                     btn.classList.add('hidden');
-                                    btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
-                                    btn.title = '숨김 해제';
+                                    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+                                    btn.title = '복원하기';
                                     if (row) {
                                         if (isInHiddenTable) {
                                             row.style.display = '';
@@ -1928,10 +2019,10 @@ def generate_html_report(df, months, mode='dispense', ma_months=3, threshold_low
                                         }
                                     }
                                 } else {
-                                    // 숨김 해제된 상태
+                                    // 휴지통에 넣지 않은 상태
                                     btn.classList.remove('hidden');
-                                    btn.innerHTML = '<i class="bi bi-eye"></i>';
-                                    btn.title = '숨김 처리';
+                                    btn.innerHTML = '<i class="bi bi-trash"></i>';
+                                    btn.title = '휴지통에 넣기';
                                     if (row) {
                                         if (isInHiddenTable) {
                                             row.style.display = 'none';
@@ -2530,7 +2621,7 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
                         <table id="urgent-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -2626,8 +2717,8 @@ def generate_urgent_drugs_section(urgent_drugs, ma_months, months):
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_checked else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_checked else "휴지통에 넣기"
 
         html += f"""
                                 <tr class="urgent-row tab-clickable-row" data-drug-code="{drug_code}"
@@ -2717,7 +2808,7 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
                         <table id="low-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -2780,8 +2871,8 @@ def generate_low_stock_section(low_drugs_df, ma_months, months, threshold_low=3)
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_checked else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_checked else "휴지통에 넣기"
 
         # 신규 약품 태그 (데이터에 포함된 경우)
         new_drug_tag = ""
@@ -2875,7 +2966,7 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
                         <table id="high-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -2934,8 +3025,8 @@ def generate_high_stock_section(high_drugs_df, ma_months, months, threshold_low=
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_checked else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_checked else "휴지통에 넣기"
 
         # 신규 약품 태그 (데이터에 포함된 경우)
         new_drug_tag = ""
@@ -3037,7 +3128,7 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
                         <table id="excess-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -3096,8 +3187,8 @@ def generate_excess_stock_section(excess_drugs_df, ma_months, months, threshold_
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_checked else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_checked else "휴지통에 넣기"
 
         # 신규 약품 태그 (데이터에 포함된 경우)
         new_drug_tag = ""
@@ -3195,7 +3286,7 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
                         <table id="dead-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -3253,8 +3344,8 @@ def generate_dead_stock_section(dead_stock_drugs, ma_months, months):
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_checked else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_checked else "휴지통에 넣기"
 
         # 인라인 차트용 데이터 생성
         chart_data = {
@@ -3344,7 +3435,7 @@ def generate_negative_stock_section(negative_stock_drugs, ma_months, months):
                         <table id="negative-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -3386,8 +3477,8 @@ def generate_negative_stock_section(negative_stock_drugs, ma_months, months):
 
         # 숨김 버튼 상태
         hidden_class = "hidden" if is_checked else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_checked else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_checked else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_checked else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_checked else "휴지통에 넣기"
 
         # 비고 (사용 중인지 여부)
         usage_note = "사용 중" if latest_ma > 0 else "미사용"
@@ -3461,22 +3552,24 @@ def generate_hidden_drugs_section(df, ma_months, months):
 
     # 체크된 항목(숨김 처리된 항목) 가져오기
     checked_items = checked_items_db.get_checked_items()
+    checked_items_status = checked_items_db.get_checked_items_with_status()
     memos = drug_memos_db.get_all_memos()
     custom_thresholds = drug_thresholds_db.get_threshold_dict()
 
     html = f"""
                     <div id="hidden-empty-message" style="padding: var(--space-8); text-align: center; color: var(--text-muted); display: none;">
                         <svg class="icon-xl" style="width: 48px; height: 48px; margin: 0 auto var(--space-4);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y1="1" y2="23"/>
+                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
                         </svg>
-                        <p style="font-size: 1.125rem; margin-bottom: var(--space-2);">숨김 처리된 약품이 없습니다.</p>
-                        <p style="font-size: 0.875rem;">각 탭에서 숨김 버튼을 클릭하여 약품을 숨김 처리할 수 있습니다.</p>
+                        <p style="font-size: 1.125rem; margin-bottom: var(--space-2);">휴지통이 비어있습니다.</p>
+                        <p style="font-size: 0.875rem;">각 탭에서 휴지통 버튼을 클릭하여 약품을 정리할 수 있습니다.</p>
                     </div>
                     <div class="table-container" style="max-height: 70vh; overflow-y: auto;">
                         <table id="hidden-drugs-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">숨김</th>
+                                    <th style="width: 50px;">휴지통</th>
+                                    <th style="width: 80px;">처리 상태</th>
                                     <th>약품명</th>
                                     <th>약품코드</th>
                                     <th>제약회사</th>
@@ -3497,8 +3590,11 @@ def generate_hidden_drugs_section(df, ma_months, months):
         is_hidden = drug_code in checked_items
         row_display_style = "" if is_hidden else "display: none;"
         hidden_btn_class = "hidden" if is_hidden else ""
-        hidden_icon = '<i class="bi bi-eye-slash"></i>' if is_hidden else '<i class="bi bi-eye"></i>'
-        hidden_title = "숨김 해제" if is_hidden else "숨김 처리"
+        hidden_icon = '<i class="bi bi-arrow-counterclockwise"></i>' if is_hidden else '<i class="bi bi-trash"></i>'
+        hidden_title = "복원하기" if is_hidden else "휴지통에 넣기"
+
+        # 처리 상태
+        process_status = checked_items_status.get(drug_code, '대기중')
 
         # 약품명 30자 제한
         drug_name = row['약품명'] if row['약품명'] else "정보없음"
@@ -3586,6 +3682,7 @@ def generate_hidden_drugs_section(df, ma_months, months):
                                             </button>
                                         </div>
                                     </td>
+                                    <td style="text-align: center;"><span class="process-status-badge status-{process_status}">{process_status}</span></td>
                                     <td style="font-weight: bold;">{threshold_icon}{drug_name_display}</td>
                                     <td>{drug_code}</td>
                                     <td>{company_display}</td>

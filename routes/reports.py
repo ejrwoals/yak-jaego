@@ -605,6 +605,128 @@ def toggle_checked_item():
 
 
 # ============================================================
+# 약 휴지통 관리 API
+# ============================================================
+
+@reports_bp.route('/api/trash/items', methods=['GET'])
+def get_trash_items():
+    """휴지통 약품 전체 목록 (상태/유형 + 약품명/제약회사 포함)"""
+    try:
+        items = checked_items_db.get_trash_items()
+
+        # 약품 정보(약품명, 제약회사) 보강
+        for item in items:
+            drug_info = inventory_db.get_inventory(item['약품코드'])
+            if drug_info:
+                item['약품명'] = drug_info.get('약품명', '')
+                item['제약회사'] = drug_info.get('제약회사', '')
+            else:
+                item['약품명'] = ''
+                item['제약회사'] = ''
+
+        return jsonify({'status': 'success', 'items': items})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@reports_bp.route('/api/trash/update_status', methods=['POST'])
+def update_trash_status():
+    """처리상태 변경"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        status = data.get('status')
+
+        if not drug_code or not status:
+            return jsonify({'status': 'error', 'message': '약품코드와 처리상태가 필요합니다.'}), 400
+
+        if status not in ('대기중', '처리중', '완료', '보류'):
+            return jsonify({'status': 'error', 'message': '유효하지 않은 처리상태입니다.'}), 400
+
+        updated = checked_items_db.update_process_status(drug_code, status)
+        if updated:
+            return jsonify({'status': 'success', 'message': f'처리상태가 {status}(으)로 변경되었습니다.'})
+        else:
+            return jsonify({'status': 'error', 'message': '해당 약품을 찾을 수 없습니다.'}), 404
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@reports_bp.route('/api/trash/update_type', methods=['POST'])
+def update_trash_type():
+    """처리유형 변경"""
+    try:
+        data = request.get_json()
+        drug_code = data.get('drug_code')
+        type_name = data.get('type', '')
+
+        if not drug_code:
+            return jsonify({'status': 'error', 'message': '약품코드가 필요합니다.'}), 400
+
+        updated = checked_items_db.update_process_type(drug_code, type_name)
+        if updated:
+            return jsonify({'status': 'success', 'message': '처리유형이 변경되었습니다.'})
+        else:
+            return jsonify({'status': 'error', 'message': '해당 약품을 찾을 수 없습니다.'}), 404
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@reports_bp.route('/api/trash/types', methods=['GET'])
+def get_trash_types():
+    """등록된 처리유형 목록"""
+    try:
+        types = checked_items_db.get_processing_types()
+        return jsonify({'status': 'success', 'types': types})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@reports_bp.route('/api/trash/types/add', methods=['POST'])
+def add_trash_type():
+    """커스텀 처리유형 추가"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+
+        if not name:
+            return jsonify({'status': 'error', 'message': '유형명을 입력해주세요.'}), 400
+
+        success = checked_items_db.add_processing_type(name)
+        if success:
+            return jsonify({'status': 'success', 'message': f'처리유형 "{name}"이(가) 추가되었습니다.'})
+        else:
+            return jsonify({'status': 'error', 'message': '이미 존재하는 유형명입니다.'}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@reports_bp.route('/api/trash/types/delete', methods=['POST'])
+def delete_trash_type():
+    """커스텀 처리유형 삭제"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+
+        if not name:
+            return jsonify({'status': 'error', 'message': '유형명이 필요합니다.'}), 400
+
+        deleted = checked_items_db.remove_processing_type(name)
+        if deleted:
+            return jsonify({'status': 'success', 'message': f'처리유형 "{name}"이(가) 삭제되었습니다.'})
+        else:
+            return jsonify({'status': 'error', 'message': '기본 유형은 삭제할 수 없습니다.'}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ============================================================
 # 메모 관리 API
 # ============================================================
 

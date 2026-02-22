@@ -13,7 +13,7 @@
 **SQLite 데이터베이스 기반 시스템**
 - `recent_inventory.sqlite3`: 각 약품의 최신 재고 수량 저장
 - `drug_timeseries.sqlite3`: 시계열 통계 데이터 (1년 이동평균, 3개월 이동평균, 런웨이 등)
-- `checked_items.sqlite3`: 긴급 약품 확인 상태 저장
+- `checked_items.sqlite3`: 긴급 약품 확인 상태 및 휴지통 처리 현황 저장 (처리상태, 처리유형, 처리유형 마스터)
 - `drug_thresholds.sqlite3`: 개별 약품 임계값 설정 저장
 - `drug_memos.sqlite3`: 통합 메모 저장 (모든 보고서에서 공유)
 - `patients.sqlite3`: 환자 정보 저장 (환자명, 주민번호 앞자리(필수, 6자리), 방문주기_일)
@@ -25,9 +25,9 @@
 - ⚠️ **DB 재생성 시 보존되는 데이터**: "DB 재생성" 버튼은 `recent_inventory`와 `drug_timeseries`만 재생성하며, 사용자 설정 DB(`checked_items`, `drug_thresholds`, `drug_memos`, `patients`, `drug_patient_map`, `drug_flags`, `suggestion_skips`, `user_settings`)는 영향받지 않음. 단, `drug_periodicity`는 재계산됨
 - **약품별 최신 재고 추적**: 각 약품마다 가장 최근에 기록된 재고를 자동 채택
 - **음수 재고 지원**: 마이너스 재고도 정확히 반영
-- **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소
+- **확인 상태 영구 저장**: 체크한 긴급 약품 상태를 DB에 보존하여 재확인 피로 감소, 체크된 약품의 처리상태(대기중/처리중/완료/보류) 및 처리유형(반품/폐기/커스텀) 추적
 
-### 🔀 세 가지 워크플로우
+### 🔀 네 가지 워크플로우
 
 1. **📊 재고 관리 보고서**
    - 사용자 정의 N개월 이동평균 (1~12개월 선택 가능)
@@ -56,6 +56,15 @@
    - 📌 **단발성 약품**: 가중 등장률 < 20% + 최근 2개월 내 등장 없음 (보라색 사이드바 책갈피 + 모달)
    - 🆕 **신규 약품**: 가중 등장률 < 20% + 최근 2개월 내 등장 있음 (초록색 사이드바 책갈피 + 모달)
    - 재고 관리가 어려운 "들쭉날쭉" 약품 식별에 최적화
+
+4. **🗑️ 약 휴지통**
+   - 보고서에서 체크(숨김)한 약품들의 처리 현황을 추적하는 관리 도구
+   - **4개 상태 탭**: 대기중/처리중/완료/보류로 약품을 분류하여 진행 상황 추적
+   - **처리유형 관리**: 반품/폐기(기본) + 사용자 정의 처리유형 추가/삭제 가능
+   - **처리유형 필터**: 전체/미지정 + 실제 카테고리 태그 클릭으로 필터링
+   - **인라인 편집**: 테이블에서 직접 처리상태/처리유형 변경 (드롭다운)
+   - **메모 편집**: 약품별 메모 인라인 수정
+   - **복원 기능**: 체크 해제하여 보고서 테이블에 다시 표시
 
 ### 📊 주요 기능
 
@@ -140,6 +149,15 @@
   - **단발성 약품**: 가중 등장률 < 20% + 최근 2개월 내 등장 없음 (보라색 사이드바 책갈피 + 모달)
   - **신규 약품**: 가중 등장률 < 20% + 최근 2개월 내 등장 있음 (초록색 사이드바 책갈피 + 모달)
 - **📌 가중 등장률**: 최근 달에 높은 가중치 부여 (가장 오래된 달 = 0.1, 가장 최근 달 = 1.0, 선형 감소 방식)
+
+#### 워크플로우 4: 약 휴지통
+- **🗂️ 4개 상태 탭**: 대기중/처리중/완료/보류 탭으로 약품 처리 현황 분류
+- **🏷️ 처리유형 관리**: 반품/폐기(기본) + 사용자 정의 처리유형 추가/삭제
+- **🔍 처리유형 필터**: 전체/미지정 + 카테고리 태그 클릭 필터링
+- **✏️ 인라인 편집**: 처리상태/처리유형을 테이블 내 드롭다운으로 직접 변경
+- **📝 메모 편집**: 약품별 메모 인라인 수정
+- **🔄 복원 기능**: 체크 해제로 보고서에 약품 다시 표시
+- **🎨 상태별 배지 색상**: 대기중(노란색), 처리중(파란색), 완료(초록색), 보류(회색) - 보고서 모달에서도 동일 색상 적용
 
 ## 🚀 빠른 시작
 
@@ -251,6 +269,7 @@ python web_app.py
    - **재고 관리 보고서**: 전문약/일반약 시계열 분석
    - **약 주문 수량 산출**: 런웨이 기반 주문 계산
    - **고변동성 약품 보고서**: CV 기반 변동성 분석
+   - **약 휴지통**: 체크한 약품의 처리 현황 관리
 3. 보고서가 자동으로 생성되어 새 탭에서 열립니다
 4. 종료: 브라우저 탭/창을 닫으면 서버가 자동으로 종료됩니다 (또는 웹 UI 우측 하단의 **🛑 종료** 버튼 클릭, 터미널에서 `Ctrl+C`)
 
@@ -343,6 +362,33 @@ python web_app.py
 - 고변동성 약품: 사용량 예측이 어려우므로 더 많은 버퍼 재고 필요
 - 저변동성 약품: 예측이 쉬우므로 적정 재고로 효율적 관리 가능
 
+### 워크플로우 4: 약 휴지통
+
+**개요:**
+보고서(워크플로우 1~3)에서 체크(숨김)한 약품들의 후속 처리 현황을 추적하는 관리 도구입니다. 체크된 약품들이 실제로 반품/폐기 등의 처리가 되었는지 확인하고 관리할 수 있습니다.
+
+**주요 기능:**
+- 🗂️ **4개 상태 탭**: 대기중(노란색)/처리중(파란색)/완료(초록색)/보류(회색)로 약품 분류
+- 🏷️ **처리유형 관리**: 반품/폐기(기본 유형) + 사용자 정의 처리유형 추가/삭제
+- 🔍 **처리유형 필터**: 전체/미지정 + 실제 카테고리 태그 클릭으로 해당 유형만 필터링
+- ✏️ **인라인 편집**: 테이블에서 처리상태/처리유형을 드롭다운으로 직접 변경
+- 📝 **메모 편집**: 약품별 메모를 테이블 내에서 바로 수정
+- 🔄 **복원**: 체크를 해제하여 보고서 테이블에 약품을 다시 표시
+
+**데이터 흐름:**
+1. 워크플로우 1~3의 보고서에서 약품 체크 → `checked_items.sqlite3`에 저장
+2. 약 휴지통 페이지(`/workflow/trash`)에서 체크된 약품 목록 조회
+3. 각 약품의 처리상태/처리유형을 변경하며 후속 조치 추적
+4. 처리 완료 시 "완료" 상태로 변경, 필요 시 복원하여 보고서에 다시 표시
+
+**API 엔드포인트:**
+- `GET /api/trash/items`: 휴지통 약품 전체 목록 (약품명, 제약회사 정보 포함)
+- `POST /api/trash/update_status`: 처리상태 변경 (대기중/처리중/완료/보류)
+- `POST /api/trash/update_type`: 처리유형 변경
+- `GET /api/trash/types`: 등록된 처리유형 목록 조회
+- `POST /api/trash/types/add`: 커스텀 처리유형 추가
+- `POST /api/trash/types/delete`: 커스텀 처리유형 삭제 (기본 유형은 삭제 불가)
+
 ### 🔄 재고 업데이트 (선택 사항)
 
 today 파일을 업데이트한 후 DB만 갱신하고 싶을 때:
@@ -373,12 +419,13 @@ yak-jaego/
 │   ├── workflow_simple.html       # 재고 관리 워크플로우 페이지
 │   ├── workflow_order.html        # 주문 계산 워크플로우 페이지
 │   ├── workflow_volatility.html   # 고변동성 약품 보고서 워크플로우 페이지
+│   ├── workflow_trash.html        # 약 휴지통 관리 워크플로우 페이지
 │   ├── data_manage.html           # 데이터 파일 관리 페이지 (업로드/삭제/미리보기/검증)
 │   └── error.html                 # 에러 페이지
 ├── routes/                        # Flask Blueprint 라우트 모듈 폴더
 │   ├── __init__.py                # Blueprint 등록 함수 (register_blueprints)
-│   ├── main.py                    # 메인 페이지, 워크플로우 페이지 (4개 라우트)
-│   ├── reports.py                 # 보고서 생성/관리, 체크/메모 (12개 라우트)
+│   ├── main.py                    # 메인 페이지, 워크플로우 페이지 (5개 라우트)
+│   ├── reports.py                 # 보고서 생성/관리, 체크/메모, 휴지통 API (18개 라우트)
 │   ├── inventory.py               # 재고 관리, 임계값 설정 (8개 라우트)
 │   ├── drugs.py                   # 약품 관리, 플래그, 버퍼 계산 (10개 라우트)
 │   ├── patients.py                # 환자 관리, 약품-환자 연결 (14개 라우트)
@@ -400,7 +447,7 @@ yak-jaego/
 ├── drug_order_calculator.py       # 주문 수량 산출 모듈
 ├── inventory_db.py                # recent_inventory.sqlite3 관리 모듈
 ├── drug_timeseries_db.py      # drug_timeseries.sqlite3 관리 모듈
-├── checked_items_db.py            # checked_items.sqlite3 관리 모듈 (체크 상태 저장)
+├── checked_items_db.py            # checked_items.sqlite3 관리 모듈 (체크 상태, 처리상태/유형, 휴지통)
 ├── drug_thresholds_db.py          # drug_thresholds.sqlite3 관리 모듈 (개별 임계값)
 ├── drug_memos_db.py               # drug_memos.sqlite3 관리 모듈 (통합 메모)
 ├── patients_db.py                 # patients.sqlite3 관리 모듈 (환자 정보)
@@ -422,7 +469,7 @@ yak-jaego/
 ├── today.csv/xls/xlsx             # 오늘 나간 약품의 재고 현황 (사용자 제공)
 ├── recent_inventory.sqlite3       # 최신 재고 DB (자동 생성)
 ├── drug_timeseries.sqlite3    # 시계열 통계 DB (자동 생성)
-├── checked_items.sqlite3          # 체크 상태 DB (자동 생성)
+├── checked_items.sqlite3          # 체크 상태 및 휴지통 처리 현황 DB (자동 생성)
 ├── drug_thresholds.sqlite3        # 개별 임계값 DB (자동 생성)
 ├── drug_memos.sqlite3             # 통합 메모 DB (자동 생성)
 ├── patients.sqlite3               # 환자 정보 DB (자동 생성)
@@ -459,11 +506,11 @@ yak-jaego/
 ### web_app.py - 웹 UI 메인 애플리케이션 (사용자용)
 
 #### 아키텍처:
-- **Blueprint 패턴**: 79개의 라우트를 8개의 Blueprint 모듈로 분리하여 유지보수성 향상
+- **Blueprint 패턴**: 78개의 라우트를 8개의 Blueprint 모듈로 분리하여 유지보수성 향상
 - **web_app.py**: Flask 앱 설정, 시스템 라우트 (heartbeat, shutdown, rebuild-db)만 포함
 - **routes/ 폴더**: 비즈니스 로직 라우트를 도메인별로 분리
-  - `main.py`: 메인 페이지, 워크플로우 페이지
-  - `reports.py`: 보고서 생성/관리, 체크/메모
+  - `main.py`: 메인 페이지, 워크플로우 페이지 (약 휴지통 포함)
+  - `reports.py`: 보고서 생성/관리, 체크/메모, 휴지통 API
   - `inventory.py`: 재고 관리, 임계값 설정
   - `drugs.py`: 약품 관리, 플래그, 버퍼 계산
   - `patients.py`: 환자 관리, 약품-환자 연결
@@ -488,6 +535,8 @@ yak-jaego/
   - API 엔드포인트: `GET /api/data-files`, `POST /api/upload-data-file`, `POST /api/delete-data-file`, `GET /api/preview-data-file/<filename>`, `GET /api/validate-data-file/<filename>`
 - **사용자 설정 관리**: 사용자 설정값 조회/저장/초기화
   - API 엔드포인트: `GET /api/settings` (조회), `POST /api/settings` (저장), `POST /api/settings/reset` (기본값 복원)
+- **약 휴지통 관리** (`/workflow/trash`): 체크한 약품의 후속 처리 현황 추적
+  - API 엔드포인트: `GET /api/trash/items` (목록), `POST /api/trash/update_status` (상태변경), `POST /api/trash/update_type` (유형변경), `GET /api/trash/types` (유형목록), `POST /api/trash/types/add` (유형추가), `POST /api/trash/types/delete` (유형삭제)
 
 ### inventory_db.py - 최신 재고 DB 관리
 
@@ -497,7 +546,7 @@ yak-jaego/
   1. `init_db.py` 실행 시 (DB 초기화/재생성)
   2. `inventory_updater.py` CLI 실행 시
   3. 웹 UI에서 today 파일 업로드 시 (`/api/calculate-order`)
-  4. 웹 UI에서 개별 약품 재고 수정 시 (`/api/update-inventory`) ← v3.10 신규
+  4. 웹 UI에서 개별 약품 재고 수정 시 (`/api/update-inventory`)
 - 테이블 스키마:
   ```sql
   CREATE TABLE recent_inventory (

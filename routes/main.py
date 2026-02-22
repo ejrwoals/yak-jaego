@@ -84,3 +84,9 @@ def workflow_order():
 def workflow_volatility():
     """고변동성 약품 보고서 워크플로우 페이지"""
     return render_template('workflow_volatility.html')
+
+
+@main_bp.route('/workflow/trash')
+def workflow_trash():
+    """약 휴지통 관리 워크플로우 페이지"""
+    return render_template('workflow_trash.html')
