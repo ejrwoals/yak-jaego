@@ -22,9 +22,10 @@
 
     // 슬라이더 상수
     var RUNWAY_MAX_VALUE = 7;
-    var HIGHLIGHT_MIN_VALUE = 0.5;
-    var HIGHLIGHT_MAX_VALUE = 6;
-    var HIGHLIGHT_STEP = 0.5;
+    var HIGHLIGHT_MIN_VALUE = 0;
+    var HIGHLIGHT_MAX_VALUE = 3;
+    var HIGHLIGHT_STEP = 0.1;
+    var HIGHLIGHT_CLAMP_MIN = 0.1;
 
     Jaego.settings = {
         /**
@@ -340,7 +341,7 @@
                 var value = HIGHLIGHT_MIN_VALUE + (percent / 100) * (HIGHLIGHT_MAX_VALUE - HIGHLIGHT_MIN_VALUE);
                 // STEP 단위로 반올림
                 value = Math.round(value / HIGHLIGHT_STEP) * HIGHLIGHT_STEP;
-                return Math.max(HIGHLIGHT_MIN_VALUE, Math.min(HIGHLIGHT_MAX_VALUE, value));
+                return Math.max(HIGHLIGHT_CLAMP_MIN, Math.min(HIGHLIGHT_MAX_VALUE, value));
             }
 
             function startDrag(e) {
@@ -377,7 +378,8 @@
          * 강조 표시 슬라이더 UI 업데이트
          */
         updateHighlightSliderUI: function() {
-            var value = tempSettings.runway_threshold;
+            var value = Math.max(HIGHLIGHT_CLAMP_MIN, Math.min(tempSettings.runway_threshold, HIGHLIGHT_MAX_VALUE));
+            tempSettings.runway_threshold = value;
             var percent = ((value - HIGHLIGHT_MIN_VALUE) / (HIGHLIGHT_MAX_VALUE - HIGHLIGHT_MIN_VALUE)) * 100;
 
             var handle = document.getElementById('settingsHighlightHandle');
@@ -385,12 +387,14 @@
                 handle.style.left = percent + '%';
             }
 
+            var displayVal = value % 1 === 0 ? value.toFixed(0) : parseFloat(value.toFixed(1)).toString();
+
             var valueDisplay = document.getElementById('settingsHighlightValue');
             if (valueDisplay) {
-                valueDisplay.textContent = value;
+                valueDisplay.textContent = displayVal;
             }
 
-            document.getElementById('settings_runway_threshold').value = value;
+            document.getElementById('settings_runway_threshold').value = displayVal;
         },
 
         /**
