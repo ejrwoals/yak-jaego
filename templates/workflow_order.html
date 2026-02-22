@@ -495,13 +495,10 @@
                         <div class="slider-handle" id="sliderHandle"></div>
                     </div>
                     <div class="slider-labels">
-                        <span style="left: 0%;">0.5</span>
-                        <span style="left: 9.09%;">1</span>
-                        <span style="left: 27.27%;">2</span>
-                        <span style="left: 45.45%;">3</span>
-                        <span style="left: 63.64%;">4</span>
-                        <span style="left: 81.82%;">5</span>
-                        <span style="left: 100%;">6</span>
+                        <span style="left: 0%;">0</span>
+                        <span style="left: 33.33%;">1</span>
+                        <span style="left: 66.67%;">2</span>
+                        <span style="left: 100%;">3</span>
                     </div>
                 </div>
                 <div class="slider-value-display">
@@ -583,10 +580,11 @@
 
     // Slider logic
     (function() {
-        var MIN_VALUE = 0.5;
-        var MAX_VALUE = 6;
-        var STEP = 0.5;
-        var currentValue = userSettings.runway_threshold || 1;
+        var MIN_VALUE = 0;
+        var MAX_VALUE = 3;
+        var STEP = 0.1;
+        var CLAMP_MIN = 0.1;
+        var currentValue = Math.max(CLAMP_MIN, Math.min(userSettings.runway_threshold || 1, MAX_VALUE));
 
         var track = document.getElementById('sliderTrack');
         var handle = document.getElementById('sliderHandle');
@@ -594,21 +592,27 @@
         var thresholdValue = document.getElementById('thresholdValue');
         var thresholdInfoText = document.getElementById('thresholdInfoText');
 
+        function formatValue(val) {
+            return val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(1)).toString();
+        }
+
         function valueToPercent(value) {
             return ((value - MIN_VALUE) / (MAX_VALUE - MIN_VALUE)) * 100;
         }
 
         function percentToValue(percent) {
             var rawValue = MIN_VALUE + (percent / 100) * (MAX_VALUE - MIN_VALUE);
-            return Math.round(rawValue / STEP) * STEP;
+            var snapped = Math.round(rawValue / STEP) * STEP;
+            return Math.max(CLAMP_MIN, snapped);
         }
 
         function updateUI() {
             var percent = valueToPercent(currentValue);
             handle.style.left = percent + '%';
-            thresholdInput.value = currentValue;
-            thresholdValue.textContent = currentValue;
-            if (thresholdInfoText) thresholdInfoText.textContent = currentValue;
+            var displayVal = formatValue(currentValue);
+            thresholdInput.value = displayVal;
+            thresholdValue.textContent = displayVal;
+            if (thresholdInfoText) thresholdInfoText.textContent = displayVal;
 
             // 세부 설정 요약 업데이트
             updateAdvancedSettingsSummary();
