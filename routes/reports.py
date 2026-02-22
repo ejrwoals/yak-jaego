@@ -50,7 +50,10 @@ def allowed_file(filename):
 
 @reports_bp.route('/generate/simple_report', methods=['POST'])
 def generate_simple_report_route():
-    """단순 재고 관리 보고서 생성 API (Single MA)"""
+    """단순 재고 관리 보고서 생성 API (Single MA, 선택적 재고 파일 업로드 지원)"""
+    temp_filepath = None
+    inventory_result = None
+
     try:
         mode = request.form.get('mode', 'dispense')
         ma_months = int(request.form.get('ma_months', 3))
@@ -65,6 +68,30 @@ def generate_simple_report_route():
 
         if not (1 <= threshold_low < threshold_high <= 24):
             return jsonify({'status': 'error', 'message': '경계값 설정이 올바르지 않습니다.'}), 400
+
+        # 선택적 재고 파일 업로드 처리
+        if 'inventoryFile' in request.files:
+            file = request.files['inventoryFile']
+            if file and file.filename != '':
+                if not allowed_file(file.filename):
+                    return jsonify({'status': 'error', 'message': '허용되지 않는 파일 형식입니다. (csv, xls, xlsx만 가능)'}), 400
+
+                import uuid
+                temp_filename = f"temp_inventory_{uuid.uuid4().hex[:8]}{os.path.splitext(file.filename)[1]}"
+                temp_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], temp_filename)
+
+                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+                file.save(temp_filepath)
+
+                abs_temp_filepath = os.path.abspath(temp_filepath)
+                print(f"📦 재고 분석 보고서 - {file.filename} 업로드 완료, 재고 업데이트 중...")
+
+                inventory_result = inventory_updater.update_inventory_from_today_csv(abs_temp_filepath)
+
+                if inventory_result is None:
+                    return jsonify({'status': 'error', 'message': '재고 파일을 처리할 수 없습니다. 파일 형식을 확인해주세요.'}), 400
+
+                print(f"✅ 재고 업데이트 완료: {inventory_result}")
 
         # 약품 유형 결정
         drug_type = '전문약' if mode == 'dispense' else '일반약'
@@ -92,18 +119,29 @@ def generate_simple_report_route():
         # 파일명만 추출
         report_filename = os.path.basename(report_path)
 
-        return jsonify({
+        response_data = {
             'status': 'success',
             'report_url': f'/reports/{report_filename}',
             'report_filename': report_filename,
             'drug_type': drug_type,
             'drug_count': len(df),
-            'ma_months': ma_months
-        })
+            'ma_months': ma_months,
+            'inventory_updated': inventory_result is not None
+        }
+
+        if inventory_result is not None:
+            response_data['inventory_result'] = inventory_result
+
+        return jsonify(response_data)
 
     except Exception as e:
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    finally:
+        if temp_filepath and os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
+            print(f"🗑️  임시 파일 삭제: {temp_filepath}")
 
 
 @reports_bp.route('/generate/volatility_report', methods=['POST'])

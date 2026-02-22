@@ -255,6 +255,144 @@
     .radio-option.disabled input[type="radio"] {
         cursor: not-allowed;
     }
+
+    /* Optional Upload Box */
+    .optional-upload-box {
+        background: var(--color-surface-hover);
+        border: 1.5px dashed var(--color-border-hover);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        margin-bottom: var(--space-5);
+        transition: border-color var(--transition-fast), background-color var(--transition-fast), border-style var(--transition-fast);
+    }
+
+    .optional-upload-box.has-file {
+        border-color: var(--color-success);
+        border-style: solid;
+        background: var(--color-success-light);
+    }
+
+    .optional-upload-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-weight: var(--font-semibold);
+        color: var(--color-text-primary);
+        font-size: var(--text-sm);
+        margin-bottom: var(--space-3);
+    }
+
+    .optional-badge {
+        font-size: var(--text-xs);
+        font-weight: var(--font-medium);
+        color: var(--color-text-muted);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        padding: 2px 8px;
+        border-radius: var(--radius-full);
+    }
+
+    .upload-guide-toggle {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1);
+        font-size: var(--text-xs);
+        font-weight: var(--font-medium);
+        color: var(--color-text-muted);
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 2px 0;
+    }
+
+    .upload-guide-toggle:hover {
+        color: var(--color-text-secondary);
+    }
+
+    .upload-guide-toggle .icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .upload-guide-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height var(--transition-normal), opacity var(--transition-normal);
+        opacity: 0;
+    }
+
+    .upload-guide-content.open {
+        max-height: 100px;
+        opacity: 1;
+    }
+
+    .upload-guide-text {
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        line-height: var(--leading-relaxed);
+        padding-bottom: var(--space-3);
+    }
+
+    .optional-upload-area {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+    }
+
+    .file-label-optional {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+    }
+
+    .file-label-optional:hover {
+        background: var(--color-surface-active);
+        border-color: var(--color-border-hover);
+    }
+
+    .optional-upload-area .file-name {
+        flex: 1;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-height: auto;
+        margin-top: 0;
+    }
+
+    .optional-upload-area .file-name.selected {
+        color: var(--color-success-dark);
+        font-weight: var(--font-semibold);
+    }
+
+    .clear-file-btn {
+        background: transparent;
+        border: none;
+        color: var(--color-text-muted);
+        cursor: pointer;
+        padding: var(--space-1);
+        border-radius: var(--radius-sm);
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+    }
+
+    .clear-file-btn:hover {
+        background: var(--color-surface-active);
+        color: var(--color-danger);
+    }
 </style>
 {% endblock %}
 
@@ -319,6 +457,34 @@
                         </span>
                     </label>
                 </div>
+            </div>
+        </div>
+
+        <!-- 재고 데이터 업데이트 (선택) -->
+        <div class="optional-upload-box" id="uploadBox">
+            <div class="optional-upload-header">
+                <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-upload"></use></svg>
+                <span>재고 데이터 업데이트</span>
+                <span class="optional-badge">선택사항</span>
+                <button type="button" class="upload-guide-toggle" id="uploadGuideToggle" onclick="toggleUploadGuide()">
+                    <svg class="icon"><use href="#icon-help-circle"></use></svg>
+                </button>
+            </div>
+            <div class="upload-guide-content" id="uploadGuideContent">
+                <p class="upload-guide-text">
+                    최신 재고 상태를 반영하려면 PMPLUS의 <strong>[경영관리]</strong> - <strong>[약품별조제판매현황]</strong>에서 이번 달에 소모된 약품 내역을 조회하여 <strong>[출력]</strong> - <strong>[파일로 저장]</strong> 한 뒤, 해당 <strong>.xls</strong> 파일을 업로드하세요.
+                </p>
+            </div>
+            <div class="optional-upload-area">
+                <label for="inventoryFileInput" class="file-label-optional">
+                    <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-folder"></use></svg>
+                    파일 선택
+                </label>
+                <input type="file" id="inventoryFileInput" name="inventoryFile" accept=".csv,.xls,.xlsx" style="display: none;">
+                <div id="inventoryFileName" class="file-name">파일이 선택되지 않았습니다</div>
+                <button type="button" id="clearFileBtn" class="clear-file-btn" style="display: none;">
+                    <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-x"></use></svg>
+                </button>
             </div>
         </div>
 
@@ -409,7 +575,7 @@
 
     <div class="loading" id="loading">
         <div class="spinner"></div>
-        <p style="color: #718096;">보고서를 생성하고 있습니다...</p>
+        <p id="loadingText" style="color: var(--color-text-muted);">보고서를 생성하고 있습니다...</p>
     </div>
 </div>
 {% endblock %}
@@ -430,6 +596,13 @@
         var arrow = document.getElementById('info-box-arrow');
         content.classList.toggle('open');
         arrow.classList.toggle('open');
+    }
+
+    function toggleUploadGuide() {
+        var content = document.getElementById('uploadGuideContent');
+        var toggle = document.getElementById('uploadGuideToggle');
+        content.classList.toggle('open');
+        toggle.classList.toggle('open');
     }
 
     // 세부 설정 토글
@@ -473,15 +646,53 @@
         updateAdvancedSettingsSummary();
     })();
 
+    // 파일 업로드 (선택사항)
+    var inventoryFileInput = document.getElementById('inventoryFileInput');
+    var inventoryFileName = document.getElementById('inventoryFileName');
+    var clearFileBtn = document.getElementById('clearFileBtn');
+    var uploadBox = document.getElementById('uploadBox');
+
+    inventoryFileInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (file) {
+            inventoryFileName.textContent = file.name;
+            inventoryFileName.classList.add('selected');
+            clearFileBtn.style.display = 'inline-flex';
+            uploadBox.classList.add('has-file');
+        } else {
+            clearUploadFile();
+        }
+    });
+
+    clearFileBtn.addEventListener('click', function() {
+        clearUploadFile();
+    });
+
+    function clearUploadFile() {
+        inventoryFileInput.value = '';
+        inventoryFileName.textContent = '파일이 선택되지 않았습니다';
+        inventoryFileName.classList.remove('selected');
+        clearFileBtn.style.display = 'none';
+        uploadBox.classList.remove('has-file');
+    }
+
     document.getElementById('reportForm').addEventListener('submit', function(e) {
         e.preventDefault();
 
         var submitBtn = document.getElementById('submitBtn');
         var loading = document.getElementById('loading');
+        var loadingText = document.getElementById('loadingText');
+        var hasFile = inventoryFileInput.files.length > 0;
 
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-loader"></use></svg> 생성 중...';
         loading.classList.add('active');
+
+        if (hasFile) {
+            loadingText.textContent = '재고 데이터를 업데이트하고 보고서를 생성하고 있습니다...';
+        } else {
+            loadingText.textContent = '보고서를 생성하고 있습니다...';
+        }
 
         var formData = new FormData(this);
 
@@ -498,7 +709,13 @@
                 submitBtn.innerHTML = '<svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-file-text"></use></svg> 보고서 생성하기';
                 loading.classList.remove('active');
 
-                showToast('보고서가 성공적으로 생성되었습니다!', 'success');
+                if (data.inventory_updated && data.inventory_result) {
+                    showToast('재고 업데이트 완료 (갱신 ' + data.inventory_result.updated + '건, 신규 ' + data.inventory_result.inserted + '건) + 보고서 생성 완료!', 'success');
+                } else {
+                    showToast('보고서가 성공적으로 생성되었습니다!', 'success');
+                }
+
+                clearUploadFile();
             } else {
                 throw new Error(data.message || '보고서 생성 실패');
             }

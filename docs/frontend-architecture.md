@@ -465,6 +465,89 @@ app.config['VERSION'] = '1'  # 변경 시 증가
 **주의:** 부모 컨테이너(`.collapse-box`)에도 `overflow: visible`을 적용해야 합니다.
 부모가 `overflow: hidden`이면 자식의 `overflow: visible`이 무시됩니다.
 
+### 툴팁 대안: 인라인 토글 가이드
+
+툴팁이 z-index 충돌, stacking context, overflow 등으로 해결이 어려운 경우, **인라인 토글 가이드** 패턴으로 대체한다.
+(?) 아이콘을 클릭하면 안내 문구가 `max-height` 애니메이션으로 펼쳐지는 방식이다.
+
+#### HTML 구조
+
+```html
+<div class="some-header">
+    <span>제목 텍스트</span>
+    <!-- 우측 끝에 (?) 아이콘 토글 -->
+    <button type="button" class="upload-guide-toggle" id="guideToggle" onclick="toggleGuide()">
+        <svg class="icon"><use href="#icon-help-circle"></use></svg>
+    </button>
+</div>
+<!-- 펼쳐지는 안내 문구 -->
+<div class="upload-guide-content" id="guideContent">
+    <p class="upload-guide-text">안내 문구 내용</p>
+</div>
+```
+
+#### CSS
+
+```css
+/* 토글 버튼: 헤더 우측 끝에 배치 (부모가 flex일 때 margin-left: auto) */
+.upload-guide-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px 0;
+}
+
+.upload-guide-toggle:hover {
+    color: var(--color-text-secondary);
+}
+
+.upload-guide-toggle .icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* 펼쳐지는 컨텐츠 */
+.upload-guide-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--transition-normal), opacity var(--transition-normal);
+    opacity: 0;
+}
+
+.upload-guide-content.open {
+    max-height: 100px;
+    opacity: 1;
+}
+
+.upload-guide-text {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    line-height: var(--leading-relaxed);
+    padding-bottom: var(--space-3);
+}
+```
+
+#### JavaScript
+
+```javascript
+function toggleGuide() {
+    var content = document.getElementById('guideContent');
+    var toggle = document.getElementById('guideToggle');
+    content.classList.toggle('open');
+    toggle.classList.toggle('open');
+}
+```
+
+#### 적용된 페이지
+
+- `templates/workflow_simple.html` - 재고 데이터 업데이트 안내
+
 ---
 
 ## 참고
