@@ -49,15 +49,13 @@
     <script src="{{ url_for('static', filename='js/components/confirm-modal.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script src="{{ url_for('static', filename='js/components/settings.js') }}?v={{ config.get('VERSION', '1') }}"></script>
     <script>
-        // 브라우저 종료 감지: pagehide 이벤트 기반
+        // 브라우저 연결 감지: 주기적 heartbeat 방식
         (function() {
-            // 페이지 로드 시 1회 heartbeat (새로고침/페이지이동 시 종료 취소용)
-            fetch('/api/heartbeat', { method: 'POST' }).catch(function() {});
-
-            // 페이지 종료 시 서버에 알림 (브라우저 닫기/새로고침/페이지이동)
-            window.addEventListener('pagehide', function() {
-                navigator.sendBeacon('/api/page-unload');
-            });
+            function sendHeartbeat() {
+                fetch('/api/heartbeat', { method: 'POST' }).catch(function() {});
+            }
+            sendHeartbeat();
+            setInterval(sendHeartbeat, 10000);
         })();
     </script>
     {% endblock %}

@@ -61,12 +61,11 @@ app.config['DEV_MODE'] = not paths.is_frozen()  # 개발 모드 플래그 (PyIns
 _last_heartbeat = time.time()
 _heartbeat_lock = threading.Lock()
 _shutdown_requested = False
-_unload_pending = False  # 브라우저 종료 예고 상태
 _long_operation_in_progress = False  # 오래 걸리는 작업 진행 중 (auto-shutdown 방지)
 
 # Heartbeat 설정
-HEARTBEAT_INTERVAL = 5  # 클라이언트가 5초마다 ping
-UNLOAD_TIMEOUT = 5  # 5초: 브라우저 종료 감지 후 빠른 종료 (pagehide 이벤트 기반)
+HEARTBEAT_INTERVAL = 10  # 클라이언트가 10초마다 heartbeat 전송
+HEARTBEAT_TIMEOUT = 120  # 120초(2분) 동안 heartbeat 없으면 서버 종료
 
 
 # =============================================================================
@@ -117,19 +116,9 @@ def rebuild_db():
 @app.route('/api/heartbeat', methods=['POST'])
 def heartbeat():
     """브라우저 연결 상태 확인용 heartbeat"""
-    global _last_heartbeat, _unload_pending
+    global _last_heartbeat
     with _heartbeat_lock:
         _last_heartbeat = time.time()
-        _unload_pending = False  # 새 heartbeat 도착 → 종료 예고 취소 (새로고침/페이지이동)
-    return jsonify({'status': 'ok'})
-
-
-@app.route('/api/page-unload', methods=['POST'])
-def page_unload():
-    """브라우저 페이지 종료 예고 (pagehide 이벤트)"""
-    global _unload_pending
-    with _heartbeat_lock:
-        _unload_pending = True  # 짧은 타임아웃 활성화
     return jsonify({'status': 'ok'})
 
 
@@ -162,24 +151,22 @@ def shutdown():
 # =============================================================================
 
 def check_heartbeat_timeout():
-    """브라우저 종료 감지 (pagehide 이벤트 기반)"""
+    """브라우저 종료 감지 (주기적 heartbeat 기반)"""
     global _shutdown_requested
     while not _shutdown_requested:
         time.sleep(1)  # 1초마다 체크
 
         with _heartbeat_lock:
             elapsed = time.time() - _last_heartbeat
-            is_unloading = _unload_pending
             is_long_op = _long_operation_in_progress
 
         # 오래 걸리는 작업 중에는 auto-shutdown 방지
         if is_long_op:
             continue
 
-        # 브라우저 종료 예고(pagehide) 후 5초 내 재연결 없으면 종료
-        # 탭이 열려있는 동안은 타임아웃 없이 무한정 실행
-        if is_unloading and elapsed > UNLOAD_TIMEOUT:
-            print(f"\n🚪 브라우저 종료 감지 ({UNLOAD_TIMEOUT}초 내 재연결 없음)")
+        # heartbeat 없이 HEARTBEAT_TIMEOUT(2분) 경과 시 종료
+        if elapsed > HEARTBEAT_TIMEOUT:
+            print(f"\n🚪 브라우저 종료 감지 ({HEARTBEAT_TIMEOUT}초 동안 heartbeat 없음)")
             print("🛑 서버를 자동 종료합니다...")
             _shutdown_requested = True
             import signal
@@ -200,7 +187,7 @@ if __name__ == '__main__':
     # 브라우저 자동 열기 (1초 후)
     Timer(1, open_browser).start()
 
-    # 브라우저 종료 감지 (pagehide 이벤트 기반)
+    # 브라우저 종료 감지 (주기적 heartbeat 기반)
     heartbeat_thread = threading.Thread(target=check_heartbeat_timeout, daemon=True)
     heartbeat_thread.start()
 
