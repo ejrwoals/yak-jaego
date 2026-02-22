@@ -139,71 +139,131 @@
         text-decoration: underline;
     }
 
-    /* Info box - orange theme */
-    .info-box-orange {
-        background-color: #fff3e0;
-        border-left: 4px solid #ff9800;
-        border-radius: 10px;
-        margin-bottom: 30px;
-        overflow: hidden;
+    /* Upload Box (workflow_simple.html과 동일 패턴) */
+    .optional-upload-box {
+        background: var(--color-surface-hover);
+        border: 1.5px dashed var(--color-border-hover);
+        border-radius: var(--radius-lg);
+        padding: var(--space-4);
+        margin-bottom: var(--space-5);
+        transition: border-color var(--transition-fast), background-color var(--transition-fast), border-style var(--transition-fast);
     }
 
-    .info-box-orange .info-box-header:hover {
-        background: rgba(255, 152, 0, 0.1);
+    .optional-upload-box.has-file {
+        border-color: var(--color-success);
+        border-style: solid;
+        background: var(--color-success-light);
     }
 
-    .info-box-orange .info-box-header h3 {
-        color: #e65100;
-        margin: 0;
-        font-size: 0.95em;
+    .optional-upload-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-weight: var(--font-semibold);
+        color: var(--color-text-primary);
+        font-size: var(--text-sm);
+        margin-bottom: var(--space-3);
     }
 
-    .info-box-orange .info-box-arrow {
-        color: #e65100;
-    }
-
-    .info-box-orange .info-box-content ul {
-        color: #bf360c;
-        margin: 0 20px 15px 35px;
-        line-height: 1.8;
-    }
-
-    .info-box-orange .info-box-content li {
-        margin: 5px 0;
-        font-size: 0.9em;
-    }
-
-    .upload-section {
-        margin: 30px 0;
-        text-align: center;
-    }
-
-    .file-label {
-        display: inline-block;
-        padding: 12px 30px;
-        background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
-        color: white;
-        border-radius: 8px;
+    .upload-guide-toggle {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        font-size: var(--text-xs);
+        font-weight: var(--font-medium);
+        color: var(--color-text-muted);
         cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 600;
+        background: none;
+        border: none;
+        padding: 2px 0;
     }
 
-    .file-label:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    .upload-guide-toggle:hover {
+        color: var(--color-text-secondary);
     }
 
-    .file-name {
-        margin-top: 15px;
-        font-size: 0.95em;
-        color: #7f8c8d;
-        min-height: 24px;
+    .upload-guide-toggle .icon {
+        width: 16px;
+        height: 16px;
     }
 
-    .file-name.selected {
-        color: #2e7d32;
-        font-weight: 600;
+    .upload-guide-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height var(--transition-normal), opacity var(--transition-normal);
+        opacity: 0;
+    }
+
+    .upload-guide-content.open {
+        max-height: 100px;
+        opacity: 1;
+    }
+
+    .upload-guide-text {
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+        line-height: var(--leading-relaxed);
+        padding-bottom: var(--space-3);
+    }
+
+    .optional-upload-area {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+    }
+
+    .file-label-optional {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-4);
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+    }
+
+    .file-label-optional:hover {
+        background: var(--color-surface-active);
+        border-color: var(--color-border-hover);
+    }
+
+    .optional-upload-area .file-name {
+        flex: 1;
+        font-size: var(--text-sm);
+        color: var(--color-text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-height: auto;
+        margin-top: 0;
+    }
+
+    .optional-upload-area .file-name.selected {
+        color: var(--color-success-dark);
+        font-weight: var(--font-semibold);
+    }
+
+    .clear-file-btn {
+        background: transparent;
+        border: none;
+        color: var(--color-text-muted);
+        cursor: pointer;
+        padding: var(--space-1);
+        border-radius: var(--radius-sm);
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+    }
+
+    .clear-file-btn:hover {
+        background: var(--color-surface-active);
+        color: var(--color-danger);
     }
 
     .calculate-btn {
@@ -396,21 +456,19 @@
         </h1>
     </div>
 
-    <div class="info-box-orange">
+    <div class="info-box">
         <div class="info-box-header" onclick="toggleInfoBox()">
-            <h3 style="display: flex; align-items: center; gap: 8px;">
-                <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-alert-triangle"></use></svg>
-                실행 전 확인사항
-            </h3>
+            <span class="info-box-title">
+                <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-info"></use></svg>
+                보고서 활용 안내
+            </span>
             <span class="info-box-arrow" id="info-box-arrow">▼</span>
         </div>
         <div class="info-box-content" id="info-box-content">
-            <ul>
-                <li>PMPLUS의 <strong>[경영관리]</strong> - <strong>[약품별조제판매현황]</strong>에서 오늘 날짜로 소모된 약품을 조회하여 <strong>[출력]</strong> - <strong>[파일로 저장]</strong> 해주세요</li>
-                <li>생성된 <strong>.xls</strong> 파일을 아래에 업로드 해주세요</li>
-                <li>런웨이 <span id="thresholdInfoText">1</span>개월 미만 약품은 노란색으로 강조됩니다</li>
-                <li>표의 각 행을 클릭하면 자세한 차트와 주문수량 계산기가 나옵니다</li>
-            </ul>
+            <div class="info-box-body">
+                <p>런웨이 <span id="thresholdInfoText">1</span>개월 미만 약품은 노란색으로 강조됩니다</p>
+                <p>표의 각 행을 클릭하면 자세한 차트와 주문수량 계산기가 나옵니다</p>
+            </div>
         </div>
     </div>
 
@@ -455,13 +513,31 @@
         </div>
     </div>
 
-    <div class="upload-section">
-        <label for="todayFileInput" class="file-label" style="display: inline-flex; align-items: center; gap: 8px;">
-            <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-folder"></use></svg>
-            재고 현황 파일 선택
-        </label>
-        <input type="file" id="todayFileInput" accept=".csv,.xls,.xlsx" style="display: none;">
-        <div id="fileName" class="file-name">파일이 선택되지 않았습니다</div>
+    <!-- 재고 현황 파일 업로드 -->
+    <div class="optional-upload-box" id="uploadBox">
+        <div class="optional-upload-header">
+            <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-upload"></use></svg>
+            <span>재고 현황 파일</span>
+            <button type="button" class="upload-guide-toggle" id="uploadGuideToggle" onclick="toggleUploadGuide()">
+                <svg class="icon"><use href="#icon-help-circle"></use></svg>
+            </button>
+        </div>
+        <div class="upload-guide-content" id="uploadGuideContent">
+            <p class="upload-guide-text">
+                PMPLUS의 <strong>[경영관리]</strong> - <strong>[약품별조제판매현황]</strong>에서 오늘 날짜로 소모된 약품을 조회하여 <strong>[출력]</strong> - <strong>[파일로 저장]</strong> 한 뒤, 해당 <strong>.xls</strong> 파일을 업로드하세요.
+            </p>
+        </div>
+        <div class="optional-upload-area">
+            <label for="todayFileInput" class="file-label-optional">
+                <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-folder"></use></svg>
+                파일 선택
+            </label>
+            <input type="file" id="todayFileInput" accept=".csv,.xls,.xlsx" style="display: none;">
+            <div id="fileName" class="file-name">파일이 선택되지 않았습니다</div>
+            <button type="button" id="clearFileBtn" class="clear-file-btn" style="display: none;">
+                <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-x"></use></svg>
+            </button>
+        </div>
     </div>
 
     <button class="calculate-btn" onclick="calculateOrder()" id="calculateBtn" disabled>
@@ -593,23 +669,46 @@
         updateUI();
     })();
 
+    // Upload guide toggle
+    function toggleUploadGuide() {
+        var content = document.getElementById('uploadGuideContent');
+        var toggle = document.getElementById('uploadGuideToggle');
+        content.classList.toggle('open');
+        toggle.classList.toggle('open');
+    }
+
     // File selection
     var fileInput = document.getElementById('todayFileInput');
     var fileName = document.getElementById('fileName');
     var calculateBtn = document.getElementById('calculateBtn');
+    var clearFileBtn = document.getElementById('clearFileBtn');
+    var uploadBox = document.getElementById('uploadBox');
 
     fileInput.addEventListener('change', function(e) {
         var file = e.target.files[0];
         if (file) {
             fileName.textContent = file.name;
             fileName.classList.add('selected');
+            clearFileBtn.style.display = 'inline-flex';
+            uploadBox.classList.add('has-file');
             calculateBtn.disabled = false;
         } else {
-            fileName.textContent = '파일이 선택되지 않았습니다';
-            fileName.classList.remove('selected');
-            calculateBtn.disabled = true;
+            clearUploadFile();
         }
     });
+
+    clearFileBtn.addEventListener('click', function() {
+        clearUploadFile();
+    });
+
+    function clearUploadFile() {
+        fileInput.value = '';
+        fileName.textContent = '파일이 선택되지 않았습니다';
+        fileName.classList.remove('selected');
+        clearFileBtn.style.display = 'none';
+        uploadBox.classList.remove('has-file');
+        calculateBtn.disabled = true;
+    }
 
     async function calculateOrder() {
         var file = fileInput.files[0];
@@ -646,12 +745,8 @@
                 setTimeout(function() {
                     window.open('/reports/' + result.html_filename, '_blank');
 
-                    btn.disabled = true;
                     btn.innerHTML = originalText;
-
-                    fileInput.value = '';
-                    fileName.textContent = '파일이 선택되지 않았습니다';
-                    fileName.classList.remove('selected');
+                    clearUploadFile();
                 }, 800);
             } else {
                 showStatus('오류: ' + result.error, 'error');

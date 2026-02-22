@@ -460,34 +460,6 @@
             </div>
         </div>
 
-        <!-- 재고 데이터 업데이트 (선택) -->
-        <div class="optional-upload-box" id="uploadBox">
-            <div class="optional-upload-header">
-                <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-upload"></use></svg>
-                <span>재고 데이터 업데이트</span>
-                <span class="optional-badge">선택사항</span>
-                <button type="button" class="upload-guide-toggle" id="uploadGuideToggle" onclick="toggleUploadGuide()">
-                    <svg class="icon"><use href="#icon-help-circle"></use></svg>
-                </button>
-            </div>
-            <div class="upload-guide-content" id="uploadGuideContent">
-                <p class="upload-guide-text">
-                    최신 재고 상태를 반영하려면 PMPLUS의 <strong>[경영관리]</strong> - <strong>[약품별조제판매현황]</strong>에서 이번 달에 소모된 약품 내역을 조회하여 <strong>[출력]</strong> - <strong>[파일로 저장]</strong> 한 뒤, 해당 <strong>.xls</strong> 파일을 업로드하세요.
-                </p>
-            </div>
-            <div class="optional-upload-area">
-                <label for="inventoryFileInput" class="file-label-optional">
-                    <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-folder"></use></svg>
-                    파일 선택
-                </label>
-                <input type="file" id="inventoryFileInput" name="inventoryFile" accept=".csv,.xls,.xlsx" style="display: none;">
-                <div id="inventoryFileName" class="file-name">파일이 선택되지 않았습니다</div>
-                <button type="button" id="clearFileBtn" class="clear-file-btn" style="display: none;">
-                    <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-x"></use></svg>
-                </button>
-            </div>
-        </div>
-
         <!-- 세부 설정 토글 -->
         <div class="advanced-settings-box">
             <div class="advanced-settings-header" onclick="toggleAdvancedSettings()">
@@ -564,6 +536,34 @@
                     <input type="hidden" name="threshold_low" id="threshold_low" value="1">
                     <input type="hidden" name="threshold_high" id="threshold_high" value="3">
                 </div>
+            </div>
+        </div>
+
+        <!-- 재고 데이터 업데이트 (선택) -->
+        <div class="optional-upload-box" id="uploadBox">
+            <div class="optional-upload-header">
+                <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-upload"></use></svg>
+                <span>재고 데이터 업데이트</span>
+                <span class="optional-badge">선택사항</span>
+                <button type="button" class="upload-guide-toggle" id="uploadGuideToggle" onclick="toggleUploadGuide()">
+                    <svg class="icon"><use href="#icon-help-circle"></use></svg>
+                </button>
+            </div>
+            <div class="upload-guide-content" id="uploadGuideContent">
+                <p class="upload-guide-text">
+                    최신 재고 상태를 반영하려면 PMPLUS의 <strong>[경영관리]</strong> - <strong>[약품별조제판매현황]</strong>에서 이번 달에 소모된 약품 내역을 조회하여 <strong>[출력]</strong> - <strong>[파일로 저장]</strong> 한 뒤, 해당 <strong>.xls</strong> 파일을 업로드하세요.
+                </p>
+            </div>
+            <div class="optional-upload-area">
+                <label for="inventoryFileInput" class="file-label-optional">
+                    <svg class="icon" style="width: var(--icon-md); height: var(--icon-md);"><use href="#icon-folder"></use></svg>
+                    파일 선택
+                </label>
+                <input type="file" id="inventoryFileInput" name="inventoryFile" accept=".csv,.xls,.xlsx" style="display: none;">
+                <div id="inventoryFileName" class="file-name">파일이 선택되지 않았습니다</div>
+                <button type="button" id="clearFileBtn" class="clear-file-btn" style="display: none;">
+                    <svg class="icon" style="width: var(--icon-sm); height: var(--icon-sm);"><use href="#icon-x"></use></svg>
+                </button>
             </div>
         </div>
 
